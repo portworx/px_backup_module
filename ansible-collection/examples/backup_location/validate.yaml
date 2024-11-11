@@ -1,0 +1,14 @@
+---
+- name: Validate Px-Backup Backup location
+  hosts: localhost
+  gather_facts: false
+
+  tasks:
+    - name: Validate backup location
+      backup_location:
+        operation: VALIDATE
+        api_url: "{{ px_backup_api_url }}"
+        token: "{{ px_backup_token }}"
+        name: "my-bucket"
+        uid: "12a83088-4367-47ca-babe-0465017ec91b"
+        org_id: "default"

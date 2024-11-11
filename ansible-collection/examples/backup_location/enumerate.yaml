@@ -1,0 +1,12 @@
+---
+- name: List all PX-Backup backup locations
+  hosts: localhost
+  gather_facts: false
+
+  tasks:
+    - name: Backup Location Enumerate call
+      backup_location:
+        operation: INSPECT_ALL
+        api_url: "{{ px_backup_api_url }}"
+        token: "{{ px_backup_token }}"
+        org_id: "default"

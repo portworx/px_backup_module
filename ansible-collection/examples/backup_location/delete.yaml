@@ -1,0 +1,79 @@
+---
+- name: Delete PX-Backup Backup Location
+  hosts: localhost
+  gather_facts: false
+
+  # Define variables that can be overridden
+  vars:
+    # Token should be provided via vault or extra-vars
+    # px_backup_token: ""  
+    org_id: "default"
+    backup_location_name: "my-bucket"
+    backup_location_uid: "12a83088-4367-47ca-babe-0465017ec91b"  # Should be provided
+    delete_backups: false  # Whether to also delete associated backups
+    validate_certs: true
+    s3_config:
+      region: "us-east-1"
+      endpoint: "10.13.28.221:9000"
+      disable_ssl: true
+      disable_path_style: false
+    cloud_credential_name: "devm"
+    cloud_credential_uid: "ee0dad7b-43a9-4791-8c85-467172206245"
+
+  # You can create a vars file and include it
+  vars_files:
+    - "vars/px_backup_secrets.yaml"  # Contains sensitive data like tokens
+
+  tasks:
+    # Optional: First check if the backup location exists
+    - name: Get backup location details before deletion
+      backup_location:
+        operation: INSPECT_ONE
+        cloud_credential_name: "{{ cloud_credential_name }}"
+        cloud_credential_uid: "{{ cloud_credential_uid }}"
+        api_url: "{{ px_backup_api_url }}"
+        token: "{{ px_backup_token }}"
+        org_id: "{{ org_id }}"
+        name: "{{ backup_location_name }}"
+        uid: "{{ backup_location_uid }}"
+        location_type: "S3"  # Required parameter even for inspection
+        s3_config: "{{ s3_config }}"
+        path: "dummy"        # Required parameter even for inspection
+      register: backup_location_info
+      ignore_errors: true
+
+    # Delete the backup location
+    - name: Delete backup location
+      backup_location:
+        operation: DELETE
+        cloud_credential_name: "{{ cloud_credential_name }}"
+        cloud_credential_uid: "{{ cloud_credential_uid }}"
+        api_url: "{{ px_backup_api_url }}"
+        token: "{{ px_backup_token }}"
+        name: "{{ backup_location_name }}"
+        org_id: "{{ org_id }}"
+        uid: "{{ backup_location_uid }}"
+        delete_backups: "{{ delete_backups }}"
+        validate_certs: "{{ validate_certs }}"
+        location_type: "S3"  # Required parameter even for deletion
+        s3_config: "{{ s3_config }}"
+        path: "dummy"        # Required parameter even for deletion
+      register: delete_result
+      when: backup_location_info is success
+
+    # Output results
+    - name: Show deletion results
+      debug:
+        msg: "Backup location {{ backup_location_name }} was successfully deleted"
+      when: delete_result is changed
+
+    - name: Show skipped deletion
+      debug:
+        msg: "Backup location {{ backup_location_name }} deletion was skipped as it might not exist"
+      when: backup_location_info is failed
+
+  handlers:
+    - name: Cleanup temporary files
+      file:
+        path: "/tmp/px_backup_{{ backup_location_name }}"
+      listen: "cleanup"

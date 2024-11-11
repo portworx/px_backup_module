@@ -1,0 +1,31 @@
+---
+- name: Update Px-Backup backup location ownership
+  hosts: localhost
+  gather_facts: false
+
+  tasks:
+    - name: Update backup location ownership
+      backup_location:
+        operation: UPDATE_OWNERSHIP
+
+        cloud_credential_name: "devm"
+        cloud_credential_uid: "ee0dad7b-43a9-4791-8c85-467172206245"
+        api_url: "{{ px_backup_api_url }}"
+        token: "{{ px_backup_token }}"
+        location_type: "S3"
+        name: "my-bucket"
+        uid: "12a83088-4367-47ca-babe-0465017ec91b"
+        org_id: "default"
+        s3_config:
+          region: "us-east-1"
+          endpoint: "10.13.28.221:9000"
+          disable_ssl: true
+          disable_path_style: false
+        ownership:
+          owner: "user1"
+          groups:
+            - id: "group1"
+              access: "Read"
+          collaborators:
+            - id: "user2"
+              access: "Write"

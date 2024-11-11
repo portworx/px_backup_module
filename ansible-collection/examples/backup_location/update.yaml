@@ -1,0 +1,127 @@
+---
+- name: Update PX-Backup Location Configuration
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    org_id: "default"
+    validate_certs: true
+    
+    # Backup location details
+    backup_location_name: "my-bucket"
+    backup_location_uid: "12a83088-4367-47ca-babe-0465017ec91b"
+    location_type: "S3"
+    bucket_path: "my-bucket"
+    
+    # Cloud credentials
+    cloud_credential_name: "devm"
+    cloud_credential_uid: "ee0dad7b-43a9-4791-8c85-467172206245"
+    
+    # S3 specific configuration
+    s3_config:
+      region: "us-east-2"
+      endpoint: "10.13.28.221:9000"
+      disable_ssl: true
+      disable_path_style: false
+    
+    # Optional settings
+    object_lock_enabled: false
+    delete_backups: false
+    validate_cloud_credential: true
+    
+    # Labels
+    backup_location_labels:
+      environment: "production"
+      team: "devops"
+    
+    # Ownership configuration
+    ownership_config:
+      owner: "admin"
+      groups:
+        - id: "devops-team"
+          access: "Write"
+        - id: "monitoring-team"
+          access: "Read"
+      collaborators:
+        - id: "external-auditor"
+          access: "Read"
+
+  vars_files:
+    - "vars/px_backup_secrets.yaml"
+
+  tasks:
+    - name: Get current timestamp
+      set_fact:
+        current_timestamp: "{{ lookup('pipe', 'date +%Y-%m-%d-%H-%M-%S') }}"
+      
+    - name: Verify backup location exists
+      backup_location:
+        operation: INSPECT_ONE
+        api_url: "{{ px_backup_api_url }}"
+        token: "{{ px_backup_token }}"
+        org_id: "{{ org_id }}"
+        name: "{{ backup_location_name }}"
+        uid: "{{ backup_location_uid }}"
+        location_type: "{{ location_type }}"
+        path: "{{ bucket_path }}"
+        s3_config: "{{ s3_config }}"
+      register: backup_location_check
+
+    - name: Backup current configuration
+      copy:
+        content: "{{ backup_location_check | to_nice_json }}"
+        dest: "/tmp/backup_location_{{ backup_location_name }}_{{ current_timestamp }}.json"
+      when: backup_location_check is success
+
+    - name: Update backup location configuration
+      backup_location:
+        operation: UPDATE
+        api_url: "{{ px_backup_api_url }}"
+        token: "{{ px_backup_token }}"
+        name: "{{ backup_location_name }}"
+        uid: "{{ backup_location_uid }}"
+        org_id: "{{ org_id }}"
+        location_type: "{{ location_type }}"
+        path: "{{ bucket_path }}"
+        cloud_credential_name: "{{ cloud_credential_name }}"
+        cloud_credential_uid: "{{ cloud_credential_uid }}"
+        s3_config: "{{ s3_config }}"
+        object_lock_enabled: "{{ object_lock_enabled }}"
+        delete_backups: "{{ delete_backups }}"
+        validate_cloud_credential: "{{ validate_cloud_credential }}"
+        validate_certs: "{{ validate_certs }}"
+        labels: "{{ backup_location_labels }}"
+      register: update_result
+
+    - name: Update backup location ownership
+      backup_location:
+        operation: UPDATE_OWNERSHIP
+        api_url: "{{ px_backup_api_url }}"
+        token: "{{ px_backup_token }}"
+        name: "{{ backup_location_name }}"
+        uid: "{{ backup_location_uid }}"
+        org_id: "{{ org_id }}"
+        ownership: "{{ ownership_config }}"
+      register: ownership_result
+      when: ownership_config is defined
+      
+    - name: Validate updated configuration
+      backup_location:
+        operation: INSPECT_ONE
+        api_url: "{{ px_backup_api_url }}"
+        token: "{{ px_backup_token }}"
+        name: "{{ backup_location_name }}"
+        uid: "{{ backup_location_uid }}"
+        org_id: "{{ org_id }}"
+        location_type: "{{ location_type }}"
+        path: "{{ bucket_path }}"
+        s3_config: "{{ s3_config }}"
+      register: validation_result
+      when: update_result is changed or ownership_result is changed
+      
+    - name: Show update results
+      debug:
+        msg: 
+          - "Backup location update status: {{ 'Success' if update_result is changed else 'No changes needed' }}"
+          - "Ownership update status: {{ 'Success' if ownership_result is changed else 'No changes needed' }}"
+          - "Validation status: {{ validation_result.backup_location.status | default('Not validated') }}"

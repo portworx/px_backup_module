@@ -1,0 +1,71 @@
+---
+- name: Configure PX-Backup S3 Backup Location
+  hosts: localhost
+  gather_facts: false
+
+  tasks:
+    - name: Create S3 backup location
+      backup_location:
+        operation: CREATE
+        api_url: "{{ px_backup_api_url }}"
+        token: "{{ px_backup_token }}"
+        name: "sample-s3"
+        org_id: "default"
+        location_type: "S3"
+        path: "my-bucket"
+        cloud_credential_name: "devm"
+        cloud_credential_uid: "{{ cloud_cred_uid }}"
+        s3_config:
+          region: "us-east-1"
+          endpoint: "10.13.28.221:9000"
+          disable_ssl: true
+          disable_path_style: false
+
+    - name: Create Google backup location
+      backup_location:
+        operation: CREATE
+        api_url: "{{ px_backup_api_url }}"
+        token: "{{ px_backup_token }}"
+        name: "my-gcp-bucket"
+        org_id: "default"
+        location_type: "Google"
+        path: "{{ bucket_name }}" # path or bucket name
+        cloud_credential_name: "{{ cloud_cred_name}}"
+        cloud_credential_uid: "{{ cloud_cred_uid }}"
+        google_config:
+          project_id: "{{google_project_id }}"
+          json_key: "{{ google_json_key}}"
+
+    - name: Create Azure backup location
+      backup_location:
+        operation: CREATE
+        api_url: "{{ px_backup_api_url }}"
+        token: "{{ px_backup_token }}"
+        name: "prod-azure-backup"
+        org_id: "default"
+        location_type: "Azure"
+        path: "my-container"
+        cloud_credential_name: "azure-creds"
+        cloud_credential_uid: "{{ cloud_cred_uid }}"
+        azure_config:
+          account_name: "mystorageaccount"
+          account_key: "{{ azure_account_key }}"
+          client_secret: "{{ azure_client_secret }}"
+          client_id: "{{ azure_client_id }}"
+          tenant_id: "{{ azure_tenant_id }}"
+          subscription_id: "{{ azure_subscription_id }}"
+
+
+    - name: Create NFS backup location
+      backup_location:
+        operation: CREATE
+        api_url: "{{ px_backup_api_url }}"
+        token: "{{ px_backup_token }}"
+        name: "prod-nfs-backup"
+        org_id: "default"
+        location_type: "NFS"
+        path: "/backups"
+        nfs_config:
+          server_addr: "nfs.example.com"
+          sub_path: "/data"
+          mount_option: "rw,sync"

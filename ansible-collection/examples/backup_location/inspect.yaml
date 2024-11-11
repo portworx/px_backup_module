@@ -1,0 +1,30 @@
+---
+- name: Inspect PX-Backup Location
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    # Required variables
+    backup_location_name: "my-bucket"
+    backup_location_uid: "12a83088-4367-47ca-babe-0465017ec91b"
+    org_id: "default"
+    include_secrets: false
+    validate_certs: true
+
+  tasks:
+    - name: Get backup location details
+      backup_location:
+        operation: INSPECT_ONE
+        api_url: "{{ px_backup_api_url }}"
+        token: "{{ px_backup_token }}"
+        name: "{{ backup_location_name }}"
+        uid: "{{ backup_location_uid }}"
+        org_id: "{{ org_id }}"
+        include_secrets: "{{ include_secrets }}"
+        validate_certs: "{{ validate_certs }}"
+      register: backup_location_info
+
+    - name: Display backup location details
+      debug:
+        var: backup_location_info
+        verbosity: 0
