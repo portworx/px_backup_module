@@ -1,0 +1,90 @@
+---
+- name: Inspect PX-Backup Locations
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/backup_location/inspect.yaml"
+
+  pre_tasks:
+    - name: Debug variables
+      debug:
+        msg:
+          - "API URL: {{ px_backup_api_url }}"
+          - "Token: {{ px_backup_token }}"
+          - "Total backup locations to inspect: {{ backup_locations_inspect | length }}"
+
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - px_backup_token is defined
+          - backup_locations_inspect is defined
+        fail_msg: "Required variables must be defined"
+
+  tasks:
+    - name: Inspect backup locations
+      block:
+        - name: Get backup location details
+          backup_location:
+            operation: INSPECT_ONE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            name: "{{ item.name }}"
+            uid: "{{ item.uid }}"
+            org_id: "{{ org_id | default('default') }}"
+            include_secrets: "{{ item.include_secrets | default(default_include_secrets) }}"
+            validate_certs: "{{ validate_certs }}"
+          register: inspect_result
+          loop: "{{ backup_locations_inspect }}"
+          loop_control:
+            label: "{{ item.name }}"
+
+      rescue:
+        - name: Display error details
+          debug:
+            msg: "Failed to inspect backup locations: {{ inspect_result.results | selectattr('failed', 'true') | map(attribute='msg') | list }}"
+          when: inspect_result is defined and inspect_result.results is defined
+
+        - name: Fail with error message
+          fail:
+            msg: "Failed to inspect backup locations. See above for details."
+
+    - name: Process and display inspection results
+      block:
+        - name: Display inspection results for each location
+          debug:
+            msg:
+              - "Backup Location Details:"
+              - "----------------------------------------"
+              - "Name: {{ item.backup_location.backup_location.metadata.name }}"
+              - "Type: {{ item.backup_location.backup_location.backup_location_info.type }}"
+              - "Path: {{ item.backup_location.backup_location.backup_location_info.path }}"
+              - "Status: {{ item.backup_location.backup_location.backup_location_info.status.status }}"
+              - "Status Reason: {{ item.backup_location.backup_location.backup_location_info.status.reason }}"
+              - "Cloud Credential:"
+              - "  Name: {{ item.backup_location.backup_location.backup_location_info.cloud_credential_ref.name }}"
+              - "  UID: {{ item.backup_location.backup_location.backup_location_info.cloud_credential_ref.uid }}"
+              - "Created: {{ item.backup_location.backup_location.metadata.create_time }}"
+              - "Last Updated: {{ item.backup_location.backup_location.metadata.last_update_time }}"
+              - "Owner: {{ item.backup_location.backup_location.metadata.ownership.owner }}"
+              - "S3 Configuration:"
+              - "  Region: {{ item.backup_location.backup_location.backup_location_info.s3_config.region }}"
+              - "  Endpoint: {{ item.backup_location.backup_location.backup_location_info.s3_config.endpoint }}"
+              - "  Disable SSL: {{ item.backup_location.backup_location.backup_location_info.s3_config.disable_ssl }}"
+              - "  Disable Path Style: {{ item.backup_location.backup_location.backup_location_info.s3_config.disable_path_style | default('false') }}"
+              - "----------------------------------------"
+          loop: "{{ inspect_result.results }}"
+          loop_control:
+            label: "{{ item.backup_location.backup_location.metadata.name }}"
+          when: item.backup_location is defined
+
+    - name: Summarize inspection
+      debug:
+        msg:
+          - "Inspection Summary:"
+          - "Total locations inspected: {{ inspect_result.results | length }}"
+          - "Successful inspections: {{ inspect_result.results | selectattr('backup_location', 'defined') | list | length }}"
+          - "Failed inspections: {{ inspect_result.results | selectattr('failed', 'defined') | selectattr('failed', 'true') | list | length }}"
+      when: inspect_result is defined and inspect_result.results is defined

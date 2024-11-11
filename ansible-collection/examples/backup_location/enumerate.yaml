@@ -1,0 +1,23 @@
+---
+- name: List all PX-Backup backup locations
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ inventory_dir}}/group_vars/common/all.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - px_backup_token is defined
+        fail_msg: "Required variables px_backup_api_url and px_backup_token must be defined"
+
+  tasks:
+    - name: Backup Location Enumerate call
+      backup_location:
+        operation: INSPECT_ALL
+        api_url: "{{ px_backup_api_url }}"
+        token: "{{ px_backup_token }}"
+        org_id: "{{ org_id | default('default') }}"

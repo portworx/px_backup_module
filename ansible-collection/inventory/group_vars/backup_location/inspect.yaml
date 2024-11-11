@@ -1,0 +1,18 @@
+---
+# Backup locations to inspect
+backup_locations_inspect:
+  - name: "bl-1"
+    uid: "uid"
+    include_secrets: false
+
+  - name: "bl-2"
+    uid: "uid"
+    include_secrets: false
+
+  - name: "bl-3"
+    uid: "uid"
+    include_secrets: false
+
+# Global inspect configuration
+validate_certs: false
+default_include_secrets: false
