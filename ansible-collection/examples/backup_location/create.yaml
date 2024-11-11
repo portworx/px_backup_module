@@ -1,0 +1,65 @@
+---
+- name: Configure PX-Backup Locations
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/backup_location/create.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - px_backup_token is defined
+          - backup_locations is defined
+        fail_msg: "Required variables must be defined"
+
+  tasks:
+    - name: Create backup locations
+      block:
+        - name: Create backup location
+          backup_location:
+            operation: CREATE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            name: "{{ item.name }}"
+            org_id: "{{ org_id | default('default') }}"
+            location_type: "{{ item.location_type }}"
+            path: "{{ item.path }}"
+            encryption_key: "{{ item.encryption_key | default(omit) }}"
+            cloud_credential_name: "{{ item.cloud_credential_name | default(omit) }}"
+            cloud_credential_uid: "{{ item.cloud_credential_uid | default(omit) }}"
+            validate_cloud_credential: "{{ item.validate_cloud_credential | default(true) }}"
+            object_lock_enabled: "{{ item.object_lock_enabled | default(false) }}"
+            s3_config: "{{ item.s3_config | default(omit) }}"
+            google_config: "{{ item.google_config | default(omit) }}"
+            azure_config: "{{ item.azure_config | default(omit) }}"
+            nfs_config: "{{ item.nfs_config | default(omit) }}"
+            validate_certs: "{{ item.validate_certs | default(true) }}"
+          loop: "{{ backup_locations }}"
+          register: backup_result
+          loop_control:
+            label: "{{ item.name }}"
+
+      rescue:
+        - name: Display error details
+          debug:
+            msg: "Failed to create backup location: {{ backup_result.results | selectattr('failed', 'true') | map(attribute='msg') | list }}"
+          when: backup_result is defined and backup_result.results is defined
+
+        - name: Fail with error message
+          fail:
+            msg: "Failed to create backup locations. See above for details."
+
+    - name: Display creation results
+      debug:
+        msg: 
+          - "Successfully created backup locations:"
+          - "Created locations: {{ backup_result.results | map(attribute='item.name') | list }}"
+          - "Changed status: {{ backup_result.results | map(attribute='changed') | list }}"
+      when: 
+        - backup_result is defined 
+        - backup_result.results is defined
+        - (backup_result.results | selectattr('failed', 'defined') | selectattr('failed', 'true') | list | length) == 0

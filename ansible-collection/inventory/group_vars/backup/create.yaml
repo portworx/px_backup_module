@@ -1,0 +1,12 @@
+---
+# Variables specific to backup creation
+backup_config:
+  namespaces: ["default", "kube-system"]
+  label_selectors: 
+    app: "myapp"
+  resource_types: ["deployments", "services"]
+  include_resources: []
+  
+# Reference common credentials
+cloud_cred_name: "{{ cloud_credentials.s3.name }}"
+cloud_cred_uid: "{{ cloud_credentials.s3.uid }}"

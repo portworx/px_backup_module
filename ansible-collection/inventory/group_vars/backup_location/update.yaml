@@ -1,0 +1,60 @@
+---
+# Backup locations to update
+backup_locations_update:
+  - name: "bl-1"
+    uid: "uid"
+    location_type: "S3"
+    path: "sys1"
+    cloud_credential_name: "cloud-cred-name"
+    cloud_credential_uid: "cloud-cred-uid"
+    validate_cloud_credential: true
+    object_lock_enabled: false
+    delete_backups: false
+    s3_config:
+      region: "us-east-1"
+      endpoint: "s3.amazon.com"
+      disable_ssl: true
+      disable_path_style: false
+      storage_class: "STANDARD"
+      sse_type: "Invalid"
+    labels:
+      environment: "production"
+      team: "devops"
+    ownership:
+      owner: "admin"
+      groups:
+        - id: "devops-team"
+          access: "Write"
+        - id: "monitoring-team"
+          access: "Read"
+      collaborators:
+        - id: "external-auditor"
+          access: "Read"
+
+  - name: "bl-2"
+    uid: "uid"
+    location_type: "S3"
+    path: "sys2"
+    cloud_credential_name: "cloud-cred-name"
+    cloud_credential_uid: "cloud-cred-uid"
+    validate_cloud_credential: true
+    object_lock_enabled: false
+    s3_config:
+      region: "us-east-1"
+      endpoint: "s3.amazon.com"
+      disable_ssl: true
+      disable_path_style: false
+      storage_class: "STANDARD"
+      sse_type: "Invalid"
+    labels:
+      environment: "staging"
+      team: "development"
+    ownership:
+      owner: "admin"
+      groups:
+        - id: "dev-team"
+          access: "Write"
+
+# Global update configuration
+validate_certs: false
+backup_configs: true
