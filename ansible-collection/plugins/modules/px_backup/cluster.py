@@ -25,7 +25,6 @@ from dataclasses import dataclass
 from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.px_backup.api import PXBackupClient
 import requests
-import base64
 
 DOCUMENTATION = r'''
 ---
@@ -94,10 +93,10 @@ options:
         description: Kubernetes configuration
         required: false
         type: str
-    cloud_type:
+    provider:
         description: Cloud provider type
         required: false
-        choices: ['OTHERS', 'AWS', 'AZURE', 'GOOGLE', 'IBM']
+        choices: ['Invalid', 'AWS', 'Azure', 'Google', 'IBM', 'Rancher']
         type: str
     cloud_credential_ref:
         description: Reference to cloud credentials
@@ -121,10 +120,23 @@ options:
             uid:
                 description: UID of platform credential
                 type: str
+    teleport_cluster_id:
+        description: Teleport cluster ID
+        required: false
+        type: str
+    tenant_id:
+        description: Tenant ID
+        required: false
+        type: str
     service_token:
         description: Service token for authentication
         required: false
         type: str
+    delete_backups:
+        description: Whether to delete backups when cluster is deleted
+        required: false
+        type: bool
+        default: false
     delete_restores:
         description: Whether to delete restores when cluster is deleted
         required: false
@@ -182,6 +194,87 @@ notes:
 '''
 
 # TODO: Add examples
+EXAMPLES = r'''
+# Create a new cluster with kubeconfig
+- name: Create cluster
+  cluster:
+    operation: CREATE
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    name: "prod-cluster"
+    org_id: "default"
+    kubeconfig: "{{ lookup('file', '/path/to/kubeconfig') }}"
+    provider: "AWS"
+    cloud_credential_ref:
+      name: "aws-creds"
+      uid: "cred-123"
+
+# List all clusters
+- name: List all clusters
+  cluster:
+    operation: INSPECT_ALL
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    org_id: "default"
+
+# Share cluster with users
+- name: Share cluster
+  cluster:
+    operation: SHARE_CLUSTER
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    name: "prod-cluster"
+    org_id: "default"
+    uid: "cluster-123"
+    cluster_share:
+      users: ["user1", "user2"]
+      groups: ["group1"]
+      share_cluster_backups: true
+'''
+
+RETURN = r'''
+cluster:
+    description: Details of the cluster for single-item operations
+    type: dict
+    returned: success
+    sample: {
+        "metadata": {
+            "name": "prod-cluster",
+            "org_id": "default",
+            "uid": "123-456"
+        },
+        "clusterInfo": {
+            "provider": "AWS",
+            "k8s_version": "1.24.0"
+        }
+    }
+clusters:
+    description: List of clusters for INSPECT_ALL operation
+    type: list
+    returned: when operation is INSPECT_ALL
+    sample: [
+        {
+            "metadata": {
+                "name": "cluster1",
+                "org_id": "default"
+            }
+        },
+        {
+            "metadata": {
+                "name": "cluster2",
+                "org_id": "default"
+            }
+        }
+    ]
+message:
+    description: Operation result message
+    type: str
+    returned: always
+changed:
+    description: Whether the operation changed the cluster
+    type: bool
+    returned: always
+'''
 
 # Configure logging
 logger = logging.getLogger('cluster')
@@ -209,19 +302,6 @@ class OperationResult:
     message: str = ""
     error: Optional[str] = None
 
-def encode_kubeconfig(kubeconfig: str) -> str:
-    """
-    Encode a kubeconfig string to Base64.
-
-    Args:
-        kubeconfig (str): The kubeconfig string to encode.
-
-    Returns:
-        str: The Base64-encoded kubeconfig string.
-    """
-    encoded_kubeconfig = base64.b64encode(kubeconfig.encode('utf-8')).decode('utf-8')
-    return encoded_kubeconfig
-
 def validate_params(params: Dict[str, Any], operation: str, required_params: List[str]) -> None:
     """
     Validate parameters for the given operation
@@ -243,16 +323,30 @@ def create_cluster(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict[
     try:
         params = dict(module.params)
         cluster_request = build_cluster_request(params)
-        
+
+        # Make the create request
         response = client.make_request(
             method='POST',
             endpoint='v1/cluster',
             data=cluster_request
         )
-        return response, True
+        
+        # Return the cluster from the response
+        if isinstance(response, dict) and 'cluster' in response:
+            return response['cluster'], True
+            
+        # If we get an unexpected response format, raise an error
+        raise ValueError(f"Unexpected API response format: {response}")
         
     except Exception as e:
-        module.fail_json(msg=f"Failed to create cluster: {str(e)}")
+        error_msg = str(e)
+        if isinstance(e, requests.exceptions.RequestException) and hasattr(e, 'response'):
+            try:
+                error_detail = e.response.json()
+                error_msg = f"{error_msg}: {error_detail}"
+            except ValueError:
+                error_msg = f"{error_msg}: {e.response.text}"
+        module.fail_json(msg=f"Failed to create cluster: {error_msg}")
 
 def update_cluster(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict[str, Any], bool]:
     """Update an existing cluster"""
@@ -282,6 +376,7 @@ def update_backup_share(module: AnsibleModule, client: PXBackupClient) -> Tuple[
             "org_id": module.params['org_id'],
             "name": module.params['name'],
             "uid": module.params['uid'],
+            # TODO: what does this do?
             "add_backup_share": module.params.get('backup_share', {}).get('add', {}),
             "del_backup_share": module.params.get('backup_share', {}).get('delete', {})
         }
@@ -351,7 +446,7 @@ def enumerate_clusters(module: AnsibleModule, client: PXBackupClient) -> List[Di
         params = {
             'labels': module.params.get('labels', {}),
             'include_secrets': module.params.get('include_secrets', False),
-            'only_backup_share': module.params.get('only_backup_share', False),
+            'only_backup_shares': module.params.get('only_backup_shares', False),
             'cloud_credential_ref': module.params.get('cloud_credential_ref', {}),
         }
             
@@ -401,6 +496,7 @@ def delete_cluster(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict[
     except Exception as e:
         module.fail_json(msg=f"Failed to delete cluster: {str(e)}")
 
+# TODO: Implement for all providers
 def build_cluster_request(params: Dict[str, Any]) -> Dict[str, Any]:
     """
     Build cluster request object
@@ -429,25 +525,25 @@ def build_cluster_request(params: Dict[str, Any]) -> Dict[str, Any]:
     
     # Add kubeconfig if provided
     if params.get('kubeconfig'):
-        request['kubeconfig'] = encode_kubeconfig(params['kubeconfig'])
+        cluster_info['kubeconfig'] = params['kubeconfig']
     
-    # Add cloud type if specified
-    cloud_type = params.get('cloud_type')
-    if cloud_type:
-        request['cloud_type'] = cloud_type
+    # Add provider if specified
+    if params.get('provider'):
+        cluster_info['provider'] = params['provider']
     
-        # Add credential references for cloud clusters
-        if cloud_type in ['AWS', 'AZURE', 'GOOGLE', 'IBM'] and params.get('cloud_credential_ref'):
-            request['cloud_credential_ref'] = {
-                    'name': params['cloud_credential_ref'].get('name'),
-                    'uid': params['cloud_credential_ref'].get('uid')
-                }
+    # Add credential references
+    if params.get('cloud_credential_ref'):
+        cluster_info['cloud_credential_ref'] = params['cloud_credential_ref']
     
     if params.get('platform_credential_ref'):
-        request['platform_credential_ref'] = {   
-            'name': params['platform_credential_ref'].get('name'),
-            'uid': params['platform_credential_ref'].get('uid')
-        }
+        cluster_info['platform_credential_ref'] = params['platform_credential_ref']
+    
+    # Add teleport configuration if provided
+    if params.get('teleport_cluster_id'):
+        cluster_info['teleport_cluster_id'] = params['teleport_cluster_id']
+    
+    if params.get('tenant_id'):
+        cluster_info['tenant_id'] = params['tenant_id']
     
     if params.get('service_token'):
         cluster_info['service_token'] = params['service_token']
@@ -455,13 +551,10 @@ def build_cluster_request(params: Dict[str, Any]) -> Dict[str, Any]:
     # Add optional fields
     if params.get('labels'):
         request['metadata']['labels'] = params['labels']
-
-    if params.get('ownership'):
-        request['metadata']['ownership'] = params['ownership']
     
     # Add cluster info to request if not empty
     if cluster_info:
-        request['clusterinfo'] = cluster_info
+        request['clusterInfo'] = cluster_info
 
     return request
 
@@ -629,28 +722,31 @@ def run_module():
             )
         ),
         kubeconfig=dict(type='str', required=False, no_log=True),
-        cloud_type=dict(
+        provider=dict(
             type='str',
             required=False,
-            choices=['OTHERS', 'AWS', 'AZURE', 'GOOGLE', 'IBM']
+            choices=['Invalid', 'AWS', 'Azure', 'Google', 'IBM', 'Rancher']
         ),
         cloud_credential_ref=dict(
             type='dict',
             required=False,
             options=dict(
-                name=dict(type='str', required=True),
-                uid=dict(type='str', required=True)
+                name=dict(type='str'),
+                uid=dict(type='str')
             )
         ),
         platform_credential_ref=dict(
             type='dict',
             required=False,
             options=dict(
-                name=dict(type='str', required=True),
-                uid=dict(type='str', required=True)
+                name=dict(type='str'),
+                uid=dict(type='str')
             )
         ),
+        teleport_cluster_id=dict(type='str', required=False),
+        tenant_id=dict(type='str', required=False),
         service_token=dict(type='str', required=False, no_log=True),
+        delete_backups=dict(type='bool', required=False, default=False),
         delete_restores=dict(type='bool', required=False, default=False),
         delete_all_cluster_backups=dict(type='bool', required=False, default=False),
         validate_certs=dict(type='bool', default=True),
@@ -696,8 +792,8 @@ def run_module():
 
     module = AnsibleModule(
         argument_spec=module_args,
-        supports_check_mode=True
-        #required_one_of=[['kubeconfig', 'teleport_cluster_id']]
+        supports_check_mode=True,
+        required_one_of=[['kubeconfig', 'teleport_cluster_id']]
     )
 
     try:
