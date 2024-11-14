@@ -1,0 +1,12 @@
+---
+- name: List all PX-Backup clusters
+  hosts: localhost
+  gather_facts: false
+
+  tasks:
+    - name: Cluster Enumerate call
+      cluster:
+        operation: INSPECT_ALL
+        api_url: "{{ px_backup_api_url }}"
+        token: "{{ px_backup_token }}"
+        org_id: "default"

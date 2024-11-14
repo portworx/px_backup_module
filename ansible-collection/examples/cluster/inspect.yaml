@@ -1,0 +1,30 @@
+---
+- name: Inspect PX-Backup Cluster
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    # Required variables
+    cluster_name: "<cluster-name>"
+    cluster_uid: "<uid>"
+    org_id: "default"
+    include_secrets: false
+    validate_certs: true
+
+  tasks:
+    - name: Get cluster details
+      cluster:
+        operation: INSPECT_ONE
+        api_url: "{{ px_backup_api_url }}"
+        token: "{{ px_backup_token }}"
+        name: "{{ cluster_name }}"
+        uid: "{{ cluster_uid }}"
+        org_id: "{{ org_id }}"
+        include_secrets: "{{ include_secrets }}"
+        validate_certs: "{{ validate_certs }}"
+      register: cluster_info
+
+    - name: Display cluster details
+      debug:
+        var: cluster_info
+        verbosity: 0

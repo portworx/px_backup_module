@@ -1,0 +1,4 @@
+---
+- name: Update PX-Backup Cluster
+  hosts: localhost
+  gather_facts: false
