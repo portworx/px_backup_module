@@ -50,7 +50,7 @@
         path: "my-container"
         cloud_credential_name: "{{ cloud_cred_name }}"
         cloud_credential_uid: "{{ cloud_cred_uid }}"
-        az_environment: "Global"
+        az_environment: "AZURE_GLOBAL"
         azure_config:
           account_name: "mystorageaccount"
           account_key: "{{ azure_account_key }}"
