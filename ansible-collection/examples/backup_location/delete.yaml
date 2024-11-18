@@ -60,5 +60,5 @@
           - "Successfully deleted: {{ delete_result.results | selectattr('changed', 'true') | list | length }}"
           - "Failed: {{ delete_result.results | selectattr('failed', 'defined') | selectattr('failed', 'true') | list | length }}"
           - "Deleted locations:"
-          - "{{ delete_result.results | selectattr('changed', 'true') | map(attribute='item') | list | json_query('[*].{name: name, uid: uid, delete_backups: delete_backups}') }}"
+          - "{{ delete_result.results | selectattr('changed', 'true') | map(attribute='item') | list | json_query('[*].{name: name, uid: uid }') }}"
       when: delete_result is defined and delete_result.results is defined

@@ -9,7 +9,6 @@ backup_locations_update:
     cloud_credential_uid: "cloud-cred-uid"
     validate_cloud_credential: true
     object_lock_enabled: false
-    delete_backups: false
     s3_config:
       region: "us-east-1"
       endpoint: "s3.amazon.com"
