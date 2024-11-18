@@ -1,0 +1,5 @@
+---
+# Common variables used across all playbooks
+px_backup_api_url: "https://px-backup-svc-exposed.com"
+px_backup_token: "eyJhbGciOiJSUzI1..."  # Your token here
+org_id: "default"

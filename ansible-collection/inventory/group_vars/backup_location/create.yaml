@@ -1,0 +1,77 @@
+---
+# Define backup locations list
+backup_locations:
+  # S3 Configuration
+  - name: "s3-backup"
+    location_type: "S3"
+    path: "my-backup-bucket"
+    cloud_credential_name: "s3-credentials"
+    cloud_credential_uid: "s3-cred-123456"
+    validate_certs: true
+    encryption_key: "{{ encryption_key }}"
+    validate_cloud_credential: true
+    object_lock_enabled: "{{ object_lock }}"
+    s3_config:
+      region: "us-east-1"
+      endpoint: "s3.amazonaws.com"
+      disable_ssl: false
+      disable_path_style: false
+      storage_class: "STANDARD"
+      sse_type: "SSE_S3"
+
+  # GCP Configuration  
+  - name: "gcp-backup"
+    location_type: "Google"
+    path: "my-gcp-backup-bucket"
+    cloud_credential_name: "gcp-credentials" 
+    cloud_credential_uid: "{{ cloud_cred_uid }}"
+    validate_certs: true
+    encryption_key: "{{ encryption_key }}"
+    validate_cloud_credential: true
+    object_lock_enabled: "{{ object_lock }}"
+    google_config:
+      project_id: "my-project-id"
+      json_key: |
+        {
+          "type": "service_account",
+          "project_id": "my-project-id",
+          "private_key_id": "abcd1234...",
+          "private_key": "-----BEGIN PRIVATE KEY-----\nYourPrivateKey\n-----END PRIVATE KEY-----\n",
+          "client_email": "service-account@project.iam.gserviceaccount.com",
+          "client_id": "123456789",
+          "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+          "token_uri": "https://oauth2.googleapis.com/token",
+          "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+          "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/service-account%40project.iam.gserviceaccount.com"
+        }
+
+  # Azure Configuration
+  - name: "azure-backup"
+    location_type: "Azure"
+    path: "my-azure-container"
+    cloud_credential_name: "azure-credentials"
+    cloud_credential_uid: "{{ cloud_cred_uid }}"
+    validate_certs: true
+    encryption_key: "{{ encryption_key }}"
+    validate_cloud_credential: true
+    object_lock_enabled: "{{ object_lock }}"
+    azure_config:
+      account_name: "mystorageaccount"
+      account_key: "your-azure-storage-account-key"
+      client_secret: "your-azure-client-secret"
+      client_id: "your-azure-client-id"
+      tenant_id: "your-azure-tenant-id"
+      subscription_id: "your-azure-subscription-id"
+
+  # NFS Configuration
+  - name: "nfs-backup"
+    location_type: "NFS"
+    path: "/backups"
+    validate_certs: true
+    encryption_key: "{{ encryption_key }}"
+    validate_cloud_credential: true
+    object_lock_enabled: "{{ object_lock }}"
+    nfs_config:
+      server_addr: "nfs.example.com"
+      sub_path: "/data"
+      mount_option: "rw,sync"
