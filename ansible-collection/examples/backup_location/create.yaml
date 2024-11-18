@@ -5,23 +5,25 @@
 
   tasks:
     - name: Create S3 backup location
+      tags: s3
       backup_location:
         operation: CREATE
         api_url: "{{ px_backup_api_url }}"
         token: "{{ px_backup_token }}"
-        name: "sample-s3"
+        name: "sample-s3-test-s3"
         org_id: "default"
         location_type: "S3"
-        path: "my-bucket"
-        cloud_credential_name: "devm"
+        path: "kg-parallel-delete"
+        cloud_credential_name: "s3official"
         cloud_credential_uid: "{{ cloud_cred_uid }}"
         s3_config:
           region: "us-east-1"
-          endpoint: "10.13.28.221:9000"
+          endpoint: "s3.amazonaws.com"
           disable_ssl: true
           disable_path_style: false
 
     - name: Create Google backup location
+      tags: gcp
       backup_location:
         operation: CREATE
         api_url: "{{ px_backup_api_url }}"
@@ -37,16 +39,18 @@
           json_key: "{{ google_json_key}}"
 
     - name: Create Azure backup location
+      tags: azure
       backup_location:
         operation: CREATE
         api_url: "{{ px_backup_api_url }}"
         token: "{{ px_backup_token }}"
-        name: "prod-azure-backup"
+        name: "prod-azure-backup-test-2"
         org_id: "default"
         location_type: "Azure"
         path: "my-container"
-        cloud_credential_name: "azure-creds"
+        cloud_credential_name: "{{ cloud_cred_name }}"
         cloud_credential_uid: "{{ cloud_cred_uid }}"
+        az_environment: "Global"
         azure_config:
           account_name: "mystorageaccount"
           account_key: "{{ azure_account_key }}"
@@ -57,6 +61,7 @@
 
 
     - name: Create NFS backup location
+      tags: nfs
       backup_location:
         operation: CREATE
         api_url: "{{ px_backup_api_url }}"

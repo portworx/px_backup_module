@@ -370,6 +370,10 @@ def create_backup_location(module: AnsibleModule, client: PXBackupClient) -> Tup
         # Get module parameters directly
         params = dict(module.params)
         backup_location_request = build_backup_location_request(params)
+        print(f"Final payload before sending to API: {backup_location_request}")
+
+        module.debug(msg=f"Final payload before sending to API: {backup_location_request}")
+
         
         # Make API request
         response = client.make_request(
@@ -556,17 +560,33 @@ def build_backup_location_request(params: Dict[str, Any]) -> Dict[str, Any]:
         if s3_config:
             request['backup_location']['s3_config'] = s3_config
             
-    elif location_type == 'Azure' and params.get('azure_config'):
-        azure_config = {}
-        azure_fields = [
-            'account_name', 'account_key', 'client_secret', 'client_id',
-            'tenant_id', 'subscription_id'
-        ]
-        for key in azure_fields:
-            if params['azure_config'].get(key) is not None:
-                azure_config[key] = params['azure_config'][key]
-        if azure_config:
-            request['backup_location']['azure_config'] = azure_config
+    elif params.get("location_type") == "Azure" and params.get("azure_config"):
+        request['backup_location']['s3_config'] = {
+            "endpoint": "s3.amazonaws.com",
+            "azure_environment": {"type": 1 if params.get("az_environment") == "Global" else 2}
+        }
+        
+        # Add cloud_credential_obj with minimal Azure configuration
+        request['cloud_credential_obj'] = {
+            "metadata": {
+                "name": params.get('cloud_credential_name'),
+                "uid": params.get('cloud_credential_uid'),
+                "org_id": params.get('org_id')
+            },
+            "cloud_credential_info": {
+                "type": 2,  # Assuming type 2 is for Azure
+                "Config": {
+                    "azure_config": {
+                        "account_name": params['azure_config'].get("account_name"),
+                        "accountkey": params['azure_config'].get("account_key"),
+                        "clientsecret": params['azure_config'].get("client_secret"),
+                        "clientid": params['azure_config'].get("client_id"),
+                        "tenantid": params['azure_config'].get("tenant_id"),
+                        "subscriptionid": params['azure_config'].get("subscription_id")
+                    }
+                }
+            }
+        }
 
     elif params['location_type'] == 'Google' and params.get('google_config'):
         validate_google_config(params)
@@ -729,6 +749,8 @@ def run_module():
         delete_backups=dict(type='bool', required=False, default=False),
         validate_cloud_credential=dict(type='bool', required=False, default=True),
         object_lock_enabled=dict(type='bool', required=False, default=False),
+        az_environment=dict(type='str', choices=['Global', 'China', 'Germany', 'US'], required=False),
+
         
         # S3 Configuration
         s3_config=dict(
