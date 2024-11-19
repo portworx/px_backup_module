@@ -2,3 +2,15 @@
 - name: Delete PX-Backup Cluster
   hosts: localhost
   gather_facts: false
+
+  tasks:
+    - name: Delete cluster
+      cluster:
+        operation: DELETE
+        api_url: "{{ px_backup_api_url }}"
+        token: "{{ px_backup_token }}"
+        org_id: "default"
+        name: "<name>"
+        uid: "<uid>"
+
+        

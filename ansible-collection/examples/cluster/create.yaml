@@ -2,3 +2,17 @@
 - name: Create PX-Backup Cluster
   hosts: localhost
   gather_facts: false
+
+  tasks:
+    - name: Create non-cloud cluster with invalid kubeconfig
+      cluster:
+        operation: CREATE
+        api_url: "{{ px_backup_api_url }}"
+        token: "{{ px_backup_token }}"
+        org_id: "default"
+        name: "fail-cluster1"
+        platform_credential_ref:
+          name: ""
+          uid: ""
+        kubeconfig: "invalid"
+        provider: "OTHERS"
