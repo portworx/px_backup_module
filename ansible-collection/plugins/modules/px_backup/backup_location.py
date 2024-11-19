@@ -551,16 +551,15 @@ def build_backup_location_request(params: Dict[str, Any]) -> Dict[str, Any]:
             request['backup_location']['s3_config'] = s3_config
             
     elif location_type == 'Azure' and params.get('azure_config'):
-        azure_config = {}
-        azure_fields = [
-            'account_name', 'account_key', 'client_secret', 'client_id',
-            'tenant_id', 'subscription_id'
-        ]
-        for key in azure_fields:
-            if params['azure_config'].get(key) is not None:
-                azure_config[key] = params['azure_config'][key]
-        if azure_config:
-            request['backup_location']['azure_config'] = azure_config
+        azure_config = params.get('azure_config', {})
+        azure_environment = azure_config.get('azure_environment', 'AZURE_GLOBAL')  # Use default if key is missing
+
+        # Include azure_environment in the request payload
+        request['backup_location']['s3_config'] = {
+            "azure_environment": {
+                "type": azure_environment
+            }
+        }
 
     elif params['location_type'] == 'Google' and params.get('google_config'):
         validate_google_config(params)
@@ -754,7 +753,8 @@ def run_module():
                 client_secret=dict(type='str', no_log=True),
                 client_id=dict(type='str', no_log=True),
                 tenant_id=dict(type='str', no_log=True),
-                subscription_id=dict(type='str', no_log=True)
+                subscription_id=dict(type='str', no_log=True),
+                azure_environment=dict(type='str', no_log=True)
             )
         ),
         

@@ -62,6 +62,7 @@ backup_locations:
       client_id: "your-azure-client-id"
       tenant_id: "your-azure-tenant-id"
       subscription_id: "your-azure-subscription-id"
+      azure_environment: "AZURE_GLOBAL"
 
   # NFS Configuration
   - name: "nfs-backup"
