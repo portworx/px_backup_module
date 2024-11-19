@@ -1,0 +1,60 @@
+---
+- name: Configure PX-Backup S3 Backup Location
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/cloud_credential/create_vars.yaml"
+  
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - pxcentral_auth_url is defined
+          - pxcentral_client_id is defined
+          - pxcentral_username is defined
+          - pxcentral_password is defined
+        fail_msg: "Required variables must be defined"
+  tasks:
+    - name: Request bearer token
+      auth:
+        auth_url: "{{ pxcentral_auth_url }}"
+        client_id: "{{ pxcentral_client_id }}"
+        username: "{{ pxcentral_username }}"
+        password: "{{ pxcentral_password }}"
+        token_duration: "{{ token_duration }}"
+      register: token_response
+      check_mode: no
+
+    - name: Create Cloud Credentials
+      block:
+        - name: Create Cloud Credential
+          cloud_credential:
+            operation: CREATE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ token_response.access_token }}"
+            name: "{{ item.name }}"
+            org_id: "{{ org_id | default('default') }}"
+            credential_type: "{{ item.credential_type }}"
+            owner: "admin"
+            aws_config: "{{ item.aws_config | default(omit) }}"
+            azure_config: "{{ item.azure_config | default(omit) }}"
+            ibm_config: "{{ item.ibm_config | default(omit) }}"
+            google_config: "{{ item.google_config | default(omit) }}"
+            rancher_config: "{{ item.rancher_config | default(omit) }}"
+          loop: "{{ cloud_credentials }}"
+          register: cloudcred_result
+          loop_control:
+            label: "{{ item.name }}"
+
+    - name: List Add Cloud Credentials
+      cloud_credential:
+        operation: INSPECT_ALL
+        api_url: "{{ px_backup_api_url }}"
+        token: "{{ token_response.access_token }}"
+        org_id: "{{ org_id }}"
+
+
+
+
