@@ -1,4 +1,19 @@
 ---
-- name: Update PX-Backup Cluster
+- name: Update PX-Backup cluster
   hosts: localhost
   gather_facts: false
+
+  tasks:
+    - name: Update cluster
+      cluster:
+        operation: UPDATE
+        api_url: "{{ px_backup_api_url }}"
+        token: "{{ px_backup_token }}"
+        org_id: "default"
+        name: "test-cluster"
+        uid: "feb239d3-4af4-4b2e-b010-cc8f4f2e254c"
+        provider: "OTHERS"
+        platform_credential_ref:
+          name: ""
+          uid: ""
+        kubeconfig: "invalid"
