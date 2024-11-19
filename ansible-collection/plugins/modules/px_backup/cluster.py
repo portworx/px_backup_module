@@ -96,7 +96,7 @@ options:
     provider:
         description: Cloud provider type
         required: false
-        choices: ['Invalid', 'AWS', 'Azure', 'Google', 'IBM', 'Rancher']
+        choices: ['OTHERS', 'AWS', 'AZURE', 'GOOGLE', 'IBM']
         type: str
     cloud_credential_ref:
         description: Reference to cloud credentials
@@ -194,87 +194,6 @@ notes:
 '''
 
 # TODO: Add examples
-EXAMPLES = r'''
-# Create a new cluster with kubeconfig
-- name: Create cluster
-  cluster:
-    operation: CREATE
-    api_url: "https://px-backup.example.com"
-    token: "{{ px_backup_token }}"
-    name: "prod-cluster"
-    org_id: "default"
-    kubeconfig: "{{ lookup('file', '/path/to/kubeconfig') }}"
-    provider: "AWS"
-    cloud_credential_ref:
-      name: "aws-creds"
-      uid: "cred-123"
-
-# List all clusters
-- name: List all clusters
-  cluster:
-    operation: INSPECT_ALL
-    api_url: "https://px-backup.example.com"
-    token: "{{ px_backup_token }}"
-    org_id: "default"
-
-# Share cluster with users
-- name: Share cluster
-  cluster:
-    operation: SHARE_CLUSTER
-    api_url: "https://px-backup.example.com"
-    token: "{{ px_backup_token }}"
-    name: "prod-cluster"
-    org_id: "default"
-    uid: "cluster-123"
-    cluster_share:
-      users: ["user1", "user2"]
-      groups: ["group1"]
-      share_cluster_backups: true
-'''
-
-RETURN = r'''
-cluster:
-    description: Details of the cluster for single-item operations
-    type: dict
-    returned: success
-    sample: {
-        "metadata": {
-            "name": "prod-cluster",
-            "org_id": "default",
-            "uid": "123-456"
-        },
-        "clusterInfo": {
-            "provider": "AWS",
-            "k8s_version": "1.24.0"
-        }
-    }
-clusters:
-    description: List of clusters for INSPECT_ALL operation
-    type: list
-    returned: when operation is INSPECT_ALL
-    sample: [
-        {
-            "metadata": {
-                "name": "cluster1",
-                "org_id": "default"
-            }
-        },
-        {
-            "metadata": {
-                "name": "cluster2",
-                "org_id": "default"
-            }
-        }
-    ]
-message:
-    description: Operation result message
-    type: str
-    returned: always
-changed:
-    description: Whether the operation changed the cluster
-    type: bool
-    returned: always
-'''
 
 # Configure logging
 logger = logging.getLogger('cluster')
@@ -525,11 +444,11 @@ def build_cluster_request(params: Dict[str, Any]) -> Dict[str, Any]:
     
     # Add kubeconfig if provided
     if params.get('kubeconfig'):
-        cluster_info['kubeconfig'] = params['kubeconfig']
+        request['kubeconfig'] = params['kubeconfig']
     
     # Add provider if specified
     if params.get('provider'):
-        cluster_info['provider'] = params['provider']
+        request['cloud_type'] = params['provider']
     
     # Add credential references
     if params.get('cloud_credential_ref'):
@@ -554,7 +473,7 @@ def build_cluster_request(params: Dict[str, Any]) -> Dict[str, Any]:
     
     # Add cluster info to request if not empty
     if cluster_info:
-        request['clusterInfo'] = cluster_info
+        request['clusterinfo'] = cluster_info
 
     return request
 
@@ -725,7 +644,7 @@ def run_module():
         provider=dict(
             type='str',
             required=False,
-            choices=['Invalid', 'AWS', 'Azure', 'Google', 'IBM', 'Rancher']
+            choices=['OTHERS', 'AWS', 'AZURE', 'GOOGLE', 'IBM']
         ),
         cloud_credential_ref=dict(
             type='dict',
@@ -792,8 +711,8 @@ def run_module():
 
     module = AnsibleModule(
         argument_spec=module_args,
-        supports_check_mode=True,
-        required_one_of=[['kubeconfig', 'teleport_cluster_id']]
+        supports_check_mode=True
+        #required_one_of=[['kubeconfig', 'teleport_cluster_id']]
     )
 
     try:
