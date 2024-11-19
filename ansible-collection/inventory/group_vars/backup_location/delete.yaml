@@ -1,29 +1,8 @@
 ---
 # Backup locations to delete
 backup_locations_delete:
-  - name: "bl-1"
-    uid: "uid"
-    location_type: "S3"
-    path: "bl1"               # Required parameter
-    cloud_credential_name: "cloud-cred-name"
-    cloud_credential_uid: "cloud-uid"
-    s3_config:
-      region: "us-east-1"
-      endpoint: "s3.amazon.com"
-      disable_ssl: true
-      disable_path_style: true
-
-  - name: "bl-2"
-    uid: "uid"
-    location_type: "S3"
-    path: "bl2"               # Required parameter
-    cloud_credential_name: "cloud-cred-name"
-    cloud_credential_uid: "cloud-uid"
-    s3_config:
-      region: "us-east-1"
-      endpoint: "s3.amazon.com"
-      disable_ssl: true
-      disable_path_style: true
+  - name: "sample-backup-location-name"
+    uid: "sample-backup-location-uid"
 
 # Global delete configuration
 validate_certs: false
