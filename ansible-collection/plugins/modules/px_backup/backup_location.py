@@ -528,11 +528,12 @@ def build_backup_location_request(params: Dict[str, Any]) -> Dict[str, Any]:
     if params.get('ownership'):
         request['metadata']['ownership'] = params['ownership']
 
-    if params.get('cloud_credential_name') and params.get('cloud_credential_uid'):
+    # Construct cloud_credential_ref dynamically if the keys are provided
+    if params.get('cloud_credential_ref'):
         request['backup_location']['cloud_credential_ref'] = {
-            "name": params['cloud_credential_name'],
-            "uid": params['cloud_credential_uid']
-        }
+            "name": params['cloud_credential_ref']['cloud_credential_name'],
+            "uid": params['cloud_credential_ref']['cloud_credential_uid']
+    }
 
     # Add location-specific configuration based on type
     location_type = params.get('location_type')
@@ -717,10 +718,16 @@ def run_module():
         location_type=dict(type='str', required=False, choices=['S3', 'Azure', 'Google', 'NFS']),
         path=dict(type='str', required=False),
         encryption_key=dict(type='str', required=False, no_log=True),
-        cloud_credential_name=dict(type='str', required=False),
-        cloud_credential_uid=dict(type='str', required=False),
         validate_cloud_credential=dict(type='bool', required=False, default=True),
         object_lock_enabled=dict(type='bool', required=False, default=False),
+        cloud_credential_ref=dict(
+            type='dict',
+            required=False,
+            options=dict(
+                cloud_credential_name=dict(type='str', required=True),
+                cloud_credential_uid=dict(type='str', required=True)
+            )
+        ),
         
         # S3 Configuration
         s3_config=dict(
