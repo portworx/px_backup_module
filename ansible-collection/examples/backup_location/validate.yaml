@@ -27,16 +27,6 @@
             org_id: "{{ org_id | default('default') }}"
             name: "{{ item.name }}"
             uid: "{{ item.uid }}"
-            location_type: "{{ item.location_type }}"
-            path: "{{ item.path }}"
-            cloud_credential_name: "{{ item.cloud_credential_name }}"
-            cloud_credential_uid: "{{ item.cloud_credential_uid }}"
-            validate_cloud_credential: "{{ item.validate_cloud_credential | default(true) }}"
-            validate_certs: "{{ validate_certs }}"
-            s3_config: "{{ item.s3_config | default(omit) }}"
-            google_config: "{{ item.google_config | default(omit) }}"
-            azure_config: "{{ item.azure_config | default(omit) }}"
-            nfs_config: "{{ item.nfs_config | default(omit) }}"
           register: validation_result
           loop: "{{ backup_locations_validate }}"
           loop_control:
@@ -50,15 +40,8 @@
             name: "{{ item.name }}"
             uid: "{{ item.uid }}"
             org_id: "{{ org_id | default('default') }}"
-            location_type: "{{ item.location_type }}"
-            path: "{{ item.path }}"
-            cloud_credential_name: "{{ item.cloud_credential_name }}"
-            cloud_credential_uid: "{{ item.cloud_credential_uid }}"
+            include_secrets: "{{ item.include_secrets | default(default_include_secrets) }}"
             validate_certs: "{{ validate_certs }}"
-            s3_config: "{{ item.s3_config | default(omit) }}"
-            google_config: "{{ item.google_config | default(omit) }}"
-            azure_config: "{{ item.azure_config | default(omit) }}"
-            nfs_config: "{{ item.nfs_config | default(omit) }}"
           register: post_validate_state
           loop: "{{ backup_locations_validate }}"
           loop_control:
