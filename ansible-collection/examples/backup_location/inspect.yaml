@@ -55,26 +55,32 @@
       block:
         - name: Display inspection results for each location
           debug:
-            msg:
-              - "Backup Location Details:"
-              - "----------------------------------------"
-              - "Name: {{ item.backup_location.backup_location.metadata.name }}"
-              - "Type: {{ item.backup_location.backup_location.backup_location_info.type }}"
-              - "Path: {{ item.backup_location.backup_location.backup_location_info.path }}"
-              - "Status: {{ item.backup_location.backup_location.backup_location_info.status.status }}"
-              - "Status Reason: {{ item.backup_location.backup_location.backup_location_info.status.reason }}"
-              - "Cloud Credential:"
-              - "  Name: {{ item.backup_location.backup_location.backup_location_info.cloud_credential_ref.name }}"
-              - "  UID: {{ item.backup_location.backup_location.backup_location_info.cloud_credential_ref.uid }}"
-              - "Created: {{ item.backup_location.backup_location.metadata.create_time }}"
-              - "Last Updated: {{ item.backup_location.backup_location.metadata.last_update_time }}"
-              - "Owner: {{ item.backup_location.backup_location.metadata.ownership.owner }}"
-              - "S3 Configuration:"
-              - "  Region: {{ item.backup_location.backup_location.backup_location_info.s3_config.region }}"
-              - "  Endpoint: {{ item.backup_location.backup_location.backup_location_info.s3_config.endpoint }}"
-              - "  Disable SSL: {{ item.backup_location.backup_location.backup_location_info.s3_config.disable_ssl }}"
-              - "  Disable Path Style: {{ item.backup_location.backup_location.backup_location_info.s3_config.disable_path_style | default('false') }}"
-              - "----------------------------------------"
+            msg: >
+              [
+                "Backup Location Details:",
+                "----------------------------------------",
+                "Name: {{ item.backup_location.backup_location.metadata.name }}",
+                "Type: {{ item.backup_location.backup_location.backup_location_info.type }}",
+                "Path: {{ item.backup_location.backup_location.backup_location_info.path }}",
+                "Status: {{ item.backup_location.backup_location.backup_location_info.status.status }}",
+                "Status Reason: {{ item.backup_location.backup_location.backup_location_info.status.reason }}",
+                {% if item.backup_location.backup_location.backup_location_info.type != 'NFS' %}
+                "Cloud Credential:",
+                "  Name: {{ item.backup_location.backup_location.backup_location_info.cloud_credential_ref.name }}",
+                "  UID: {{ item.backup_location.backup_location.backup_location_info.cloud_credential_ref.uid }}",
+                {% endif %}
+                "Created: {{ item.backup_location.backup_location.metadata.create_time }}",
+                "Last Updated: {{ item.backup_location.backup_location.metadata.last_update_time }}",
+                "Owner: {{ item.backup_location.backup_location.metadata.ownership.owner }}",
+                {% if item.backup_location.backup_location.backup_location_info.type in ['S3', 'Azure'] %}
+                "S3 Configuration:",
+                "  Region: {{ item.backup_location.backup_location.backup_location_info.s3_config.region | default('not applicable') }}",
+                "  Endpoint: {{ item.backup_location.backup_location.backup_location_info.s3_config.endpoint | default('not applicable') }}",
+                "  Disable SSL: {{ item.backup_location.backup_location.backup_location_info.s3_config.disable_ssl | default('false') }}",
+                "  Disable Path Style: {{ item.backup_location.backup_location.backup_location_info.s3_config.disable_path_style | default('false') }}",
+                {% endif %}
+                "----------------------------------------"
+              ]
           loop: "{{ inspect_result.results }}"
           loop_control:
             label: "{{ item.backup_location.backup_location.metadata.name }}"
