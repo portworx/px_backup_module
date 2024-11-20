@@ -5,8 +5,9 @@ backup_locations:
   - name: "s3-backup"
     location_type: "S3"
     path: "my-backup-bucket"
-    cloud_credential_name: "s3-credentials"
-    cloud_credential_uid: "s3-cred-123456"
+    cloud_credential_ref: 
+      cloud_credential_name: "s3-credentials"
+      cloud_credential_uid: "s3-cred-123456"
     validate_certs: true
     encryption_key: "{{ encryption_key }}"
     validate_cloud_credential: true
@@ -23,8 +24,9 @@ backup_locations:
   - name: "gcp-backup"
     location_type: "Google"
     path: "my-gcp-backup-bucket"
-    cloud_credential_name: "gcp-credentials" 
-    cloud_credential_uid: "{{ cloud_cred_uid }}"
+    cloud_credential_ref: 
+      cloud_credential_name: "gcp-credentials" 
+      cloud_credential_uid: "{{ cloud_cred_uid }}"
     validate_certs: true
     encryption_key: "{{ encryption_key }}"
     validate_cloud_credential: true
@@ -49,8 +51,9 @@ backup_locations:
   - name: "azure-backup"
     location_type: "Azure"
     path: "my-azure-container"
-    cloud_credential_name: "azure-credentials"
-    cloud_credential_uid: "{{ cloud_cred_uid }}"
+    cloud_credential_ref:
+      cloud_credential_name: "azure-credentials"
+      cloud_credential_uid: "{{ cloud_cred_uid }}"
     validate_certs: true
     encryption_key: "{{ encryption_key }}"
     validate_cloud_credential: true
