@@ -1,62 +1,51 @@
 ---
 # Backup locations to update
-backup_locations_update:
+backup_ownership_updates:
   - name: "bl-1"
-    uid: "uid"
-    include_secrets: false
-    location_type: "S3"
-    path: "sys1"
-    cloud_credential_name: "cloud-cred-name"
-    cloud_credential_uid: "cloud-cred-uid"
-    validate_cloud_credential: true
-    object_lock_enabled: false
-    s3_config: 
-      region: "us-east-1"
-      endpoint: "s3.amazon.com"
-      disable_ssl: true
-      disable_path_style: true
-      sse_type: "SSE_S3"  # Required - must be one of: Invalid, SSE_S3, SSE_KMS
-      azure_environment:  # Optional - if provided, must include type
-        type: "Invalid"
-    labels:
-      environment: "production"
-      team: "devops"
+    uid: "bl-1-uid"
     ownership:
-      owner: "admin"
+      owner: "9f2a1ab7-fee0"
       groups:
-        - id: "devops-team"
+        - id: "test-grp-0"
           access: "Write"
-        - id: "monitoring-team"
-          access: "Read"
       collaborators:
-        - id: "external-auditor"
+        - id: "95d5fd0d-2b95-4bfc"
           access: "Read"
 
-  - name: "bl-2"
-    uid: "uid"
-    include_secrets: false
-    location_type: "S3"
-    path: "sys2"
-    cloud_credential_name: "cloud-cred-name"
-    cloud_credential_uid: "cloud-cred-uid"
-    validate_cloud_credential: true
-    object_lock_enabled: false
-    s3_config:
-      region: "us-east-1"
-      endpoint: "s3.amazon.com"
-      disable_ssl: true
-      disable_path_style: true
-      sse_type: "SSE_S3"  # Required - must be one of: Invalid, SSE_S3, SSE_KMS
-      azure_environment:  # Optional - if provided, must include type
-        type: "Invalid"
-    labels:
-      environment: "staging"
-      team: "development"
+  - name: "gcp-backup-2"
+    uid: "e1359f6b-15c8-4383-85de"
     ownership:
-      owner: "admin"
+      owner: "9f2a1ab7-fee0"
       groups:
-        - id: "dev-team"
+        - id: "test-grp-0"
           access: "Write"
+      collaborators:
+        - id: "95d5fd0d-2b95-4bfc"
+          access: "Read"
+
+  - name: "azure-backup-test-2"
+    uid: "2e706c32-1da0-4d3a"
+    ownership:
+      owner: "9f2a1ab7-fee0"
+      groups:
+        - id: "test-grp-0"
+          access: "Write"
+      collaborators:
+        - id: "95d5fd0d-2b95-4bfc"
+          access: "Read"
+
+  - name: "nfs-backup-2"
+    uid: "a47c397a-1fd2-450e"
+    ownership:
+      owner: "9f2a1ab7-fee0"
+      groups:
+        - id: "test-grp-0"
+          access: "Write"
+      collaborators:
+        - id: "95d5fd0d-2b95-4bfc"
+          access: "Read"
+    
+
 
 # Global update configuration
 validate_certs: false

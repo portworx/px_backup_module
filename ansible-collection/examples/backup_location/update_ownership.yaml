@@ -27,13 +27,6 @@
             org_id: "{{ org_id | default('default') }}"
             name: "{{ item.name }}"
             uid: "{{ item.uid }}"
-            location_type: "{{ item.location_type }}"
-            cloud_credential_name: "{{ item.cloud_credential_name | default(omit) }}"
-            cloud_credential_uid: "{{ item.cloud_credential_uid | default(omit) }}"
-            s3_config: "{{ item.s3_config | default(omit) }}"
-            google_config: "{{ item.google_config | default(omit) }}"
-            azure_config: "{{ item.azure_config | default(omit) }}"
-            nfs_config: "{{ item.nfs_config | default(omit) }}"
             ownership: "{{ item.ownership }}"
           loop: "{{ backup_ownership_updates }}"
           register: ownership_result
