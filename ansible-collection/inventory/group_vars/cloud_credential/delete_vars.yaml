@@ -1,0 +1,10 @@
+# Backup locations to delete
+cloud_credentials:
+  - name: "gcp-cc"
+    uid: "uid"
+
+  - name: "ibm-cc"
+    uid: "uid"
+
+# Global delete configuration
+validate_certs: false
