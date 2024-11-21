@@ -1,0 +1,112 @@
+# ansible-collection/examples/backup/inspect.yaml
+---
+- name: Inspect PX-Backup Backup
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/backup/inspect.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - px_backup_token is defined
+          - org_id is defined
+          - backup_name is defined
+          - backup_uid is defined
+        fail_msg: "Required variables must be defined"
+
+  tasks:
+    - name: Inspect backup
+      block:
+        - name: Get backup details
+          backup:
+            operation: INSPECT_ONE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            org_id: "{{ org_id }}"
+            name: "{{ backup_name }}"
+            uid: "{{ backup_uid }}"
+            validate_certs: "{{ validate_certs | default(true) }}"
+          register: backup_result
+
+        # Optional debug output
+        - name: Show raw response
+          debug:
+            msg: "{{ backup_result | to_nice_json }}"
+          when: debug_output | default(false)
+
+        # Format and display backup details
+        - name: Display backup details
+          debug:
+            msg: |
+              {% set backup = backup_result.backup %}
+              BACKUP DETAILS
+              ==============
+
+              GENERAL INFORMATION
+              ------------------
+              Name: {{ backup.metadata.name }}
+              UID: {{ backup.metadata.uid }}
+              Organization: {{ backup.metadata.org_id }}
+              Created: {{ backup.metadata.create_time }}
+              Last Updated: {{ backup.metadata.last_update_time }}
+              Owner: {{ backup.metadata.ownership.owner }}
+
+              BACKUP STATUS
+              -------------
+              Status: {{ backup.backup_info.status.status }}
+              Reason: {{ backup.backup_info.status.reason }}
+              Stage: {{ backup.backup_info.stage }}
+              
+              CLUSTER INFORMATION
+              ------------------
+              Cluster: {{ backup.backup_info.cluster }}
+              Cluster UID: {{ backup.backup_info.cluster_ref.uid }}
+              Target Namespace: {{ backup.backup_info.target_namespace }}
+              Namespaces Backed Up: {{ backup.backup_info.namespaces | join(', ') }}
+
+              BACKUP CONFIGURATION
+              -------------------
+              Type: {{ backup.backup_info.backup_type.type }}
+              Object Type: {{ backup.backup_info.backup_object_type.type }}
+              Backup Location: {{ backup.backup_info.backup_location_ref.name }} ({{ backup.backup_info.backup_location_ref.uid }})
+              Backup Path: {{ backup.backup_info.backup_path }}
+
+              {% if backup.backup_info.backup_schedule is defined %}
+              SCHEDULE INFORMATION
+              -------------------
+              Schedule Name: {{ backup.backup_info.backup_schedule.name }}
+              Schedule UID: {{ backup.backup_info.backup_schedule.uid }}
+              {% endif %}
+
+              COMPLETION TIMES
+              ---------------
+              Volumes Completion: {{ backup.backup_info.completion_time_info.volumes_completion_time | regex_replace('Z$', ' UTC') }}
+              Resources Completion: {{ backup.backup_info.completion_time_info.resources_completion_time | regex_replace('Z$', ' UTC') }}
+              Total Completion: {{ backup.backup_info.completion_time_info.total_completion_time | regex_replace('Z$', ' UTC') }}
+
+              {% if backup.backup_info.volumes is defined and backup.backup_info.volumes %}
+              VOLUME INFORMATION
+              -----------------
+              {% for volume in backup.backup_info.volumes %}
+              Volume: {{ volume.pvc }}
+              - Namespace: {{ volume.namespace }}
+              - Size: {{ volume.total_size | default('N/A') | filesizeformat }}
+              - Status: {{ volume.status.status }}
+              - Driver: {{ volume.driver_name }}
+              {% endfor %}
+              {% endif %}
+
+      rescue:
+        - name: Display error details
+          debug:
+            msg: "Failed to inspect backup: {{ backup_result.msg if backup_result.msg is defined else 'Unknown error occurred' }}"
+          when: backup_result is defined
+
+        - name: Fail with error message
+          fail:
+            msg: "Failed to inspect backup. See above for details."

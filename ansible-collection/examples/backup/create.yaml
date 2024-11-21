@@ -1,0 +1,71 @@
+---
+- name: Configure PX-Backup Backups
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/backup/create.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - px_backup_token is defined
+          - backups is defined
+          - backups | length > 0
+        fail_msg: "Required variables must be defined"
+
+  tasks:
+    - name: Create backups
+      block:
+        - name: Create backup
+          backup:
+            operation: CREATE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            name: "{{ item.name }}"
+            org_id: "{{ org_id | default('default') }}"
+            backup_location_ref: "{{ item.backup_location_ref }}"
+            cluster_ref: "{{ item.cluster_ref }}"
+            namespaces: "{{ item.namespaces | default([]) }}"
+            label_selectors: "{{ item.label_selectors | default({}) }}"
+            resource_types: "{{ item.resource_types | default([]) }}"
+            backup_type: "{{ item.backup_type | default('Normal') }}"
+            # Optional parameters
+            pre_exec_rule_ref: "{{ item.pre_exec_rule_ref | default(omit) }}"
+            post_exec_rule_ref: "{{ item.post_exec_rule_ref | default(omit) }}"
+            include_resources: "{{ item.include_resources | default(omit) }}"
+            exclude_resource_types: "{{ item.exclude_resource_types | default(omit) }}"
+            ns_label_selectors: "{{ item.ns_label_selectors | default(omit) }}"
+            backup_object_type: "{{ item.backup_object_type | default(omit) }}"
+            skip_vm_auto_exec_rules: "{{ item.skip_vm_auto_exec_rules | default(omit) }}"
+            volume_snapshot_class_mapping: "{{ item.volume_snapshot_class_mapping | default(omit) }}"
+            direct_kdmp: "{{ item.direct_kdmp | default(omit) }}"
+            validate_certs: "{{ item.validate_certs | default(true) }}"
+          loop: "{{ backups }}"
+          register: backup_result
+          loop_control:
+            label: "{{ item.name }}"
+
+      rescue:
+        - name: Display error details
+          debug:
+            msg: "Failed to create backup: {{ backup_result.results | selectattr('failed', 'true') | map(attribute='msg') | list }}"
+          when: backup_result is defined and backup_result.results is defined
+
+        - name: Fail with error message
+          fail:
+            msg: "Failed to create backups. See above for details."
+
+    - name: Display creation results
+      debug:
+        msg: 
+          - "Successfully created backups:"
+          - "Created backups: {{ backup_result.results | map(attribute='item.name') | list }}"
+          - "Changed status: {{ backup_result.results | map(attribute='changed') | list }}"
+      when: 
+        - backup_result is defined 
+        - backup_result.results is defined
+        - (backup_result.results | selectattr('failed', 'defined') | selectattr('failed', 'true') | list | length) == 0
