@@ -18,12 +18,16 @@
           - backup_share_updates is defined
         fail_msg: "Required variables must be defined"
 
-    # Validate access_type values
-    - name: Validate access types
+    - name: Validate collaborators and groups
       assert:
-        that: 
-          - "item.access_type in ['Invalid', 'View', 'Restorable', 'FullAccess']"
-        fail_msg: "Invalid access_type '{{ item.access_type }}' for backup '{{ item.name }}'. Must be one of: Read, Write, Admin"
+        that:
+          - (item.backup_share.collaborators | default([])) | length > 0 or (item.backup_share.groups | default([])) | length > 0
+          - ((item.backup_share.collaborators | default([]) | selectattr('id', 'defined') | selectattr('access', 'defined') | list) | length) == ((item.backup_share.collaborators | default([])) | length)
+          - ((item.backup_share.groups | default([]) | selectattr('id', 'defined') | selectattr('access', 'defined') | list) | length) == ((item.backup_share.groups | default([])) | length)
+        fail_msg: >
+          Validation failed for backup '{{ item.name }}':
+          - Collaborators or groups are not defined.
+          - Some collaborators or groups are missing required 'id' or 'access' entries.
       loop: "{{ backup_share_updates }}"
       loop_control:
         label: "{{ item.name }}"
@@ -39,10 +43,7 @@
             org_id: "{{ org_id }}"
             name: "{{ item.name }}"
             uid: "{{ item.uid }}"
-            backup_share:
-              collaborators: "{{ item.collaborators | default([]) }}"
-              groups: "{{ item.groups | default([]) }}"
-              access_type: "{{ item.access_type | default('View') }}"
+            backup_share: "{{ item.backup_share | default({}) }}"
             validate_certs: "{{ item.validate_certs | default(true) }}"
           register: share_result
           loop: "{{ backup_share_updates }}"

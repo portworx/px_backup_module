@@ -1,15 +1,19 @@
 # ansible-collection/inventory/group_vars/backup/update_backup_share.yaml
 ---
 backup_share_updates:
-  - name: "ansible-bkp3"
-    uid: "43665c7a-a58e-423b-8267-14a44f23ede3"
-    collaborators:
-      - "user1@example.com"
-      - "user2@example.com"
-    groups:
-      - "platform-team"
-      - "devops-team"
-    access_type: "FullAccess"  # Maps to enum value 1
+  - name: "sample-bk-name-1"
+    uid: "1ef1a268-bec6-4dd5-be63-9e8b4173dffa"
+    backup_share:
+      groups:
+        - id: "test-grp-0"
+          access: "View"  # Use one of: Invalid, View, Restorable, FullAccess
+        # - id: "group2"
+        #   access: "FullAccess"
+      collaborators:
+        - id: "95d5fd0d-2b95-4bfc-b4dd-11808c547b84"
+          access: "View"
+        # - id: "user2@example.com"
+        #   access: "View"
     validate_certs: true
 
   # - name: "staging-backup"
