@@ -2,36 +2,21 @@
 # Backup locations to validate
 backup_locations_validate:
   - name: "bl-1"
-    uid: "uid"
-    location_type: "S3"
-    path: "sys1"
-    cloud_credential_name: "cloud-cred-name"
-    cloud_credential_uid: "cloud-uid"
-    validate_cloud_credential: true
-    s3_config:
-      region: "us-east-1"
-      endpoint: "s3.amazon.com"
-      disable_ssl: true
-      disable_path_style: true
-      sse_type: "SSE_S3"
-      azure_environment:
-        type: "Invalid"
+    uid: "bl-1-uid"
+    include_secrets: false
 
   - name: "bl-2"
-    uid: "uid"
-    location_type: "S3"
-    path: "sys2"
-    cloud_credential_name: "cloud-cred-name"
-    cloud_credential_uid: "cloud-uid"
-    validate_cloud_credential: true
-    s3_config:
-      region: "us-east-1"
-      endpoint: "s3.amazon.com"
-      disable_ssl: true
-      disable_path_style: true
-      sse_type: "SSE_S3"
-      azure_environment:
-        type: "Invalid"
-
-# Global validation configuration
+    uid: "bl-2-uid"
+    include_secrets: false
+  
+  - name: "bl-3"
+    uid: "bl-3-uid"
+    include_secrets: false
+  
+  - name: "bl-4"
+    uid: "bl-4-uid"
+    include_secrets: false
+  
+# Global inspect configuration
 validate_certs: false
+default_include_secrets: false

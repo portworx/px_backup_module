@@ -57,8 +57,7 @@
             uid: "{{ item.uid }}"
             location_type: "{{ item.location_type }}"
             path: "{{ item.path }}"
-            cloud_credential_name: "{{ item.cloud_credential_name }}"
-            cloud_credential_uid: "{{ item.cloud_credential_uid }}"
+            cloud_credential_ref: "{{ item.cloud_credential_ref | default(omit) }}"
             validate_cloud_credential: "{{ item.validate_cloud_credential | default(true) }}"
             object_lock_enabled: "{{ item.object_lock_enabled | default(false) }}"
             labels: "{{ item.labels | default(omit) }}"
@@ -89,13 +88,7 @@
         org_id: "{{ org_id | default('default') }}"
         name: "{{ item.name }}"
         uid: "{{ item.uid }}"
-        location_type: "{{ item.location_type }}"
-        path: "{{ item.path }}"
         validate_certs: "{{ validate_certs }}"
-        s3_config: "{{ item.s3_config | default(omit) }}"
-        google_config: "{{ item.google_config | default(omit) }}"
-        azure_config: "{{ item.azure_config | default(omit) }}"
-        nfs_config: "{{ item.nfs_config | default(omit) }}"
       register: final_validation
       loop: "{{ backup_locations_update }}"
       loop_control:
