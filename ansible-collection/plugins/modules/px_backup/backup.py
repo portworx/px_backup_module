@@ -230,7 +230,7 @@ notes:
     - "UPDATE: name, uid"
     - "DELETE: name, uid"
     - "INSPECT_ONE: name, uid"
-    - "INSPECT_ALL: org_id"
+    - "INSPECT_ALL: cluster_name_filter, cluster_uid_filter, org_id"
     - "UPDATE_BACKUP_SHARE: name, uid, backup_share"
 '''
 
@@ -344,9 +344,7 @@ backup:
             "total_size": 1073741824,  # 1GB in bytes
             "resource_count": 15,
             "stork_version": "2.8.0",
-            "backup_object_type": {
-                "type": "All"
-            },
+            "backup_object_type": "All",
             "direct_kdmp": false,
             "completion_time_info": {
                 "volumes_completion_time": "2024-11-19T10:00:00Z",
@@ -366,6 +364,16 @@ changed:
 '''
 
 # Configure logging
+# logger = logging.getLogger('backup')
+# logger.addHandler(logging.NullHandler())
+# logging.basicConfig(
+#     level=logging.DEBUG,  # Set the logging level to DEBUG
+#     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+#     handlers=[
+#         logging.StreamHandler(),  # Logs to the console
+#         logging.FileHandler("backup_module_debug.log", mode="w")  # Optional: Logs to a file
+#     ]
+# )
 logger = logging.getLogger('backup')
 logger.addHandler(logging.NullHandler())
 
@@ -548,13 +556,10 @@ def create_backup(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict[s
             endpoint='v1/backup',
             data=backup_request
         )
-
-        # Return the backup from the response
-        if isinstance(response, dict) and 'backup' in response:
-            return response['backup'], True
-            
-        # If we get an unexpected response format, raise an error
-        raise ValueError(f"Unexpected API response format: {response}")
+        
+        # Process response
+        result = process_backup_response(response)
+        return result, True
         
     except Exception as e:
         error_msg = str(e)
@@ -593,60 +598,72 @@ def update_backup(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict[s
                 error_msg = f"{error_msg}: {getattr(e.response, 'text', 'No response text')}"
         module.fail_json(msg=f"Failed to update backup: {error_msg}")
 
-
 def update_backup_share(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict[str, Any], bool]:
     """Update backup sharing settings"""
     try:
         # Map access types to enum values based on protobuf definition
         access_type_map = {
-        'Invalid': 0,
-        'View': 1,
-        'Restorable': 2,
-        'FullAccess': 3
+            'Invalid': 0,
+            'View': 1,
+            'Restorable': 2,
+            'FullAccess': 3
         }
 
         # Get backup share configuration from module params
-        backup_share = module.params.get('backup_share', {})
-        access_type = backup_share.get('access_type')
         
-        # Validate access type
-        if access_type not in access_type_map:
-            module.fail_json(msg=f"Invalid access_type: {access_type}. Must be one of: {', '.join(access_type_map.keys())}")
+        backupshare = module.params.get('backup_share', {})
         
-        # Convert string access type to enum value
-        access_value = access_type_map[access_type]
+        # Validate collaborators
+        collaborators = []
+        for collaborator in backupshare.get('collaborators', []):
+            if not isinstance(collaborator, dict) or 'id' not in collaborator or 'access' not in collaborator:
+                module.fail_json(
+                    msg=f"Invalid collaborator entry: {collaborator}. Each collaborator must have 'id' and 'access'."
+                )
+            access_value = access_type_map.get(collaborator['access'])
+            if access_value is None:
+                module.fail_json(
+                    msg=f"Invalid access_type '{collaborator['access']}' for collaborator '{collaborator['id']}'."
+                )
+            collaborators.append({"id": collaborator['id'], "access": access_value})
 
+        # Validate groups
+        groups = []
+        for group in backupshare.get('groups', []):
+            if not isinstance(group, dict) or 'id' not in group or 'access' not in group:
+                module.fail_json(
+                    msg=f"Invalid group entry: {group}. Each group must have 'id' and 'access'."
+                )
+            access_value = access_type_map.get(group['access'])
+            if access_value is None:
+                module.fail_json(
+                    msg=f"Invalid access_type '{group['access']}' for group '{group['id']}'."
+                )
+            groups.append({"id": group['id'], "access": access_value})
         # Structure the backup share request according to protobuf
         backup_share_request = {
             "org_id": module.params['org_id'],
             "name": module.params['name'],
             "uid": module.params['uid'],
             "backupshare": {
-                "collaborators": [
-                    {
-                        "id": user,
-                        "access": access_value
-                    } 
-                    for user in backup_share.get('collaborators', [])
-                ],
-                "groups": [
-                    {
-                        "id": group,
-                        "access": access_value
-                    }
-                    for group in backup_share.get('groups', [])
-                ]
+                "collaborators": collaborators,
+                "groups": groups
             }
         }
 
-        # Make request to update backup share
+        # Debug the request being sent
+        logger.debug(f"Backup Share Request: {backup_share_request}")
+
+        # Make the API request to update the backup share
         response = client.make_request(
             method='PUT',
             endpoint='v1/backup/updatebackupshare',
             data=backup_share_request
         )
 
+        # Return the response
         return response, True
+
     except Exception as e:
         error_msg = str(e)
         if hasattr(e, 'response'):
@@ -656,7 +673,6 @@ def update_backup_share(module: AnsibleModule, client: PXBackupClient) -> Tuple[
             except ValueError:
                 error_msg = f"{error_msg}: {getattr(e.response, 'text', 'No response text')}"
         module.fail_json(msg=f"Failed to update backup share: {error_msg}")
-
 
 def enumerate_backups(module: AnsibleModule, client: PXBackupClient) -> List[Dict[str, Any]]:
     """List all backups"""
@@ -1053,11 +1069,11 @@ def run_module():
             elements='dict',
             required=False,
             options=dict(
-                name=dict(type='str'),
-                namespace=dict(type='str'),
-                group=dict(type='str'),
-                kind=dict(type='str'),
-                version=dict(type='str')
+                name=dict(type='str', required=True),
+                namespace=dict(type='str', required=True),
+                group=dict(type='str', required=True),
+                kind=dict(type='str', required=True),
+                version=dict(type='str', required=True)
             )
         ),
         backup_type=dict(
@@ -1067,11 +1083,9 @@ def run_module():
             default='Normal'
         ),
         backup_object_type=dict(
-            type='dict',
+            type='str',
             required=False,
-            options=dict(
-                type=dict(type='str', choices=['All', 'VirtualMachine'])
-            )
+            choices=['Invalid', 'All', 'VirtualMachine']
         ),
         ns_label_selectors=dict(type='str', required=False),
         skip_vm_auto_exec_rules=dict(
@@ -1084,10 +1098,22 @@ def run_module():
             type='dict',
             required=False,
             options=dict(
-                collaborators=dict(type='list', elements='str'),
-                groups=dict(type='list', elements='str'),
-                access_type=dict(type='str', choices=[
-                                 'Invalid', 'View', 'Restorable', 'FullAccess'])
+                collaborators=dict(
+                    type='list', 
+                    elements='dict',
+                    options=dict(
+                        id=dict(type='str', required=True),
+                        access=dict(type='str', choices=['Invalid', 'View', 'Restorable', 'FullAccess'], required=True)
+                    )
+                ),
+                groups=dict(
+                    type='list', 
+                    elements='dict',
+                    options=dict(
+                        id=dict(type='str', required=True),
+                        access=dict(type='str', choices=['Invalid', 'View', 'Restorable', 'FullAccess'], required=True)
+                    )
+                ),
             )
         ),
 
@@ -1122,7 +1148,7 @@ def run_module():
 
         'INSPECT_ONE': ['name', 'uid'],
 
-        'INSPECT_ALL': ['org_id'],
+        'INSPECT_ALL': ['cluster_name_filter', 'cluster_uid_filter', 'org_id'],
 
         'UPDATE_BACKUP_SHARE': ['name', 'uid', 'backup_share']
     }
@@ -1139,6 +1165,8 @@ def run_module():
             ('operation', 'DELETE', ['name', 'uid']),
 
             ('operation', 'INSPECT_ONE', ['name', 'uid']),
+            
+            ('operation', 'INSPECT_ALL', ['cluster_name_filter', 'cluster_uid_filter', 'org_id']),
 
             ('operation', 'UPDATE_BACKUP_SHARE',
              ['name', 'uid', 'backup_share'])
