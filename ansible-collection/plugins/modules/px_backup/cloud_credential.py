@@ -365,7 +365,7 @@ def run_module():
             ('credential_type', 'Azure', ['azure_config']),
             ('credential_type', 'Google', ['google_config']),
             ('credential_type', 'IBM', ['ibm_config']),
-            ('credential_type', 'Racher', ['rancher_config'])
+            ('credential_type', 'Rancher', ['rancher_config'])
         ],
 
     )
