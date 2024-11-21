@@ -1,12 +1,57 @@
 ---
-# Variables specific to backup creation
-backup_config:
-  namespaces: ["default", "kube-system"]
-  label_selectors: 
-    app: "myapp"
-  resource_types: ["deployments", "services"]
-  include_resources: []
-  
-# Reference common credentials
-cloud_cred_name: "{{ cloud_credentials.s3.name }}"
-cloud_cred_uid: "{{ cloud_credentials.s3.uid }}"
+# Define backups list
+backups:
+  # Example backup 1: Application backup
+  - name: "app-backup"
+    backup_location_ref:
+      name: "s3-backup"
+      uid: "backup-loc-123"
+    cluster_ref:
+      name: "prod-cluster"
+      uid: "cluster-456"
+    namespaces: 
+      - "app1"
+      - "app2"
+    label_selectors:
+      app: "myapp"
+      environment: "production"
+    backup_type: "Normal"
+    resource_types:
+      - "deployments"
+      - "services"
+      - "configmaps"
+    validate_certs: true
+
+  # Example backup 2: VM backup
+  - name: "vm-backup"
+    backup_location_ref:
+      name: "azure-backup"
+      uid: "backup-loc-789"
+    cluster_ref:
+      name: "vm-cluster"
+      uid: "cluster-012"
+    backup_type: "Normal"
+    backup_object_type:
+      type: "VirtualMachine"
+    skip_vm_auto_exec_rules: true
+    validate_certs: true
+
+  # Example backup 3: Namespace backup with pre/post rules
+  - name: "ns-backup"
+    backup_location_ref:
+      name: "gcp-backup"
+      uid: "backup-loc-345"
+    cluster_ref:
+      name: "staging-cluster"
+      uid: "cluster-678"
+    namespaces:
+      - "staging"
+    ns_label_selectors: "environment=staging"
+    pre_exec_rule_ref:
+      name: "pre-backup-rule"
+      uid: "rule-123"
+    post_exec_rule_ref:
+      name: "post-backup-rule"
+      uid: "rule-456"
+    backup_type: "Normal"
+    validate_certs: true
