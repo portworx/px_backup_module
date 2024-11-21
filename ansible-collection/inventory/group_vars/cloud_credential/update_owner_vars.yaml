@@ -1,0 +1,13 @@
+---
+# Define Cloud Credential list
+cloud_credentials:
+  - name: "rancher-cc"
+    uid: "uid"
+    ownership:
+      owner: "admin"
+      groups:
+        - id: "dev-team"
+          access: "Write"
+      collaborators:
+        - id: "dev-team"
+          access: "Write"

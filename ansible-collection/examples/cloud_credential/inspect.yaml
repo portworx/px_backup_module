@@ -1,0 +1,52 @@
+---
+- name: Configure PX-Backup S3 Backup Location
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/cloud_credential/inspect_vars.yaml"
+  
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - pxcentral_auth_url is defined
+          - pxcentral_client_id is defined
+          - pxcentral_username is defined
+          - pxcentral_password is defined
+        fail_msg: "Required variables must be defined"
+  tasks:
+    - name: Request bearer token
+      auth:
+        auth_url: "{{ pxcentral_auth_url }}"
+        client_id: "{{ pxcentral_client_id }}"
+        username: "{{ pxcentral_username }}"
+        password: "{{ pxcentral_password }}"
+        token_duration: "{{ token_duration }}"
+      register: token_response
+      check_mode: no
+
+    - name: List Add Cloud Credentials
+      block:
+        - name: List Add Cloud Credentials
+          cloud_credential:
+            operation: INSPECT_ONE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ token_response.access_token }}"
+            name: "{{ item.name }}"
+            org_id: "{{ org_id | default('default') }}"
+            uid: "{{ item.uid }}"
+            include_secrets: "{{ item.include_secrets |  default(omit) }}"
+          loop: "{{ cloud_credentials }}"
+          register: cloudcred_result
+          loop_control:
+            label: "{{ item.name }}"
+
+    - name: List Add Cloud Credentials
+      debug: 
+        msg: "Cloud Credentials: {{ cloudcred_result.results }}"
+
+
+
+
