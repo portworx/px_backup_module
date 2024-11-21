@@ -1,0 +1,19 @@
+# ansible-collection/inventory/group_vars/backup/update.yaml
+---
+# List of backups to update
+backup_updates:
+  - name: "ansible-bkp1"  # Use the actual backup name
+    uid: "d2768c2f-ca68-4f70-8af8-0700ac98dff9"      # Use the actual backup UID
+    # Optional updates - only include fields you want to update
+    labels:
+      environment: "production"
+      app: "mysql"
+    # ownership:
+    #   owner: "65b8227a-07b9-472f-b132-821af82b0de2"  # Use actual owner ID
+    #   groups:
+    #     - id: "platform-team"
+    #       access: "Write"
+    #   collaborators:
+    #     - id: "user1@example.com"
+    #       access: "Read"
+    # validate_certs: true
