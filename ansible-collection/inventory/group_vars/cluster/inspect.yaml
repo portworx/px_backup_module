@@ -1,0 +1,18 @@
+---
+# Clusters to inspect
+clusters_inspect:
+  - name: "cluster-1"
+    uid: "uid-1"
+    include_secrets: false
+
+  - name: "cluster-2"
+    uid: "uid-2"
+    include_secrets: false
+
+  - name: "cluster-3"
+    uid: "uid-3"
+    include_secrets: false
+
+# Global inspect configuration
+validate_certs: false
+default_include_secrets: false

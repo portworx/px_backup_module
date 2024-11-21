@@ -1,0 +1,21 @@
+---
+# Clusters to update
+backup_share_updates:
+  - name: "cluster-1"
+    uid: "uid-1"
+    backup_share:
+      add:
+        groups:
+          - id: "group1"
+            access: 1
+        collaborators:
+          - id: "user1"
+            access: 3
+      delete: 
+        groups:
+          - id: "group1"
+        collaborators:
+          - id: "user1"
+
+# Global update configuration
+validate_certs: false
