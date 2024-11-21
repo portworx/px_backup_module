@@ -5,7 +5,6 @@
 
   vars_files:
     - "{{ inventory_dir }}/group_vars/common/all.yaml"
-    - "{{ inventory_dir }}/group_vars/common/credentials.yaml"
     - "{{ inventory_dir }}/group_vars/backup_location/delete.yaml"
 
   pre_tasks:
