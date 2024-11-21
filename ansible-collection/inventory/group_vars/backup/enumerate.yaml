@@ -1,0 +1,20 @@
+---
+# Optional filter parameters
+cluster_name_filter: "self"  # Filter backups by cluster name
+name_filter: ""         # Filter backups by backup name
+labels: {}             # Filter by labels
+  # environment: prod    # Example label filter
+max_objects: 5       # Maximum number of backups to return
+include_detailed_resources: true  # Include full resource lists in response
+
+# Filters for specific backup attributes
+owners: []             # Filter by backup owners
+status:                # Filter by backup status
+  - "Success"
+  - "Failed"
+
+backup_object_type:    # Filter by backup object type
+  type: "All"         # Can be "All" or "VirtualMachine"
+
+# SSL verification
+validate_certs: true

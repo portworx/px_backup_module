@@ -1,0 +1,78 @@
+---
+# ansible-collection/examples/backup/update_backup_share.yaml
+- name: Update PX-Backup Share Settings
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/backup/update_backup_share.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - px_backup_token is defined
+          - org_id is defined
+          - backup_share_updates is defined
+        fail_msg: "Required variables must be defined"
+
+    # Validate access_type values
+    - name: Validate access types
+      assert:
+        that: 
+          - "item.access_type in ['Invalid', 'View', 'Restorable', 'FullAccess']"
+        fail_msg: "Invalid access_type '{{ item.access_type }}' for backup '{{ item.name }}'. Must be one of: Read, Write, Admin"
+      loop: "{{ backup_share_updates }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+  tasks:
+    - name: Update backup shares
+      block:
+        - name: Update backup share settings
+          backup:
+            operation: UPDATE_BACKUP_SHARE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            org_id: "{{ org_id }}"
+            name: "{{ item.name }}"
+            uid: "{{ item.uid }}"
+            backup_share:
+              collaborators: "{{ item.collaborators | default([]) }}"
+              groups: "{{ item.groups | default([]) }}"
+              access_type: "{{ item.access_type | default('View') }}"
+            validate_certs: "{{ item.validate_certs | default(true) }}"
+          register: share_result
+          loop: "{{ backup_share_updates }}"
+          loop_control:
+            label: "{{ item.name }}"
+
+        # Display successful updates
+        - name: Display successful updates
+          debug:
+            msg: "Successfully updated sharing for backup '{{ item.item.name }}'"
+          loop: "{{ share_result.results }}"
+          loop_control:
+            label: "{{ item.item.name }}"
+          when: not item.failed
+
+        # Display failures
+        - name: Display failed updates
+          debug:
+            msg: "Failed to update sharing for backup '{{ item.item.name }}': {{ item.msg }}"
+          loop: "{{ share_result.results }}"
+          loop_control:
+            label: "{{ item.item.name }}"
+          when: item.failed
+
+      rescue:
+        - name: Display error details
+          debug:
+            msg: "Failed to update backup shares: {{ 'One or more items failed' if share_result.results is defined else share_result.msg | default('Unknown error occurred') }}"
+          when: share_result is defined
+
+        - name: Fail with error message
+          fail:
+            msg: "Failed to update backup shares. See above for details."

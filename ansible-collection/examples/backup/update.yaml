@@ -1,0 +1,67 @@
+# ansible-collection/examples/backup/update.yaml
+---
+- name: Update PX-Backup Backup
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/backup/update.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - px_backup_token is defined
+          - org_id is defined
+          - backup_updates is defined
+        fail_msg: "Required variables must be defined"
+
+  tasks:
+    - name: Update backups
+      block:
+        - name: Update backup
+          backup:
+            operation: UPDATE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            org_id: "{{ org_id }}"
+            name: "{{ item.name }}"
+            uid: "{{ item.uid }}"
+            # Optional update parameters
+            labels: "{{ item.labels | default(omit) }}"
+            ownership: "{{ item.ownership | default(omit) }}"
+            validate_certs: "{{ item.validate_certs | default(true) }}"
+          register: backup_result
+          loop: "{{ backup_updates }}"
+          loop_control:
+            label: "{{ item.name }}"
+
+        # Display successful updates
+        - name: Display update results
+          debug:
+            msg: "Successfully updated backup '{{ item.item.name }}'"
+          loop: "{{ backup_result.results }}"
+          loop_control:
+            label: "{{ item.item.name }}"
+          when: not item.failed
+
+        # Display failed updates
+        - name: Display failed updates
+          debug:
+            msg: "Failed to update backup '{{ item.item.name }}': {{ item.msg }}"
+          loop: "{{ backup_result.results }}"
+          loop_control:
+            label: "{{ item.item.name }}"
+          when: item.failed
+          
+      rescue:
+        - name: Display error details
+          debug:
+            msg: "Failed to update backup: {{ backup_result.msg if backup_result.msg is defined else 'Unknown error occurred' }}"
+          when: backup_result is defined
+
+        - name: Fail with error message
+          fail:
+            msg: "Failed to update backups. See above for details."

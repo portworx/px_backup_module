@@ -1,0 +1,85 @@
+# ansible-collection/examples/backup/enumerate.yaml
+---
+- name: Enumerate PX-Backup Backups
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/backup/enumerate.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - px_backup_token is defined
+          - org_id is defined
+        fail_msg: "Required variables must be defined"
+
+  tasks:
+    - name: Enumerate backups
+      block:
+        - name: Get list of backups
+          backup:
+            operation: INSPECT_ALL
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            org_id: "{{ org_id }}"
+            # Optional filters
+            cluster_name_filter: "{{ cluster_name_filter | default(omit) }}"
+            cluster_uid_filter: "{{ cluster_uid_filter | default(omit) }}"
+            name_filter: "{{ name_filter | default(omit) }}"
+            labels: "{{ labels | default(omit) }}"
+            max_objects: "{{ max_objects | default(omit) }}"
+            include_detailed_resources: "{{ include_detailed_resources | default(false) }}"
+            owners: "{{ owners | default(omit) }}"
+            backup_object_type: "{{ backup_object_type | default(omit) }}"
+            status: "{{ status | default(omit) }}"
+            validate_certs: "{{ validate_certs | default(true) }}"
+          register: backup_result
+
+        - name: Display backup list summary
+          debug:
+            msg: 
+              - "Total backups found: {{ backup_result.backups | length }}"
+              - "Clusters with backups: {{ backup_result.backups | map(attribute='backup_info.cluster') | unique | sort | list }}"
+
+        - name: Display detailed backup information
+          debug:
+            msg: |
+              Backup Details:
+              {% for backup in backup_result.backups %}
+              - Name: {{ backup.metadata.name }}
+                UID: {{ backup.metadata.uid }}
+                Creation Time: {{ backup.metadata.create_time }}
+                Last Update: {{ backup.metadata.last_update_time }}
+                Owner: {{ backup.metadata.ownership.owner }}
+                Cluster: {{ backup.backup_info.cluster }}
+                Backup Location: {{ backup.backup_info.backup_location_ref.name }}
+                Status: {{ backup.backup_info.status.status }}
+                Status Reason: {{ backup.backup_info.status.reason }}
+                Namespaces: {{ backup.backup_info.namespaces | join(', ') }}
+                Backup Type: {{ backup.backup_info.backup_type.type }}
+                Stage: {{ backup.backup_info.stage }}
+                Volumes:
+                {% if backup.backup_info.volumes is defined %}
+                {% for volume in backup.backup_info.volumes %}
+                  * PVC: {{ volume.pvc }} ({{ volume.namespace }})
+                    Status: {{ volume.status.status }}
+                {% endfor %}
+                {% else %}
+                  No volumes in this backup
+                {% endif %}
+              {% endfor %}
+          when: backup_result.backups | length > 0
+
+      rescue:
+        - name: Display error details
+          debug:
+            msg: "Failed to enumerate backups: {{ backup_result.msg if backup_result.msg is defined else 'Unknown error occurred' }}"
+          when: backup_result is defined
+
+        - name: Fail with error message
+          fail:
+            msg: "Failed to enumerate backups. See above for details."
