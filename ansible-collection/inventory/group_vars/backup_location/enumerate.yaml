@@ -1,7 +1,6 @@
 ---
 # Variables specific to enumeration operations
 include_secrets: false
-include_validation_state: true
 labels: {}  # Optional labels for filtering
 
 # Optional filters

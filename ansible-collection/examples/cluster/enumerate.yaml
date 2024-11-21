@@ -3,10 +3,21 @@
   hosts: localhost
   gather_facts: false
 
+  vars_files:
+    - "{{ inventory_dir}}/group_vars/common/all.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - px_backup_token is defined
+        fail_msg: "Required variables px_backup_api_url and px_backup_token must be defined"
+
   tasks:
     - name: Cluster Enumerate call
       cluster:
         operation: INSPECT_ALL
         api_url: "{{ px_backup_api_url }}"
         token: "{{ px_backup_token }}"
-        org_id: "default"
+        org_id: "{{ org_id | default('default') }}"

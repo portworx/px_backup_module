@@ -1,30 +1,77 @@
 ---
-- name: Inspect PX-Backup Cluster
+- name: Inspect PX-Backup Clusters
   hosts: localhost
   gather_facts: false
 
-  vars:
-    # Required variables
-    cluster_name: "<cluster-name>"
-    cluster_uid: "<uid>"
-    org_id: "default"
-    include_secrets: false
-    validate_certs: true
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/cluster/inspect.yaml"
+
+  pre_tasks:
+    - name: Debug variables
+      debug:
+        msg:
+          - "API URL: {{ px_backup_api_url }}"
+          - "Token: {{ px_backup_token }}"
+          - "Total clusters to inspect: {{ clusters_inspect | length }}"
+
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - px_backup_token is defined
+          - clusters_inspect is defined
+        fail_msg: "Required variables must be defined"
 
   tasks:
-    - name: Get cluster details
-      cluster:
-        operation: INSPECT_ONE
-        api_url: "{{ px_backup_api_url }}"
-        token: "{{ px_backup_token }}"
-        name: "{{ cluster_name }}"
-        uid: "{{ cluster_uid }}"
-        org_id: "{{ org_id }}"
-        include_secrets: "{{ include_secrets }}"
-        validate_certs: "{{ validate_certs }}"
-      register: cluster_info
+    - name: Inspect clusters
+      block:
+        - name: Get cluster details
+          cluster:
+            operation: INSPECT_ONE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            name: "{{ item.name }}"
+            uid: "{{ item.uid }}"
+            org_id: "{{ org_id | default('default') }}"
+            include_secrets: "{{ item.include_secrets | default(default_include_secrets) }}"
+            validate_certs: "{{ validate_certs }}"
+          register: inspect_result
+          loop: "{{ clusters_inspect }}"
+          loop_control:
+            label: "{{ item.name }}"
 
-    - name: Display cluster details
+      rescue:
+        - name: Display error details
+          debug:
+            msg: "Failed to inspect clusters: {{ inspect_result.results | selectattr('failed', 'true') | map(attribute='msg') | list }}"
+          when: inspect_result is defined and inspect_result.results is defined
+
+        - name: Fail with error message
+          fail:
+            msg: "Failed to inspect clusters. See above for details."
+        
+    - name: Process and display inspection results
+      block:
+        - name: Display inspection results for each cluster
+          debug:
+            msg: >
+              [
+                "Cluster Details:",
+                "----------------------------------------",
+                "Name: {{ item.cluster.cluster }}",
+                "----------------------------------------"
+              ]
+          loop: "{{ inspect_result.results }}"
+          loop_control:
+            label: "{{ item.cluster.cluster.metadata.name }}"
+          when: item.cluster is defined
+
+    - name: Summarize inspection
       debug:
-        var: cluster_info
-        verbosity: 0
+        msg:
+          - "Inspection Summary:"
+          - "Total clusters inspected: {{ inspect_result.results | length }}"
+          - "Successful inspections: {{ inspect_result.results | selectattr('cluster', 'defined') | list | length }}"
+          - "Failed inspections: {{ inspect_result.results | selectattr('failed', 'defined') | selectattr('failed', 'true') | list | length }}"
+      when: inspect_result is defined and inspect_result.results is defined
