@@ -333,6 +333,7 @@ def run_module():
             token=dict(type='str')
         )),
         validate_certs=dict(type='bool', default=True),
+        include_secrets=dict(type='bool', default=False),
         labels=dict(type='dict', required=False),
         ownership=dict(type='dict', required=False, options=dict(
             owner=dict(type='str'),
