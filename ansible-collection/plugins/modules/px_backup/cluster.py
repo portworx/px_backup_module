@@ -125,11 +125,6 @@ options:
         description: Service token for authentication
         required: false
         type: str
-    delete_backups:
-        description: Whether to delete backups when cluster is deleted
-        required: false
-        type: bool
-        default: false
     delete_restores:
         description: Whether to delete restores when cluster is deleted
         required: false
@@ -370,7 +365,7 @@ def enumerate_clusters(module: AnsibleModule, client: PXBackupClient) -> List[Di
         params = {
             'labels': module.params.get('labels', {}),
             'include_secrets': module.params.get('include_secrets', False),
-            'only_backup_shares': module.params.get('only_backup_shares', False),
+            'only_backup_share': module.params.get('only_backup_share', False),
             'cloud_credential_ref': module.params.get('cloud_credential_ref', {}),
         }
             
@@ -657,20 +652,19 @@ def run_module():
             type='dict',
             required=False,
             options=dict(
-                name=dict(type='str'),
-                uid=dict(type='str')
+                name=dict(type='str', required=True),
+                uid=dict(type='str', required=True)
             )
         ),
         platform_credential_ref=dict(
             type='dict',
             required=False,
             options=dict(
-                name=dict(type='str'),
-                uid=dict(type='str')
+                name=dict(type='str', required=True),
+                uid=dict(type='str', required=True)
             )
         ),
         service_token=dict(type='str', required=False, no_log=True),
-        delete_backups=dict(type='bool', required=False, default=False),
         delete_restores=dict(type='bool', required=False, default=False),
         delete_all_cluster_backups=dict(type='bool', required=False, default=False),
         validate_certs=dict(type='bool', default=True),
