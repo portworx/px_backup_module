@@ -2,10 +2,7 @@
 # Define Backup Schedule list
 backup_schedules:
   - name: "bs-4"
-    schedule_policy: "15min-retain3-incr2"
     reclaim_policy: "Retain"
-    backup_location: "s3-backup-1"
-    cluster: "demo-1"
     namespaces:
       - "default"
     label_selectors:
@@ -23,7 +20,6 @@ backup_schedules:
         kind: "Service"
         version: "v1"
     csi_snapshot_class_name: "default-snapshot-class"
-    ns_label_selectors: "string"
     resource_types:
       - "Deployment"
       - "Service"
@@ -39,7 +35,7 @@ backup_schedules:
       name: "demo-1"
       uid: "07dd2ef3-8261-4f75-acd5-64a3fc011172"
     backup_object_type:
-      type: "All"
+      type: "VirtualMachine"
     volume_snapshot_class_mapping:
       snapshot1: "class1"
       snapshot2: "class2"
