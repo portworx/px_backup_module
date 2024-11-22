@@ -1,6 +1,7 @@
 ---
 # Variables specific to enumeration operations
 include_secrets: false
+only_backup_share: false
 labels: {}  # Optional labels for filtering
 
 # Optional filters

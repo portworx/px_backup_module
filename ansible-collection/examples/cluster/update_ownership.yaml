@@ -1,0 +1,27 @@
+- name: Update PX-Backup backup share settings with add and delete options
+  hosts: localhost
+  gather_facts: false
+
+  tasks:
+    - name: Update backup share settings 
+      cluster:
+        operation: UPDATE_BACKUP_SHARE
+        api_url: "{{ px_backup_api_url }}"
+        token: "{{ px_backup_token }}"
+        org_id: "default"
+        name: "test-cluster"
+        uid: "feb239d3-4af4-4b2e-b010-cc8f4f2e254c"
+        backup_share:
+          add:
+            groups:
+              - id: "group1"
+                access: 1
+            collaborators:
+              - id: "user1"
+                access: 3
+          delete: 
+            groups:
+              - id: "group1"
+            collaborators:
+              - id: "user1"
+            

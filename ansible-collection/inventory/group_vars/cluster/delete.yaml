@@ -1,0 +1,12 @@
+---
+# Clsuters to delete
+clusters_delete:
+  - name: "sample-cluster-name"
+    uid: "sample-cluster-uid"
+
+# Global delete configuration
+validate_certs: false
+delete_all_cluster_backups: false
+delete_restores: false
+
+        
