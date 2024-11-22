@@ -1,0 +1,74 @@
+---
+- name: Configure PX-Backup Schedules
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/backup_schedule/create_vars.yaml"
+  
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - pxcentral_auth_url is defined
+          - pxcentral_client_id is defined
+          - pxcentral_username is defined
+          - pxcentral_password is defined
+        fail_msg: "Required variables must be defined"
+  tasks:
+    - name: Request bearer token
+      auth:
+        auth_url: "{{ pxcentral_auth_url }}"
+        client_id: "{{ pxcentral_client_id }}"
+        username: "{{ pxcentral_username }}"
+        password: "{{ pxcentral_password }}"
+        token_duration: "{{ token_duration }}"
+      register: token_response
+      check_mode: no
+
+    - name: Create Backup Schedule
+      block:
+        - name: Create Backup Schedule
+          backup_schedule:
+            operation: CREATE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ token_response.access_token }}"
+            name: "{{ item.name }}"
+            org_id: "{{ org_id | default('default') }}"
+            reclaim_policy: "{{ item.reclaim_policy }}"
+            namespaces: "{{ item.namespaces }}"
+            label_selectors: "{{ item.label_selectors }}"
+            pre_exec_rule: "{{ item.pre_exec_rule | default(omit)}}"
+            post_exec_rule: "{{ item.post_exec_rule | default(omit) }}"
+            include_resources: "{{ item.include_resources }}"
+            csi_snapshot_class_name: "{{ item.csi_snapshot_class_name }}"
+            resource_types: "{{ item.resource_types }}"
+            schedule_policy_ref: "{{ item.schedule_policy_ref }}"
+            backup_location_ref: "{{ item.backup_location_ref }}"
+            pre_exec_rule_ref: "{{ item.pre_exec_rule_ref | default(omit) }}"
+            post_exec_rule_ref: "{{ item.post_exec_rule_ref | default(omit) }}"
+            backup_type: "{{ item.backup_type }}"
+            ns_label_selectors: "{{ item.ns_label_selectors | default(omit) }}"
+            cluster_ref: "{{ item.cluster_ref }}"
+            backup_object_type: "{{ item.backup_object_type }}"
+            skip_vm_auto_exec_rules: "{{ item.skip_vm_auto_exec_rules | default(omit) }}"
+            volume_snapshot_class_mapping: "{{ item.volume_snapshot_class_mapping }}"
+            direct_kdmp: "{{ item.direct_kdmp }}"
+            owner: "admin"
+          loop: "{{ backup_schedules }}"
+          register: backup_result
+          loop_control:
+            label: "{{ item.name }}"
+
+    # - name: List Add Cloud Credentials
+    #   backup_schedule:
+    #     operation: INSPECT_ONE
+    #     api_url: "{{ px_backup_api_url }}"
+    #     token: "{{ px_backup_token }}"
+    #     org_id: "{{ org_id }}"
+    #     uid: "5ef3cfc7-3f01-4896-a8e0-201d96864205"
+    #     name: "kopia"
+
+
+

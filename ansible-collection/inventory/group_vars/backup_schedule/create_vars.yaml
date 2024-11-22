@@ -1,0 +1,43 @@
+---
+# Define Backup Schedule list
+backup_schedules:
+  - name: "bs-4"
+    reclaim_policy: "Retain"
+    namespaces:
+      - "default"
+    label_selectors:
+      app: "web"
+      role: "frontend"
+    include_resources:
+      - name: "resource1"
+        namespace: "default"
+        group: "group1"
+        kind: "Deployment"
+        version: "v1"
+      - name: "resource3"
+        namespace: "default"
+        group: "group3"
+        kind: "Service"
+        version: "v1"
+    csi_snapshot_class_name: "default-snapshot-class"
+    resource_types:
+      - "Deployment"
+      - "Service"
+    schedule_policy_ref:
+      name: "15min-retain3-incr2"
+      uid: "7c0b5c09-c667-4f5a-a814-de8634d197e8"
+    backup_location_ref:
+      name: "s3-backup-1"
+      uid: "0af0ae2b-6259-4d1a-a3fc-8e40fe229cb6"
+    backup_type: "Normal"
+    skip_vm_auto_exec_rules: true
+    cluster_ref:
+      name: "demo-1"
+      uid: "07dd2ef3-8261-4f75-acd5-64a3fc011172"
+    backup_object_type:
+      type: "VirtualMachine"
+    volume_snapshot_class_mapping:
+      snapshot1: "class1"
+      snapshot2: "class2"
+    direct_kdmp: true
+
