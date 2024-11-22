@@ -55,21 +55,9 @@ options:
         description: Owner Name
         required: true
         type: str
-    schedule_policy:
-        description: Schedule policy of backup Schedule
-        required: false
-        type: str
     reclaim_policy:
         description: Reclaim policy of backup Schedule
         choices: ['Invalid', 'Delete', 'Retain']
-        type: str
-    backup_location:
-        description: Backup Location of backup Schedule
-        required: false
-        type: str
-    cluster:
-        description: Cluster Name
-        required: false
         type: str
     namespaces:
         description: Namespaces which need to backup
@@ -330,10 +318,7 @@ def backup_schedule_request_body(module):
             "org_id": module.params['org_id'],
             "owner": module.params['owner']
         },
-        "schedule_policy": module.params['schedule_policy'],
         "reclaim_policy": module.params['reclaim_policy'],
-        "backup_location": module.params['backup_location'],
-        "cluster": module.params['cluster'],
         "namespaces":module.params['namespaces'],
         "include_resources": module.params['include_resources'], 
         "csi_snapshot_class_name": module.params['csi_snapshot_class_name'],
@@ -383,10 +368,7 @@ def run_module():
         org_id=dict(type='str', required=True),
         uid=dict(type='str', required=False),
         owner=dict(type='str', required=False),
-        schedule_policy=dict(type='str', required=False),
         reclaim_policy=dict(type='str', choices=['Invalid', 'Delete', 'Retain']),
-        backup_location=dict(type='str', required=False),
-        cluster=dict(type='str', required=False),
         pre_exec_rule=dict(type='str', required=False),
         post_exec_rule=dict(type='str', required=False),
         csi_snapshot_class_name=dict(type='str', required=False),
