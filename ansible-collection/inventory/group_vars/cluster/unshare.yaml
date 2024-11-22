@@ -1,0 +1,17 @@
+---
+# Clusters to unshare
+clusters_unshare:
+  - name: "cluster-1"
+    uid: "uid-1"
+    cluster_share:
+      users:
+        - "user1"
+      groups: []
+
+  - name: "cluster-2"
+    uid: "uid-2"
+    cluster_share:
+      users:
+        - "user2"
+      groups: ["group1"]
+

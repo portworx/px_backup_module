@@ -1,0 +1,39 @@
+---
+# Clusters to update
+clusters_update:
+  - name: "cluster-1"
+    uid: "uid-1"
+    cloud_type: "OTHERS"
+    kubeconfig: "kubeconfig-1"
+    labels:
+      environment: "production"
+      team: "devops"
+    ownership:
+      owner: "admin"
+      groups:
+        - id: "devops-team"
+          access: "Write"
+        - id: "monitoring-team"
+          access: "Read"
+      collaborators:
+        - id: "external-auditor"
+          access: "Read"
+
+  - name: "cluster-2"
+    uid: "uid-2"
+    cloud_type: "AZURE"
+    cloud_credential_ref:
+      name: "cloud-cred-name"
+      uid: "cloud-cred-uid"
+    kubeconfig: "kubeconfig-2"
+    labels:
+      environment: "staging"
+      team: "development"
+    ownership:
+      owner: "admin"
+      groups:
+        - id: "dev-team"
+          access: "Write"
+
+# Global update configuration
+validate_certs: false

@@ -1,0 +1,64 @@
+---
+- name: Configure PX-Backup clusters
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/cluster/create.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - px_backup_token is defined
+          - clusters is defined
+        fail_msg: "Required variables must be defined"
+
+  tasks:
+    - name: Create clusters
+      block:
+        - name: Create cluster
+          cluster:
+            operation: CREATE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            name: "{{ item.name }}"
+            org_id: "{{ org_id | default('default') }}"
+            cloud_type: "{{ item.cloud_type }}"
+            kubeconfig: "{{ item.kubeconfig }}"
+            cloud_credential_ref: "{{ item.cloud_credential_ref | default(omit) }}"
+            platform_credential_ref: "{{ item.platform_credential_ref | default(omit) }}"
+            px_config: "{{ item.px_config | default(omit) }}"
+            service_token: "{{ item.service_token | default(omit) }}"
+            delete_restores: "{{ item.delete_restores | default(false) }}"
+            delete_all_cluster_backups: "{{ item.delete_all_cluster_backups | default(false) }}"
+            validate_certs: "{{ item.validate_certs | default(true) }}"
+            backup_share: "{{ item.backup_share | default(omit) }}"
+            cluster_share: "{{ item.cluster_share | default(omit) }}"
+          loop: "{{ clusters }}"
+          register: cluster_result
+          loop_control:
+            label: "{{ item.name }}"
+
+      rescue:
+        - name: Display error details
+          debug:
+            msg: "Failed to create cluster: {{ cluster_result.results | selectattr('failed', 'true') | map(attribute='msg') | list }}"
+          when: cluster_result is defined and cluster_result.results is defined
+
+        - name: Fail with error message
+          fail:
+            msg: "Failed to create clusters. See above for details."
+
+    - name: Display creation results
+      debug:
+        msg: 
+          - "Successfully created clusters:"
+          - "Created locations: {{ cluster_result.results | map(attribute='item.name') | list }}"
+          - "Changed status: {{ cluster_result.results | map(attribute='changed') | list }}"
+      when: 
+        - cluster_result is defined 
+        - cluster_result.results is defined
+        - (cluster_result.results | selectattr('failed', 'defined') | selectattr('failed', 'true') | list | length) == 0

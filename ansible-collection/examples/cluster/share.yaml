@@ -1,0 +1,19 @@
+---
+- name: Share PX-Backup Cluster
+  hosts: localhost
+  gather_facts: false
+
+  tasks:
+    - name: Share cluster with users and groups
+      cluster:
+        operation: SHARE_CLUSTER
+        api_url: "{{ px_backup_api_url }}"
+        token: "{{ px_backup_token }}"
+        org_id: "default"
+        name: "test-cluster"
+        uid: "feb239d3-4af4-4b2e-b010-cc8f4f2e254c"
+        cluster_share:
+          users:
+            - "user1"
+          groups: []
+          share_cluster_backups: true

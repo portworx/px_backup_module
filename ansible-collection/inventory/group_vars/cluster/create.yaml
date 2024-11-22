@@ -1,0 +1,56 @@
+---
+# Clusters to create
+clusters:
+  # Vanilla k8s
+  - name: "cluster-1"
+    cloud_type: "OTHERS"
+    kubeconfig: |
+      apiVersion: v1
+
+    # GCP
+  - name: "cluster-2"
+    cloud_credential_ref:
+      name: "gcp-cred"
+      uid: "bd57f119-02be-40d1-b39e-7707ccc4ce19"
+    cloud_type: "GOOGLE"
+    kubeconfig: |
+      apiVersion: v1
+
+  # Rancher
+  - name: "cluster-3"
+    platform_credential_ref:
+      name: "admin"
+      uid: "fd4049cb-ed77-4abf-a4c3-93d1035f79ec"
+    cloud_type: "OTHERS"
+    kubeconfig: |
+      apiVersion: v1
+
+  # Azure
+  - name: "cluster-4"
+    cloud_type: "AZURE"
+    cloud_credential_ref:
+      name: "azure-cred"
+      uid: "31a7fe99-2a20-4675-bfe6-f8dc7ec4d33d"
+    kubeconfig: |
+      apiVersion: v1
+
+  # AWS
+  - name: "cluster-5"
+    cloud_credential_ref:
+      name: "aws-cred"
+      uid: "292699b1-c8db-4846-ab8b-434cd843cb6a"
+    cloud_type: "AWS"
+    kubeconfig: |
+      apiVersion: v1
+
+  # IBM
+  - name: "cluster-6"
+    cloud_credential_ref:
+      name: "ibm-cred"
+      uid: "e8386d78-c7c2-4d9f-9d8f-184c400f2672"
+    cloud_type: "IBM"
+    kubeconfig: |
+      apiVersion: v1
+
+
+    

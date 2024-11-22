@@ -1,0 +1,21 @@
+---
+# Clusters to share
+clusters_share:
+  - name: "cluster-1"
+    uid: "uid-1"
+    include_secrets: false
+    cluster_share:
+      users:
+        - "user1"
+      groups: []
+      share_cluster_backups: true
+
+  - name: "cluster-2"
+    uid: "uid-2"
+    include_secrets: false
+    cluster_share:
+      users:
+        - "user2"
+      groups: ["group1"]
+      share_cluster_backups: false
+
