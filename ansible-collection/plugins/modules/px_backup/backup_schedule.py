@@ -360,6 +360,9 @@ def backup_schedule_request_body(module):
         backup_schedule_request['backup_object_type'] = module.params['backup_object_type']
         backup_schedule_request['skip_vm_auto_exec_rules'] = module.params['skip_vm_auto_exec_rules']
 
+    if module.params.get('exclude_resource_types'):
+        backup_schedule_request['exclude_resource_types'] = module.params['exclude_resource_types']
+    
     if module.params.get('suspend'):
         backup_schedule_request['suspend'] = module.params['suspend']
 
@@ -442,6 +445,7 @@ def run_module():
             ),
         ),
         resource_types=dict(type='list', elements='str', required=False),
+        exclude_resource_types=dict(type='list', elements='str', required=False),
         namespaces=dict(type='list', elements='str'),
         volume_snapshot_class_mapping=dict(type='dict', required=False),
 
