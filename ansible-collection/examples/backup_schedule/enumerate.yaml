@@ -35,3 +35,8 @@
         backup_location_ref:
           name: "s3-backup-1"
           uid: "0af0ae2b-6259-4d1a-a3fc-8e40fe229cb6"
+        # enumerate_options:
+        #   backup_object_type: "VirtualMachine"
+        #   time_range:
+        #     start_time:
+        #     end_time:
