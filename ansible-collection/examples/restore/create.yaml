@@ -1,0 +1,62 @@
+---
+- name: Configure PX-Backup restores
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/restore/create.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - px_backup_token is defined
+          - restores is defined
+          - restores | length > 0
+        fail_msg: "Required variables must be defined"
+
+  tasks:
+    - name: Create restores
+      block:
+        - name: Create restore
+          restore:
+            operation: CREATE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            name: "{{ item.name }}"
+            org_id: "{{ org_id | default('default') }}"
+            backup_ref: "{{ item.backup_ref }}"
+            cluster_ref: "{{ item.cluster_ref }}"
+            namespace_mapping: "{{ item.namespace_mapping | default({}) }}"
+            storage_class_mapping: "{{ item.storage_class_mapping | default({}) }}"
+            include_resources: "{{ item.include_resources | default(omit) }}"
+            validate_certs: "{{ item.validate_certs | default(true) }}"
+            replace_policy: "{{ item.replace_policy | default('Retain') }}"
+            cluster: "{{ item.cluster if item.cluster is defined else item.cluster_ref.name }}"
+          loop: "{{ restores }}"
+          register: restore_result
+          loop_control:
+            label: "{{ item.name }}"
+
+      rescue:
+        - name: Display error details
+          debug:
+            msg: "Failed to create restore: {{ restore_result.results | selectattr('failed', 'true') | map(attribute='msg') | list }}"
+          when: restore_result is defined and restore_result.results is defined
+
+        - name: Fail with error message
+          fail:
+            msg: "Failed to create restores. See above for details."
+
+    - name: Display creation results
+      debug:
+        msg: 
+          - "Successfully created restores:"
+          - "Created restores: {{ restore_result.results | map(attribute='item.name') | list }}"
+          - "Changed status: {{ restore_result.results | map(attribute='changed') | list }}"
+      when: 
+        - restore_result is defined 
+        - restore_result.results is defined
+        - (restore_result.results | selectattr('failed', 'defined') | selectattr('failed', 'true') | list | length) == 0

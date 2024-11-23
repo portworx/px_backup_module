@@ -1,0 +1,17 @@
+---
+# Define restores list
+restores:
+  # Example restore 1: Application restore
+  - name: "restoocpadddefaultnamespacemapping"
+    backup_ref:
+      name: "bk1"
+      uid: "99b921cf-3022-46dc-b547-7b4ee95d58fd"
+    cluster_ref:
+      name: "ocp-px"
+      uid: "61973879-c11f-4faf-ad4d-42e6d69eb285"
+    # namespace_mapping: 
+    #   "pvcsix": "pvcsix11178"
+    replace_policy: "Delete"
+    validate_certs: true
+    # storage_class_mapping:
+    #   "px-db": "px-db"
