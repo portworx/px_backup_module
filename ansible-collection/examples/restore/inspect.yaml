@@ -1,0 +1,118 @@
+# ansible-collection/examples/restore/inspect.yaml
+---
+- name: Inspect PX-Backup Restore
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/restore/inspect.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - px_backup_token is defined
+          - org_id is defined
+          - restore_name is defined
+          - restore_uid is defined
+        fail_msg: "Required variables must be defined"
+
+  tasks:
+    - name: Inspect restore
+      block:
+        - name: Get restore details
+          restore:
+            operation: INSPECT_ONE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            org_id: "{{ org_id }}"
+            name: "{{ restore_name }}"
+            uid: "{{ restore_uid }}"
+            validate_certs: "{{ validate_certs | default(true) }}"
+          register: restore_result
+
+        # Optional debug output
+        - name: Show raw response
+          debug:
+            msg: "{{ restore_result | to_nice_json }}"
+          when: debug_output | default(false)
+
+        # Format and display restore details
+        - name: Display restore details
+          debug:
+            msg: |
+              {% set restore = restore_result.restore %}
+              RESTORE DETAILS
+              ==============
+
+              GENERAL INFORMATION
+              ------------------
+              Name: {{ restore.metadata.name }}
+              UID: {{ restore.metadata.uid }}
+              Organization: {{ restore.metadata.org_id }}
+              Created: {{ restore.metadata.create_time }}
+              Last Updated: {{ restore.metadata.last_update_time }}
+              Owner: {{ restore.metadata.ownership.owner }}
+
+              RESTORE STATUS
+              -------------
+              Status: {{ restore.restore_info.status.status }}
+              Reason: {{ restore.restore_info.status.reason }}
+              
+              CLUSTER INFORMATION
+              ------------------
+              Cluster: {{ restore.restore_info.cluster }}
+              Cluster UID: {{ restore.restore_info.cluster_ref.uid }}
+
+              NAMESPACE MAPPING INFORMATION
+              ------------------
+              {% for source, destination in restore.restore_info.namespace_mapping.items() %}
+              - Source: {{ source }} 
+              - Destination: {{ destination }}
+              {% endfor %}
+
+              RESTORE CONFIGURATION
+              -------------------
+              Backup Restored Name: {{ restore.restore_info.backup_ref.name }} 
+              Backup Restored UID: {{ restore.restore_info.backup_ref.uid }}
+              Backup Location Restored Name: {{ restore.restore_info.backup_location_ref.name }} 
+              Backup Location Restored UID: {{ restore.restore_info.backup_location_ref.uid }}
+              Object Type: {{ restore.restore_info.backup_object_type.type }}
+              Replace Policy: {{ restore.restore_info.replace_policy }}
+
+              {% if restore.restore_info.resources is defined and restore.restore_info.resources %}
+              RESOURCE INFORMATION
+              -------------------
+              Resources Count: {{ restore.restore_info.resource_count }}
+              {% for resource in restore.restore_info.resources %}
+              Resource: {{ resource.name }}
+              - Kind: {{ resource.kind }}
+              - Version: {{ resource.version }}
+              - Status: {{ resource.status.status }}
+              - Reason: {{ resource.status.reason }}
+              {% endfor %}
+              {% endif %}
+
+              {% if restore.restore_info.volumes is defined and restore.restore_info.volumes %}
+              VOLUME INFORMATION
+              -----------------
+              {% for volume in restore.restore_info.volumes %}
+              Volume: {{ volume.pvc }}
+              - Source Namespace: {{ volume.source_namespace }}
+              - Size: {{ volume.total_size | default('N/A') | filesizeformat }}
+              - Status: {{ volume.status.status }}
+              - Driver: {{ volume.driver_name }}
+              {% endfor %}
+              {% endif %}
+
+      rescue:
+        - name: Display error details
+          debug:
+            msg: "Failed to inspect restore: {{ restore_result.msg if restore_result.msg is defined else 'Unknown error occurred' }}"
+          when: restore_result is defined
+
+        - name: Fail with error message
+          fail:
+            msg: "Failed to inspect restore. See above for details."
