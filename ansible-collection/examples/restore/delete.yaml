@@ -1,0 +1,76 @@
+---
+# ansible-collection/examples/restore/delete.yaml
+- name: Delete PX-Backup Restores
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/restore/delete.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - px_backup_token is defined
+          - org_id is defined
+          - restore_deletes is defined
+        fail_msg: "Required variables must be defined"
+
+    # Validate restore configurations
+    - name: Validate restore configurations
+      assert:
+        that: 
+          - "item.name is defined"
+          - "item.uid is defined"
+        fail_msg: "Each restore configuration must include 'name' and 'uid'"
+      loop: "{{ restore_deletes }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+  tasks:
+    - name: Delete restores
+      block:
+        - name: Delete restore
+          restore:
+            operation: DELETE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            org_id: "{{ org_id }}"
+            name: "{{ item.name }}"
+            uid: "{{ item.uid }}"
+            cluster_ref: "{{ item.cluster_ref | default(omit) }}"
+            validate_certs: "{{ item.validate_certs | default(true) }}"
+          register: delete_result
+          loop: "{{ restore_deletes }}"
+          loop_control:
+            label: "{{ item.name }}"
+
+        # Display successful deletes
+        - name: Display successful deletes
+          debug:
+            msg: "Successfully deleted restore '{{ item.item.name }}'"
+          loop: "{{ delete_result.results }}"
+          loop_control:
+            label: "{{ item.item.name }}"
+          when: not item.failed
+
+        # Display failures
+        - name: Display failed deletes
+          debug:
+            msg: "Failed to delete restore '{{ item.item.name }}': {{ item.msg }}"
+          loop: "{{ delete_result.results }}"
+          loop_control:
+            label: "{{ item.item.name }}"
+          when: item.failed
+
+      rescue:
+        - name: Display error details
+          debug:
+            msg: "Failed to delete restores: {{ 'One or more items failed' if delete_result.results is defined else delete_result.msg | default('Unknown error occurred') }}"
+          when: delete_result is defined
+
+        - name: Fail with error message
+          fail:
+            msg: "Failed to delete restores. See above for details."

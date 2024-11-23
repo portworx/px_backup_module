@@ -1,0 +1,87 @@
+# ansible-collection/examples/backup/enumerate.yaml
+---
+- name: Enumerate PX-Backup Restores
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/restore/enumerate.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - px_backup_token is defined
+          - org_id is defined
+        fail_msg: "Required variables must be defined"
+
+  tasks:
+    - name: Enumerate restores
+      block:
+        - name: Get list of restores
+          restore:
+            operation: INSPECT_ALL
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            org_id: "{{ org_id }}"
+            # Optional filters
+            cluster_name_filter: "{{ cluster_name_filter | default(omit) }}"
+            cluster_uid_filter: "{{ cluster_uid_filter | default(omit) }}"
+            name_filter: "{{ name_filter | default(omit) }}"
+            # labels: "{{ labels | default(omit) }}"
+            max_objects: "{{ max_objects | default(omit) }}"
+            include_detailed_resources: "{{ include_detailed_resources | default(false) }}"
+            owners: "{{ owners | default(omit) }}"
+            backup_object_type: "{{ backup_object_type | default(omit) }}"
+            status: "{{ status | default(omit) }}"
+            validate_certs: "{{ validate_certs | default(true) }}"
+          register: restore_result
+
+        - name: Display restore list summary
+          debug:
+            msg: 
+              - "Total restores found: {{ restore_result.restores | length }}"
+              - "Clusters with restores: {{ restore_result.restores | map(attribute='restore_info.cluster') | unique | sort | list }}"
+
+        - name: Display detailed restore information
+          debug:
+            msg: |
+              Restore Details:
+              {% for restore in restore_result.restores %}
+              - Name: {{ restore.metadata.name }}
+                UID: {{ restore.metadata.uid }}
+                Creation Time: {{ restore.metadata.create_time }}
+                Last Update: {{ restore.metadata.last_update_time }}
+                Owner: {{ restore.metadata.ownership.owner }}
+                Backup: {{ restore.restore_info.backup }}
+                Object Type: {{ restore.restore_info.backup_object_type.type }}
+                Cluster: {{ restore.restore_info.cluster }}
+                NameSpace Mapping: {{ restore.restore_info.namespace_mapping }}
+                Replace Policy: {{ restore.restore_info.replace_policy }}
+                Backup Location: {{ restore.restore_info.backup_location_ref.name }}
+                Status: {{ restore.restore_info.status.status }}
+                Status Reason: {{ restore.restore_info.status.reason }}
+                Volumes:
+                {% if restore.restore_info.volumes is defined %}
+                {% for volume in restore.restore_info.volumes %}
+                  * PVC: {{ volume.pvc }}
+                    PVC Source NameSpace: ({{ volume.source_namespace }})
+                    Status: {{ volume.status.status }}
+                {% endfor %}
+                {% else %}
+                  No volumes in this restore
+                {% endif %}
+              {% endfor %}
+          when: restore_result.restores | length > 0
+
+      rescue:
+        - name: Display error details
+          debug:
+            msg: "Failed to enumerate restores: {{ restore_result.params if restore_result.msg is defined else 'Unknown error occurred' }}"
+          when: restore_result is defined
+
+        - name: Fail with error message
+          fail:
+            msg: "Failed to enumerate restores. See above for details."
