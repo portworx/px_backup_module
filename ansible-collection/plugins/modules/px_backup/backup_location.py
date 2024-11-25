@@ -365,17 +365,30 @@ def create_backup_location(module: AnsibleModule, client: PXBackupClient) -> Tup
         # Get module parameters directly
         params = dict(module.params)
         backup_location_request = build_backup_location_request(params)
-        
-        # Make API request
+
+        # Make the create request
         response = client.make_request(
             method='POST',
             endpoint='v1/backuplocation',
             data=backup_location_request
         )
-        return response, True
+        
+        # Return the backup_location from the response
+        if isinstance(response, dict) and 'backup_location' in response:
+            return response['backup_location'], True
+            
+        # If we get an unexpected response format, raise an error
+        raise ValueError(f"Unexpected API response format: {response}")
         
     except Exception as e:
-        module.fail_json(msg=f"Failed to create backup location: {str(e)}")
+        error_msg = str(e)
+        if isinstance(e, requests.exceptions.RequestException) and hasattr(e, 'response'):
+            try:
+                error_detail = e.response.json()
+                error_msg = f"{error_msg}: {error_detail}"
+            except ValueError:
+                error_msg = f"{error_msg}: {e.response.text}"
+        module.fail_json(msg=f"Failed to create backup location: {error_msg}")
 
 def update_backup_location(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict[str, Any], bool]:
     """Update an existing backup location"""

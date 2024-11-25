@@ -1,12 +1,19 @@
 #!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+"""
+PX-Backup Cloud Credential Management Module
+"""
 
 from __future__ import absolute_import, division, print_function
 __metaclass__ = type
 
+from typing import Dict, Any, Tuple, Optional, List, Union  # Fixed imports
+from dataclasses import dataclass
+
 from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.px_backup.api import PXBackupClient
 import requests
-import json
 
 DOCUMENTATION = r'''
 ---
@@ -177,24 +184,45 @@ options:
                         type: str
 '''
 
-def create_cloud_credential(module, client):
+def create_cloud_credential(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict[str, Any], bool]:
     """Create a new Cloud Credential"""
-    cloud_credential_request = cloud_credential_request_body(module)
-    
     try:
-        response = client.make_request('POST', 'v1/cloudcredential', cloud_credential_request)
-        return response, True
-    except Exception as e:
-        module.fail_json(msg=f"Failed to create Cloud Credential: {str(e)}")
+        params = dict(module.params)
+        cloud_credential_request = cloud_credential_request_body(module)
 
-def update_cloud_credential(module, client):
+        # Make the create request
+        response = client.make_request(
+            method='POST',
+            endpoint='v1/cloudcredential',
+            data=cloud_credential_request
+        )
+        
+        # Return the cloud_credential from the response
+        if isinstance(response, dict) and 'cloud_credential' in response:
+            return response['cloud_credential'], True
+            
+        # If we get an unexpected response format, raise an error
+        raise ValueError(f"Unexpected API response format: {response}")
+        
+    except Exception as e:
+        error_msg = str(e)
+        if isinstance(e, requests.exceptions.RequestException) and hasattr(e, 'response'):
+            try:
+                error_detail = e.response.json()
+                error_msg = f"{error_msg}: {error_detail}"
+            except ValueError:
+                error_msg = f"{error_msg}: {e.response.text}"
+        module.fail_json(msg=f"Failed to create cloud credential: {error_msg}")
+
+def update_cloud_credential(module: AnsibleModule, client: PXBackupClient) -> tuple[Dict[str, Any], bool]:  # Using tuple instead of Tuple
     """Update an existing Cloud Credential"""
-    cloud_credential_request = cloud_credential_request_body(module)
-    cloud_credential_request['metadata']['uid'] = module.params['uid']
-    
     try:    
+        cloud_credential_request = cloud_credential_request_body(module)
+        cloud_credential_request['metadata']['uid'] = module.params['uid']
+        
         response = client.make_request('PUT', 'v1/cloudcredential', cloud_credential_request)
         return response, True
+        
     except Exception as e:
         module.fail_json(msg=f"Failed to update Cloud Credential: {str(e)}")
 
@@ -366,57 +394,55 @@ def run_module():
             ('credential_type', 'Azure', ['azure_config']),
             ('credential_type', 'Google', ['google_config']),
             ('credential_type', 'IBM', ['ibm_config']),
-            ('credential_type', 'Rancher', ['rancher_config'])
-        ],
-
-    )
-
-    if module.check_mode:
-        module.exit_json(**result)
-
-    client = PXBackupClient(
-        module.params['api_url'],
-        module.params['token'],
-        module.params['validate_certs']
+            ('credential_type', 'Rancher', ['rancher_config']),
+            ('operation', 'CREATE', ['name', 'credential_type']),
+            ('operation', 'UPDATE', ['name', 'uid', 'credential_type']),
+            ('operation', 'DELETE', ['name', 'uid']),
+            ('operation', 'INSPECT_ONE', ['name', 'uid']),
+            ('operation', 'UPDATE_OWNERSHIP', ['name', 'uid', 'ownership'])
+        ]
     )
 
     try:
+        client = PXBackupClient(
+            module.params['api_url'],
+            module.params['token'],
+            module.params['validate_certs']
+        )
 
-        # Handle other states
-        if module.params['operation'] == 'CREATE':
+        changed = False
+        operation = module.params['operation']
+
+        if operation == 'CREATE':
             cloud_credential, changed = create_cloud_credential(module, client)
+            result['cloud_credential'] = cloud_credential
             result['message'] = "Cloud Credential created successfully"
-
-        elif module.params['operation'] == 'UPDATE':
-            # Update existing backup location
+            
+        elif operation == 'UPDATE':
             cloud_credential, changed = update_cloud_credential(module, client)
+            result['cloud_credential'] = cloud_credential
             result['message'] = "Cloud Credential updated successfully"
-
-        elif module.params['operation'] == 'UPDATE_OWNERSHIP':
-            # Update existing backup location
+            
+        elif operation == 'UPDATE_OWNERSHIP':
             cloud_credential, changed = update_ownership(module, client)
-            result['message'] = "Cloud Credential Ownership update successfully"
-
-        elif module.params['operation'] == 'INSPECT_ALL':
-            # Update existing backup location
+            result['cloud_credential'] = cloud_credential
+            result['message'] = "Cloud Credential Ownership updated successfully"
+            
+        elif operation == 'INSPECT_ALL':
             cloud_credentials = enumerate_cloud_credentials(module, client)
-            message=f"Found {len(cloud_credentials)} Cloud Credential"
-            result['message'] = message
-            result['cloud_credentials']= cloud_credentials
-
-        elif module.params['operation'] == 'INSPECT_ONE':
-            # Update existing backup location
+            result['cloud_credentials'] = cloud_credentials
+            result['message'] = f"Found {len(cloud_credentials)} Cloud Credentials"
+            
+        elif operation == 'INSPECT_ONE':
             cloud_credential = inspect_cloud_credentials(module, client)
-            result['message'] = "Cloud Credential Found successfully"
-            result['cloud_credential']= cloud_credential
-
-        elif module.params['operation'] == 'DELETE':
-            # Update existing backup location
+            result['cloud_credential'] = cloud_credential
+            result['message'] = "Cloud Credential found successfully"
+            
+        elif operation == 'DELETE':
             cloud_credential, changed = delete_cloud_credentials(module, client)
-            result['message'] = "Cloud Credential Deleted successfully"
+            result['message'] = "Cloud Credential deleted successfully"
 
-
-
+        result['changed'] = changed
 
     except Exception as e:
         error_msg = str(e)

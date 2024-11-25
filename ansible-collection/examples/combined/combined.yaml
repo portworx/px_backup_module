@@ -1,0 +1,221 @@
+---
+- name: Complete PX-Backup Workflow
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/combined/combined.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - pxcentral_auth_url is defined
+          - pxcentral_client_id is defined
+          - pxcentral_username is defined
+          - pxcentral_password is defined
+          - px_backup_api_url is defined
+        fail_msg: "Required variables must be defined"
+
+  tasks:
+    - name: Request bearer token
+      auth:
+        auth_url: "{{ pxcentral_auth_url }}"
+        client_id: "{{ pxcentral_client_id }}"
+        username: "{{ pxcentral_username }}"
+        password: "{{ pxcentral_password }}"
+        token_duration: "{{ token_duration }}"
+      register: token_response
+      check_mode: no
+
+    - name: Create Cloud Credential
+      block:
+        - name: Create Cloud Credential
+          cloud_credential:
+            operation: CREATE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ token_response.access_token }}"
+            name: "{{ cloud_credential.name }}"
+            org_id: "{{ org_id }}"
+            credential_type: "{{ cloud_credential.credential_type }}"
+            owner: "{{ cloud_credential.owner }}"
+            aws_config: "{{ cloud_credential.aws_config }}"
+          register: cloudcred_result
+
+        - name: Store cloud credential UID
+          set_fact:
+            cloud_credential_uid: "{{ (ansible_check_mode and 'check-mode-uid') or cloudcred_result.cloud_credential.metadata.uid }}"
+          when: cloudcred_result is defined
+
+        - name: Verify cloud credential creation
+          fail:
+            msg: "Cloud credential creation failed or didn't return expected data"
+          when: not ansible_check_mode and cloud_credential_uid is not defined
+
+      rescue:
+        - name: Display cloud credential error details
+          debug:
+            msg: "Failed to create cloud credential: {{ cloudcred_result | to_nice_json }}"
+          when: cloudcred_result is defined
+
+        - name: Fail with detailed error
+          fail:
+            msg: "Failed to create cloud credential. See above for details."
+
+    - name: Create Cluster
+      block:
+        - name: Create cluster
+          cluster:
+            operation: CREATE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ token_response.access_token }}"
+            name: "{{ cluster.name }}"
+            org_id: "{{ org_id }}"
+            cloud_type: "{{ cluster.cloud_type }}"
+            kubeconfig: "{{ cluster.kubeconfig }}"
+            validate_certs: "{{ validate_certs | default(omit) }}"
+          register: cluster_result
+
+        - name: Store cluster UID
+          set_fact:
+            cluster_uid: "{{ (ansible_check_mode and 'check-mode-uid') or cluster_result.cluster.metadata.uid }}"
+          when: cluster_result is defined
+
+        - name: Verify cluster creation
+          fail:
+            msg: "Cluster creation failed or didn't return expected data"
+          when: not ansible_check_mode and (cluster_uid is not defined or not cluster_uid)
+
+      rescue:
+        - name: Display cluster error details
+          debug:
+            msg: "Failed to create cluster: {{ cluster_result | to_nice_json }}"
+          when: cluster_result is defined
+
+        - name: Fail with detailed error
+          fail:
+            msg: "Failed to create cluster. See above for details."
+
+    - name: Create Backup Location
+      block:
+        - name: Create backup location
+          backup_location:
+            operation: CREATE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ token_response.access_token }}"
+            name: "{{ backup_location.name }}"
+            org_id: "{{ org_id }}"
+            location_type: "{{ backup_location.location_type }}"
+            path: "{{ backup_location.path }}"
+            cloud_credential_ref:
+              cloud_credential_name: "ansible-minio"
+              cloud_credential_uid: "{{ cloud_credential_uid }}"
+            encryption_key: "{{ backup_location.encryption_key | default(omit) }}"
+            validate_cloud_credential: "{{ backup_location.validate_cloud_credential | default(true) }}"
+            validate_certs: "{{ backup_location.validate_certs | default(true) }}"
+            object_lock_enabled: "{{ backup_location.object_lock_enabled | default(false) }}"
+            s3_config:
+              region: "{{ backup_location.s3_config.region }}"
+              endpoint: "{{ backup_location.s3_config.endpoint }}"
+              disable_ssl: "{{ backup_location.s3_config.disable_ssl }}"
+              disable_path_style: "{{ backup_location.s3_config.disable_path_style }}"
+          register: backup_location_result
+
+        - name: Store backup location UID
+          set_fact:
+            backup_location_uid: "{{ (ansible_check_mode and 'check-mode-uid') or backup_location_result.backup_location.metadata.uid }}"
+          when: backup_location_result is defined
+
+        - name: Verify backup location creation
+          fail:
+            msg: "Backup location creation failed or didn't return expected data"
+          when: not ansible_check_mode and backup_location_uid is not defined
+
+      rescue:
+        - name: Display backup location error details
+          debug:
+            msg: "Failed to create backup location: {{ backup_location_result | to_nice_json }}"
+          when: backup_location_result is defined
+
+        - name: Fail with detailed error
+          fail:
+            msg: "Failed to create backup location. See above for details."
+
+    - name: Create Backup
+      block:
+        - name: Create backup
+          backup:
+            operation: CREATE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ token_response.access_token }}"
+            name: "{{ backups.name }}"
+            org_id: "{{ org_id }}"
+            backup_location_ref:
+              name: "{{ backup_location.name }}"
+              uid: "{{ backup_location_uid }}"
+            cluster_ref:
+              name: "{{ cluster.name }}"
+              uid: "{{ cluster_uid }}"
+            namespaces: "{{ backups.target_namespaces }}"
+            backup_type: "{{ backups.backup_type }}"
+            backup_object_type:
+              type: "{{ backups.backup_object_type.type }}"
+            label_selectors: "{{ backups.label_selectors | default({}) }}"
+            resource_types: "{{ backups.resource_types | default(omit) }}"
+            exclude_resource_types: "{{ backups.exclude_resource_types | default(omit) }}"
+            skip_vm_auto_exec_rules: "{{ backups.skip_vm_auto_exec_rules | default(false) }}"
+            volume_snapshot_class_mapping: "{{ backups.volume_snapshot_class_mapping | default(omit) }}"
+            direct_kdmp: "{{ backups.direct_kdmp | default(false) }}"
+          register: backup_result
+
+        - name: Store backup UID
+          set_fact:
+            backup_uid: "{{ (ansible_check_mode and 'check-mode-uid') or backup_result.backup.metadata.uid }}"
+          when: backup_result is defined
+
+        - name: Show backup status
+          debug:
+            msg: 
+              - "Backup Status:"
+              - "Name: {{ backups.name }}"
+              - "UID: {{ backup_uid }}"
+              - "Status: {{ backup_result.backup.backup_info.status.status }}"
+
+        - name: Monitor backup progress
+          backup:
+            operation: INSPECT_ONE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ token_response.access_token }}"
+            name: "{{ backups.name }}"
+            org_id: "{{ org_id }}"
+            uid: "{{ backup_uid }}"
+          register: backup_status
+          until: backup_status.backup.backup_info.status.status not in ['Pending', 'InProgress']
+          retries: 30
+          delay: 10
+          when: not ansible_check_mode
+
+      rescue:
+        - name: Display backup error details
+          debug:
+            msg: "Failed to create backup: {{ backup_result | to_nice_json }}"
+          when: backup_result is defined
+
+        - name: Fail with detailed error
+          fail:
+            msg: "Failed to create backup. See above for details."
+
+    - name: Display Final Results
+      debug:
+        msg:
+          - "Workflow completed successfully:"
+          - "Cloud Credential: {{ cloud_credential.name }} (UID: {{ cloud_credential_uid }})"
+          - "Cluster: {{ cluster.name }} (UID: {{ cluster_uid }})"
+          - "Backup Location: {{ backup_location.name }} (UID: {{ backup_location_uid }})"
+          - "Backup: {{ backups.name }} (UID: {{ backup_uid }})"
+      when:
+        - cloud_credential_uid is defined
+        - cluster_uid is defined
+        - backup_location_uid is defined
+        - backup_uid is defined

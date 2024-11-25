@@ -181,8 +181,6 @@ notes:
     - "UNSHARE_CLUSTER: name, uid, org_id, cluster_share"
 '''
 
-# TODO: Add examples
-
 # Configure logging
 logger = logging.getLogger('cluster')
 logger.addHandler(logging.NullHandler())
