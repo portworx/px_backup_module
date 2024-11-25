@@ -549,44 +549,22 @@ def create_backup(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict[s
             data=backup_request
         )
 
-        # Process response using the common handler
-        result = process_backup_response(response)
-        return result, True
+        # Return the backup from the response
+        if isinstance(response, dict) and 'backup' in response:
+            return response['backup'], True
+            
+        # If we get an unexpected response format, raise an error
+        raise ValueError(f"Unexpected API response format: {response}")
         
     except Exception as e:
         error_msg = str(e)
-        if hasattr(e, 'response'):
+        if isinstance(e, requests.exceptions.RequestException) and hasattr(e, 'response'):
             try:
                 error_detail = e.response.json()
                 error_msg = f"{error_msg}: {error_detail}"
             except ValueError:
-                error_msg = f"{error_msg}: {getattr(e.response, 'text', 'No response text')}"
+                error_msg = f"{error_msg}: {e.response.text}"
         module.fail_json(msg=f"Failed to create backup: {error_msg}")
-
-def perform_operation(module: AnsibleModule, client: PXBackupClient, operation: str) -> OperationResult:
-    """
-    Perform the requested operation
-    """
-    try:
-        if operation == 'CREATE':
-            result, changed = create_backup(module, client)
-            return OperationResult(
-                success=True,
-                changed=changed,
-                data=result,
-                message=f"Backup created successfully. Status: {result.get('status', 'Unknown')}, ID: {result.get('backup_id', 'Unknown')}"
-            )
-        
-        # ... rest of the operations ...
-
-    except Exception as e:
-        logger.exception(f"Operation {operation} failed")
-        return OperationResult(
-            success=False,
-            changed=False,
-            error=handle_api_error(e, operation)
-        )
-
 
 def update_backup(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict[str, Any], bool]:
     """Update an existing backup"""
@@ -682,8 +660,6 @@ def update_backup_share(module: AnsibleModule, client: PXBackupClient) -> Tuple[
 
 def enumerate_backups(module: AnsibleModule, client: PXBackupClient) -> List[Dict[str, Any]]:
     """List all backups"""
-    # First, let's log the input parameters for debugging
-    logger.debug(f"Enumerate parameters: {module.params}")
 
     # Build query parameters
     params = {
@@ -726,9 +702,6 @@ def enumerate_backups(module: AnsibleModule, client: PXBackupClient) -> List[Dic
             f"v1/backup/{module.params['org_id']}",
             params=params
         )
-
-        # Log the response for debugging
-        logger.debug(f"Received response: {response}")
 
         return response.get('backups', [])
     except Exception as e:

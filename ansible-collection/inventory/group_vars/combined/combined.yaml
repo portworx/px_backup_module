@@ -1,0 +1,50 @@
+---
+# Cloud Credential configuration (single configuration)
+cloud_credential:
+  name: "example-minio"
+  credential_type: "AWS"
+  owner: "example-owner-id"
+  aws_config:
+    access_key: "example-access-key"
+    secret_key: "example-secret-key"
+
+# Cluster configuration (single configuration)
+cluster:
+  name: "example-cluster"
+  cloud_type: "OTHERS"
+  kubeconfig: "<your-kubeconfig>"
+
+# Backup Location configuration (single configuration)
+backup_location:
+  name: "example-bl-s3"
+  location_type: "S3"
+  path: "example-path"
+  validate_cloud_credential: true
+  validate_certs: true
+  object_lock_enabled: false
+  s3_config:
+    region: "example-region"
+    endpoint: "example-endpoint"
+    disable_ssl: true
+    disable_path_style: true
+
+# Backup configurations
+backups:
+  name: "example-backup"
+  target_namespaces:
+    - "default"
+  backup_type: "Normal"  # or 'Generic'
+  # label_selectors:
+  #   app: "test"
+  #   environment: "dev"
+  backup_object_type:
+    type: "All"  # or 'VirtualMachine'
+  # Optional settings
+  # resource_types:
+  #   - "deployments"
+  #   - "services"
+  #   - "configmaps"
+  exclude_resource_types:
+    - "secrets"
+  direct_kdmp: false
+
