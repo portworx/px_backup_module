@@ -34,6 +34,8 @@
             include_resources: "{{ item.include_resources | default(omit) }}"
             validate_certs: "{{ item.validate_certs | default(true) }}"
             replace_policy: "{{ item.replace_policy | default('Retain') }}"
+            rancher_project_mapping: "{{ rancher_project_mapping | default(omit) }}"
+            rancher_project_name_mapping: "{{ rancher_project_name_mapping | default(omit) }}"
             cluster: "{{ item.cluster if item.cluster is defined else item.cluster_ref.name }}"
           loop: "{{ restores }}"
           register: restore_result

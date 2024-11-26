@@ -1,7 +1,6 @@
 ---
 restore_deletes:
-  - name: "default-restore-with-delete"
-    # uid: "restore-uid"
+  - name: "res-select-1-pvc"
     # Optional: cluster_ref if deleting through specific cluster
     # cluster_ref:
     #   name: "prod-cluster"
@@ -9,5 +8,4 @@ restore_deletes:
     validate_certs: true
 
   # - name: "test-backup"
-  #   uid: "backup-789"
   #   validate_certs: true
