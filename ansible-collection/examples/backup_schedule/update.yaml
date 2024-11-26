@@ -12,7 +12,6 @@
       assert:
         that:
           - px_backup_api_url is defined
-          - px_backup_token is defined
           - backup_schedules_update is defined
         fail_msg: "Required variables must be defined"
 

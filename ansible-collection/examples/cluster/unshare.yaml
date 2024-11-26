@@ -12,10 +12,10 @@
       assert:
         that:
           - px_backup_api_url is defined
-          - px_backup_token is defined
           - clusters_unshare is defined
         fail_msg: "Required variables must be defined: px_backup_api_url, px_backup_token, and clusters_unshare"
-
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
     - name: Unshare PX-Backup clusters with users and groups
       cluster:
         operation: UNSHARE_CLUSTER

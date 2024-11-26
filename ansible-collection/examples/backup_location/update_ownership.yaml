@@ -12,11 +12,12 @@
       assert:
         that:
           - px_backup_api_url is defined
-          - px_backup_token is defined
           - backup_ownership_updates is defined
         fail_msg: "Required variables must be defined"
 
   tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
     - name: Update backup locations ownership
       block:
         - name: Update backup location ownership

@@ -12,15 +12,16 @@
       assert:
         that:
           - px_backup_api_url is defined
-          - px_backup_token is defined
           - clusters_update is defined
-        fail_msg: "Required variables must be defined: px_backup_api_url, px_backup_token, and clusters_update"
+        fail_msg: "Required variables must be defined: px_backup_api_url and clusters_update"
 
     - name: Get current timestamp
       set_fact:
         current_timestamp: "{{ lookup('pipe', 'date +%Y-%m-%d-%H-%M-%S') }}"
 
   tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
     - name: Backup and update clusters
       block:
       - name: Retrieve current configurations for clusters
