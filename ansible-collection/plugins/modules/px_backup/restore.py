@@ -76,7 +76,6 @@ options:
     uid:
         description:
             - Unique identifier of the restore
-            - Required for DELETE
         required: false
         type: str
     backup_ref:
@@ -146,8 +145,8 @@ requirements:
 notes:
     - "Operation-specific required parameters:"
     - "CREATE: name, backup_ref, cluster_ref"
-    - "DELETE: name, uid"
-    - "INSPECT_ONE: name"
+    - "DELETE: name, org_id"
+    - "INSPECT_ONE: name, org_id"
     - "INSPECT_ALL: org_id"
 '''
 
@@ -464,9 +463,7 @@ def delete_restore(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict[
     """Delete a restore"""
     try:
         # Build delete request parameters
-        params = {
-            'uid': module.params['uid']
-        }
+        params = {}
         
         # Add cluster information
         if module.params.get('cluster_ref'):
@@ -478,7 +475,6 @@ def delete_restore(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict[
         response = client.make_request(
             'DELETE',
             f"v1/restore/{module.params['org_id']}/{module.params['name']}",
-            params=params
         )
         return response, True
     except Exception as e:
@@ -704,9 +700,9 @@ def run_module():
     operation_requirements = {
         'CREATE': ['name', 'backup_ref', 'cluster_ref'],
 
-        'DELETE': ['name', 'uid'],
+        'DELETE': ['name', 'org_id'],
 
-        'INSPECT_ONE': ['name'],
+        'INSPECT_ONE': ['name', 'org_id'],
 
         'INSPECT_ALL': ['org_id'],
     }
@@ -718,9 +714,9 @@ def run_module():
             ('operation', 'CREATE', [
              'name', 'backup_ref', 'cluster_ref']),
 
-            ('operation', 'DELETE', ['name', 'uid']),
+            ('operation', 'DELETE', ['name', 'org_id']),
 
-            ('operation', 'INSPECT_ONE', ['name']),
+            ('operation', 'INSPECT_ONE', ['name', 'org_id']),
 
             ('operation', 'INSPECT_ALL', ['org_id']),
         ]
