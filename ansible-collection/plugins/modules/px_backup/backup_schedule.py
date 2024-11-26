@@ -375,7 +375,7 @@ def run_module():
         backup_type=dict(type='str', choices=['Invalid', 'Generic', 'Normal']),
         ns_label_selectors=dict(type='str', required=False),
         skip_vm_auto_exec_rules=dict(type='bool', required=False),
-        suspend=dict(type='str', required=False),
+        suspend=dict(type='bool', required=False, default=False),
         direct_kdmp=dict(type='bool', required=False),
         include_resources=dict(type='list', elements='dict', options=dict(
                 name=dict(type='str'),

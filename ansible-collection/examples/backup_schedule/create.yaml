@@ -56,6 +56,7 @@
             volume_snapshot_class_mapping: "{{ item.volume_snapshot_class_mapping }}"
             direct_kdmp: "{{ item.direct_kdmp }}"
             owner: "admin"
+            exclude_resource_types: "{{ item.exclude_resource_types | default(omit) }}"
           loop: "{{ backup_schedules }}"
           register: backup_result
           loop_control:
