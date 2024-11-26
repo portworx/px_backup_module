@@ -1,27 +1,56 @@
-- name: Update PX-Backup backup share settings with add and delete options
+---
+- name: Update PX-Backup backup share settings
   hosts: localhost
   gather_facts: false
 
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/cluster/update_ownership.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - px_backup_token is defined
+          - backup_share_updates is defined
+        fail_msg: "Required variables must be defined"
+
   tasks:
-    - name: Update backup share settings 
-      cluster:
-        operation: UPDATE_BACKUP_SHARE
-        api_url: "{{ px_backup_api_url }}"
-        token: "{{ px_backup_token }}"
-        org_id: "default"
-        name: "test-cluster"
-        uid: "feb239d3-4af4-4b2e-b010-cc8f4f2e254c"
-        backup_share:
-          add:
-            groups:
-              - id: "group1"
-                access: 1
-            collaborators:
-              - id: "user1"
-                access: 3
-          delete: 
-            groups:
-              - id: "group1"
-            collaborators:
-              - id: "user1"
+    - name: Update backup shares for clusters
+      block:
+        - name: Process backup share updates
+          cluster:
+            operation: UPDATE_BACKUP_SHARE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            org_id: "{{ org_id | default('default') }}"
+            name: "{{ item.name }}"
+            uid: "{{ item.uid }}"
+            backup_share: "{{ item.backup_share }}"
+          loop: "{{ backup_share_updates }}"
+          register: backup_share_results
+          loop_control:
+            label: "{{ item.name }}"
+
+      rescue:
+        - name: Log failure details
+          debug:
+            msg: "Failed to update backup shares: {{ backup_share_results.results | selectattr('failed', 'true') | map(attribute='msg') | list }}"
+
+        - name: Fail on errors
+          fail:
+            msg: "Error updating backup shares. See debug output for details."
+
+    - name: Display update results
+      debug:
+        msg:
+          - "Backup share update summary:"
+          - "Clusters updated: {{ backup_share_results.results | map(attribute='item.name') | list }}"
+          - "Changes made: {{ backup_share_results.results | map(attribute='changed') | list }}"
+      when:
+        - backup_share_results is defined
+        - backup_share_results.results is defined
+        - (backup_share_results.results | selectattr('failed', 'defined') | selectattr('failed', 'true') | list | length) == 0
+
             

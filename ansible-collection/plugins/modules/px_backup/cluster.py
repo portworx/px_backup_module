@@ -147,6 +147,19 @@ options:
         description: Backup sharing configuration
         required: false
         type: dict
+        suboptions:
+            collaborators:
+                description: List of users to share with
+                type: list
+                elements: str
+            groups:
+                description: List of groups to share with
+                type: list
+                elements: str
+            access_type:
+                description: Access type for sharing
+                type: str
+                choices: ['Invalid', 'View', 'Restorable', 'FullAccess']
     cluster_share:
         description: Cluster sharing configuration
         required: false
@@ -290,12 +303,49 @@ def update_cluster(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict[
 def update_backup_share(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict[str, Any], bool]:
     """Update backup sharing settings"""
     try:
+        # Map access types to enum values based on protobuf definition
+        access_type_map = {
+        'Invalid': 0,
+        'View': 1,
+        'Restorable': 2,
+        'FullAccess': 3
+        }
+
+        # Get backup share configuration from module params
+        backup_share = module.params.get('backup_share', {})
+
+        # Helper function to map access types
+        def map_access_type(items):
+            if not items:
+                return []
+            mapped_items = []
+            for item in items:
+                access_type = item.get('access')
+                if access_type not in access_type_map:
+                    module.fail_json(msg=f"Invalid access_type: {access_type}. Must be one of: {', '.join(access_type_map.keys())}")
+                mapped_items.append({
+                    "id": item["id"],
+                    "access": access_type_map[access_type]
+                })
+            return mapped_items
+
+        # Process add and delete backup shares
+        add_backup_share = {
+            "groups": map_access_type(backup_share.get("add", {}).get("groups", [])),
+            "collaborators": map_access_type(backup_share.get("add", {}).get("collaborators", []))
+        }
+
+        del_backup_share = {
+            "groups": map_access_type(backup_share.get("delete", {}).get("groups", [])),
+            "collaborators": map_access_type(backup_share.get("delete", {}).get("collaborators", []))
+}
+
         request = {
             "org_id": module.params['org_id'],
             "name": module.params['name'],
             "uid": module.params['uid'],
-            "add_backup_share": module.params.get('backup_share', {}).get('add', {}),
-            "del_backup_share": module.params.get('backup_share', {}).get('delete', {})
+            "add_backup_share": add_backup_share,
+            "del_backup_share": del_backup_share
         }
         
         response = client.make_request(
@@ -684,7 +734,46 @@ def run_module():
                 share_cluster_backups=dict(type='bool', default=False)
             )
         ),
-        include_secrets=dict(type='bool', default=False)
+        include_secrets=dict(type='bool', default=False),
+         # metadata-related arguments
+        ownership=dict(
+            type='dict',
+            required=False,
+            options=dict(
+                owner=dict(type='str'),
+                groups=dict(
+                    type='list',
+                    elements='dict',
+                    options=dict(
+                        id=dict(type='str'),
+                        access=dict(
+                            type='str',
+                            choices=['Read', 'Write', 'Admin']
+                        )
+                    )
+                ),
+                collaborators=dict(
+                    type='list',
+                    elements='dict',
+                    options=dict(
+                        id=dict(type='str'),
+                        access=dict(
+                            type='str',
+                            choices=['Read', 'Write', 'Admin']
+                        )
+                    )
+                ),
+                public=dict(
+                    type='dict',
+                    options=dict(
+                        type=dict(
+                            type='str',
+                            choices=['Read', 'Write', 'Admin']
+                        )
+                    )
+                )
+            )
+        )
     )
 
     # Define required parameters for each operation
