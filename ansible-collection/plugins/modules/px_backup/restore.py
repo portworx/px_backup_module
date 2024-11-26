@@ -76,7 +76,7 @@ options:
     uid:
         description:
             - Unique identifier of the restore
-            - Required for DELETE, INSPECT_ONE operations
+            - Required for DELETE
         required: false
         type: str
     backup_ref:
@@ -147,7 +147,7 @@ notes:
     - "Operation-specific required parameters:"
     - "CREATE: name, backup_ref, cluster_ref"
     - "DELETE: name, uid"
-    - "INSPECT_ONE: name, uid"
+    - "INSPECT_ONE: name"
     - "INSPECT_ALL: org_id"
 '''
 
@@ -461,7 +461,7 @@ def create_restore(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict[
         module.fail_json(msg=f"Failed to create restore: {error_msg}")
 
 def delete_restore(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict[str, Any], bool]:
-    """Delete a backup"""
+    """Delete a restore"""
     try:
         # Build delete request parameters
         params = {
@@ -494,22 +494,18 @@ def delete_restore(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict[
 def inspect_restore(module: AnsibleModule, client: PXBackupClient) -> Dict[str, Any]:
     """Get details of a specific restore"""
     try:
-        # Build request URL and params
-        params = {}
-        if module.params.get('uid'):
-            params['uid'] = module.params['uid']
+
 
         response = client.make_request(
             'GET',
             f"v1/restore/{module.params['org_id']}/{module.params['name']}",
-            params=params
         )
         
         # Log response for debugging
         module.debug(f"API Response: {response}")
 
         if not response:
-            module.fail_json(msg=f"No restores found with name {module.params['name']} and uid {module.params['uid']}")
+            module.fail_json(msg=f"No restores found with name {module.params['name']}")
 
         # Return the processed response
         return {
@@ -710,7 +706,7 @@ def run_module():
 
         'DELETE': ['name', 'uid'],
 
-        'INSPECT_ONE': ['name', 'uid'],
+        'INSPECT_ONE': ['name'],
 
         'INSPECT_ALL': ['org_id'],
     }
@@ -724,7 +720,7 @@ def run_module():
 
             ('operation', 'DELETE', ['name', 'uid']),
 
-            ('operation', 'INSPECT_ONE', ['name', 'uid']),
+            ('operation', 'INSPECT_ONE', ['name']),
 
             ('operation', 'INSPECT_ALL', ['org_id']),
         ]

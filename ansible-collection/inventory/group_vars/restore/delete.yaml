@@ -1,7 +1,7 @@
 ---
 restore_deletes:
   - name: "restoocp"
-    uid: "fa735cc4-ccba-47ac-b6fe-55970591b9b1"
+    uid: "restore-uid"
     # Optional: cluster_ref if deleting through specific cluster
     # cluster_ref:
     #   name: "prod-cluster"

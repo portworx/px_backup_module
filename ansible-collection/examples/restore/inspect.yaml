@@ -16,7 +16,6 @@
           - px_backup_token is defined
           - org_id is defined
           - restore_name is defined
-          - restore_uid is defined
         fail_msg: "Required variables must be defined"
 
   tasks:
@@ -29,7 +28,6 @@
             token: "{{ px_backup_token }}"
             org_id: "{{ org_id }}"
             name: "{{ restore_name }}"
-            uid: "{{ restore_uid }}"
             validate_certs: "{{ validate_certs | default(true) }}"
           register: restore_result
 
