@@ -62,7 +62,7 @@
     - name: Display creation results
       debug:
         msg: 
-          - "Successfully created backups:"
+          - "Successfully created backups"
           - "Created backups: {{ backup_result.results | map(attribute='item.name') | list }}"
           - "Changed status: {{ backup_result.results | map(attribute='changed') | list }}"
       when: 
