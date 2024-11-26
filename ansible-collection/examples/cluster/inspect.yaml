@@ -8,22 +8,24 @@
     - "{{ inventory_dir }}/group_vars/cluster/inspect.yaml"
 
   pre_tasks:
+    - name: Fetch bearer token from auth module
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
     - name: Debug variables
       debug:
         msg:
           - "API URL: {{ px_backup_api_url }}"
-          - "Token: {{ px_backup_token }}"
           - "Total clusters to inspect: {{ clusters_inspect | length }}"
 
     - name: Validate required variables
       assert:
         that:
           - px_backup_api_url is defined
-          - px_backup_token is defined
           - clusters_inspect is defined
         fail_msg: "Required variables must be defined"
 
   tasks:
+    - name: Fetch bearer token from auth module
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
     - name: Inspect clusters
       block:
         - name: Get cluster details

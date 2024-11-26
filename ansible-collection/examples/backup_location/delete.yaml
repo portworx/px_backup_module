@@ -17,6 +17,8 @@
         fail_msg: "Required variables must be defined"
 
   tasks:
+    - name: Fetch bearer token from auth module
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
     - name: Delete backup locations
       block:
         - name: Delete backup location

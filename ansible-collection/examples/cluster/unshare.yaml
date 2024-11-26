@@ -4,6 +4,8 @@
   gather_facts: false
 
   tasks:
+    - name: Fetch bearer token from auth module
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
     - name: Unshare cluster from users and groups
       cluster:
         operation: UNSHARE_CLUSTER

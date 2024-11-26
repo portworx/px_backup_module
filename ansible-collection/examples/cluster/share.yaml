@@ -3,7 +3,19 @@
   hosts: localhost
   gather_facts: false
 
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+        fail_msg: "Required variables must be defined"
+
   tasks:
+    - name: Fetch bearer token from auth module
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
     - name: Share cluster with users and groups
       cluster:
         operation: SHARE_CLUSTER

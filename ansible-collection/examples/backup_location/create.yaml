@@ -12,11 +12,12 @@
       assert:
         that:
           - px_backup_api_url is defined
-          - px_backup_token is defined
           - backup_locations is defined
         fail_msg: "Required variables must be defined"
 
   tasks:
+    - name: Fetch bearer token from auth module
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
     - name: Create backup locations
       block:
         - name: Create backup location

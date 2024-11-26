@@ -13,13 +13,14 @@
       assert:
         that:
           - px_backup_api_url is defined
-          - px_backup_token is defined
           - org_id is defined
           - restore_name is defined
           - restore_uid is defined
         fail_msg: "Required variables must be defined"
 
   tasks:
+    - name: Fetch bearer token from auth module
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
     - name: Inspect restore
       block:
         - name: Get restore details
