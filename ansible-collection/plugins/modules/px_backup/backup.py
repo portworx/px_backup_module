@@ -557,9 +557,12 @@ def create_backup(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict[s
             data=backup_request
         )
         
-        # Process response
-        result = process_backup_response(response)
-        return result, True
+        # Return the backup from the response
+        if isinstance(response, dict) and 'backup' in response:
+            return response['backup'], True
+
+        # If we get an unexpected response format, raise an error
+        raise ValueError(f"Unexpected API response format: {response}")
         
     except Exception as e:
         error_msg = str(e)
