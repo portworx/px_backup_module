@@ -109,7 +109,7 @@ options:
         type: dict
     backup_type:
         description: Type of Backup
-        choices: ['Invalid', 'Generic', 'Normal'
+        choices: ['Invalid', 'Generic', 'Normal']
         type: str
     ns_label_selectors:
         description: Namespace Label Selectors

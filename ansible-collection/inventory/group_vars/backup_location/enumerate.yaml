@@ -6,3 +6,6 @@ labels: {}  # Optional labels for filtering
 # Optional filters
 cloud_credential_filter: "{{ cloud_cred_name | default(omit) }}"
 max_results: 100
+cloud_credential_ref:
+  name: "{{ cloud_cred_name | default(omit) }}"
+  uid: "{{ cloud_cred_uid | default(omit) }}"
