@@ -1,19 +1,30 @@
 ---
-- name: Share PX-Backup Cluster
+- name: Share PX-Backup Clusters
   hosts: localhost
   gather_facts: false
 
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/cluster/share.yaml"
+
   tasks:
-    - name: Share cluster with users and groups
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - px_backup_token is defined
+          - clusters_share is defined
+        fail_msg: "Required variables must be defined: px_backup_api_url, px_backup_token, and clusters_share"
+
+    - name: Share PX-Backup clusters with users and groups
       cluster:
         operation: SHARE_CLUSTER
         api_url: "{{ px_backup_api_url }}"
         token: "{{ px_backup_token }}"
-        org_id: "default"
-        name: "test-cluster"
-        uid: "feb239d3-4af4-4b2e-b010-cc8f4f2e254c"
-        cluster_share:
-          users:
-            - "user1"
-          groups: []
-          share_cluster_backups: true
+        org_id: "{{ item.org_id | default('default') }}"
+        name: "{{ item.name }}"
+        uid: "{{ item.uid }}"
+        cluster_share: "{{ item.cluster_share }}"
+      loop: "{{ clusters_share }}"
+      loop_control:
+        label: "{{ item.name }}"

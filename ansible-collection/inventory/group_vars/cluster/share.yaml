@@ -2,7 +2,7 @@
 # Clusters to share
 clusters_share:
   - name: "cluster-1"
-    uid: "uid-1"
+    uid: "cluster-1-uid"
     include_secrets: false
     cluster_share:
       users:
@@ -11,7 +11,7 @@ clusters_share:
       share_cluster_backups: true
 
   - name: "cluster-2"
-    uid: "uid-2"
+    uid: "cluster-2-uid"
     include_secrets: false
     cluster_share:
       users:

@@ -1,19 +1,107 @@
 ---
-- name: Update PX-Backup cluster
+- name: Update PX-Backup Clusters
   hosts: localhost
   gather_facts: false
 
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/cluster/update.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - px_backup_token is defined
+          - clusters_update is defined
+        fail_msg: "Required variables must be defined: px_backup_api_url, px_backup_token, and clusters_update"
+
+    - name: Get current timestamp
+      set_fact:
+        current_timestamp: "{{ lookup('pipe', 'date +%Y-%m-%d-%H-%M-%S') }}"
+
   tasks:
-    - name: Update cluster
+    - name: Backup and update clusters
+      block:
+      - name: Retrieve current configurations for clusters
+        cluster:
+          operation: INSPECT_ONE
+          api_url: "{{ px_backup_api_url }}"
+          token: "{{ px_backup_token }}"
+          org_id: "default"
+          name: "{{ item.name }}"
+          uid: "{{ item.uid }}"
+        register: current_configs
+        loop: "{{ clusters_update }}"
+        loop_control:
+          label: "{{ item.name }}"
+
+      - name: Backup current configurations
+        copy:
+          content: "{{ item }}"
+          dest: "/tmp/cluster_{{ item.item.name }}_{{ current_timestamp }}.json"
+        loop: "{{ current_configs.results }}"
+        loop_control:
+          label: "{{ item.item.name }}"
+
+      - name: Update clusters
+        cluster:
+          operation: UPDATE
+          api_url: "{{ px_backup_api_url }}"
+          token: "{{ px_backup_token }}"
+          org_id: "default"
+          name: "{{ item.name }}"
+          uid: "{{ item.uid }}"
+          kubeconfig: "{{ item.kubeconfig }}"
+          labels: "{{ item.labels | default(omit) }}"
+          cloud_credential_ref: "{{ item.cloud_credential_ref | default(omit) }}"
+          platform_credential_ref: "{{ item.platform_credential_ref | default(omit) }}"
+          ownership: "{{ item.ownership | default(omit) }}"
+        register: update_results
+        loop: "{{ clusters_update }}"
+        loop_control:
+          label: "{{ item.name }}"
+
+      rescue:
+        - name: Log failure details
+          debug:
+            msg: "Failed to update clusters: {{ update_results.results | selectattr('failed', 'true') | map(attribute='msg') | list }}"
+
+        - name: Fail with error message
+          fail:
+            msg: "Error updating clusters. Check the failure logs."
+
+    - name: Validate updated configurations
       cluster:
-        operation: UPDATE
+        operation: INSPECT_ONE
         api_url: "{{ px_backup_api_url }}"
         token: "{{ px_backup_token }}"
         org_id: "default"
-        name: "test-cluster"
-        uid: "feb239d3-4af4-4b2e-b010-cc8f4f2e254c"
-        provider: "OTHERS"
-        platform_credential_ref:
-          name: ""
-          uid: ""
-        kubeconfig: "invalid"
+        name: "{{ item.name }}"
+        uid: "{{ item.uid }}"
+      register: final_validation
+      loop: "{{ clusters_update }}"
+      loop_control:
+        label: "{{ item.name }}"
+      when: update_results is changed
+
+    - name: Show update results
+      debug:
+        msg:
+          - "Update Results:"
+          - "----------------------------------------"
+          - "Cluster: {{ item.item.name }}"
+          - "Configuration Update: {{ 'Success' if item is changed else 'No changes needed' }}"
+          - "----------------------------------------"
+      loop: "{{ update_results.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+
+    - name: Summarize update operation
+      debug:
+        msg:
+          - "Update Summary:"
+          - "Total attempted: {{ update_results.results | length }}"
+          - "Successfully updated: {{ update_results.results | selectattr('changed', 'true') | list | length }}"
+          - "Failed updates: {{ update_results.results | selectattr('failed', 'defined') | selectattr('failed', 'true') | list | length }}"
+          - "Updated clusters: {{ update_results.results | selectattr('changed', 'true') | map(attribute='item.name') | list }}"
