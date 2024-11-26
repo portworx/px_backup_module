@@ -175,7 +175,7 @@ options:
             type:
                 description: Type of backup object
                 type: str
-                choices: ['All', 'VirtualMachine']
+                choices: ['Invalid', 'All', 'VirtualMachine']
     ns_label_selectors:
         description: Label selectors for namespaces
         type: str
@@ -211,10 +211,6 @@ options:
                 description: List of groups to share with
                 type: list
                 elements: str
-            access_type:
-                description: Access type for sharing
-                type: str
-                choices: ['Invalid', 'View', 'Restorable', 'FullAccess']
     validate_certs:
         description: Verify SSL certificates
         type: bool
