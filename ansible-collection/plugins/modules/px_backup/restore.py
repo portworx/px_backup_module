@@ -634,11 +634,9 @@ def run_module():
             required=True,
             choices=[
                 'CREATE',
-                'UPDATE',
                 'DELETE',
                 'INSPECT_ONE',
                 'INSPECT_ALL',
-                'ENUMERATE'
             ]
         ),
         name=dict(type='str', required=False),
