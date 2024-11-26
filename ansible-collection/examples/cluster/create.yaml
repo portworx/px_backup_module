@@ -32,11 +32,7 @@
             platform_credential_ref: "{{ item.platform_credential_ref | default(omit) }}"
             px_config: "{{ item.px_config | default(omit) }}"
             service_token: "{{ item.service_token | default(omit) }}"
-            delete_restores: "{{ item.delete_restores | default(false) }}"
-            delete_all_cluster_backups: "{{ item.delete_all_cluster_backups | default(false) }}"
             validate_certs: "{{ item.validate_certs | default(true) }}"
-            backup_share: "{{ item.backup_share | default(omit) }}"
-            cluster_share: "{{ item.cluster_share | default(omit) }}"
           loop: "{{ clusters }}"
           register: cluster_result
           loop_control:
