@@ -375,7 +375,6 @@ def build_restore_request(params: Dict[str, Any], module: AnsibleModule, client:
     if params.get('cluster'):
         request['cluster'] = params['cluster']
     
-    # Add backup type if provided
     if params.get('replace_policy'):
         replace_policy_map = {
             'Invalid': 0,
