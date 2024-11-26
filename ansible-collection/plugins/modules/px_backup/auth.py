@@ -37,10 +37,6 @@ options:
         description: Duration of Token
         required: false
         type: str
-    validate_certs:
-        description: Verify SSL certificates
-        type: bool
-        default: true
 '''
 from ansible.module_utils.basic import AnsibleModule
 import requests
@@ -71,9 +67,9 @@ def run_module():
     """Define the Ansible module."""
     module_args = dict(
         auth_url=dict(type='str', required=True),
-        grant_type=dict(type='str', required=False, default="password"),
-        client_id=dict(type='str', required=True),
-        username=dict(type='str', required=True),
+        grant_type=dict(type='str', required=False, default="password", no_log=True),
+        client_id=dict(type='str', required=True, no_log=True),
+        username=dict(type='str', required=True, no_log=True),
         password=dict(type='str', required=True, no_log=True),
         token_duration=dict(type='str', required=False, default="7d")
     )
