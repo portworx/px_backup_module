@@ -1,0 +1,26 @@
+---
+# Backup schedules to update
+
+backup_schedules_update:
+  - name: "bs-1"
+    uid: "bs-1-uid"
+    suspend: false
+    cluster_ref:
+      name: "cluster-1"
+      uid: "cluster-1-uid"
+    pre_exec_rule_ref:
+      name: "pre-rule"
+      uid: "pre-rule-uid"
+    post_exec_rule_ref:
+      name: "post-rule"
+      uid: "post-rule-uid"
+    schedule_policy_ref:
+      name: "sched-policy-1"
+      uid: "sched-policy-1-uid"
+    backup_location_ref:
+      name: "s3-backup-loc"
+      uid: "backup-loc-uid"
+
+
+# Global update configuration
+backup_configs: true

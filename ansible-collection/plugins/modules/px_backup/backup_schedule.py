@@ -332,6 +332,16 @@ def backup_schedule_request_body(module):
         "direct_kdmp": module.params['direct_kdmp'],
 
     }
+
+    if module.params.get('operation') == "UPDATE":
+        backup_schedule_request['cluster'] = module.params['cluster_ref'].get('name')
+        backup_schedule_request['schedule_policy'] = module.params['schedule_policy_ref'].get('name')
+        if module.params.get('pre_exec_rule_ref'):
+            backup_schedule_request['pre_exec_rule_ref'] = module.params['pre_exec_rule_ref']
+        if module.params.get('post_exec_rule_ref'):
+            backup_schedule_request['post_exec_rule_ref'] = module.params['post_exec_rule_ref']
+        
+
     if module.params.get('pre_exec_rule_ref') and module.params.get('pre_exec_rule'):
         backup_schedule_request['pre_exec_rule_ref'] = module.params['pre_exec_rule_ref']
         backup_schedule_request['pre_exec_rule'] = module.params['pre_exec_rule']

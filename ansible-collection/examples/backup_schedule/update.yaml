@@ -1,0 +1,121 @@
+---
+- name: Update PX-Backup Backup Schedules
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/backup_schedule/update.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - px_backup_token is defined
+          - backup_schedules_update is defined
+        fail_msg: "Required variables must be defined"
+
+    - name: Get current timestamp
+      set_fact:
+        current_timestamp: "{{ lookup('pipe', 'date +%Y-%m-%d-%H-%M-%S') }}"
+
+  tasks:
+    - name: Backup and update schedules
+      block:
+        - name: Get current configurations
+          backup_schedule:
+            operation: INSPECT_ONE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            name: "{{ item.name }}"
+            uid: "{{ item.uid }}"
+            org_id: "{{ org_id | default('default') }}"
+            suspend: "{{ item.suspend }}"
+            cluster_ref: "{{ item.cluster_ref }}"
+            schedule_policy_ref: "{{ item.schedule_policy_ref }}"
+            backup_location_ref: "{{ item.backup_location_ref }}"
+            pre_exec_rule_ref: "{{ item.pre_exec_rule_ref | default(omit) }}"
+            post_exec_rule_ref: "{{ item.post_exec_rule_ref | default(omit) }}"
+          register: current_configs
+          loop: "{{ backup_schedules_update }}"
+          loop_control:
+            label: "{{ item.name }}"
+
+        - name: Backup current configurations
+          copy:
+            content: "{{ item }}"
+            dest: "/tmp/backup_schedule_{{ item.item.name }}_{{ current_timestamp }}.json"
+          loop: "{{ current_configs.results }}"
+          loop_control:
+            label: "{{ item.item.name }}"
+          when: backup_configs | bool
+
+        - name: Update backup schedules
+          backup_schedule:
+            operation: UPDATE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            org_id: "{{ org_id | default('default') }}"
+            name: "{{ item.name }}"
+            uid: "{{ item.uid }}"
+            suspend: "{{ item.suspend }}"
+            cluster_ref: "{{ item.cluster_ref }}"
+            schedule_policy_ref: "{{ item.schedule_policy_ref }}"
+            backup_location_ref: "{{ item.backup_location_ref }}"
+            pre_exec_rule_ref: "{{ item.pre_exec_rule_ref | default(omit) }}"
+            post_exec_rule_ref: "{{ item.post_exec_rule_ref | default(omit) }}"
+          register: update_result
+          loop: "{{ backup_schedules_update }}"
+          loop_control:
+            label: "{{ item.name }}"
+
+      rescue:
+        - name: Display error details
+          debug:
+            msg: "Failed to update backup schedules: {{ update_result.results | default([]) | selectattr('failed', 'true') | map(attribute='msg') | list }}"
+
+        - name: Fail with error message
+          fail:
+            msg: "Failed to update backup schedules. See above for details."
+
+    - name: Validate updated configurations
+      backup_schedule:
+        operation: INSPECT_ONE
+        api_url: "{{ px_backup_api_url }}"
+        token: "{{ px_backup_token }}"
+        org_id: "{{ org_id | default('default') }}"
+        name: "{{ item.name }}"
+        uid: "{{ item.uid }}"
+        suspend: "{{ item.suspend }}"
+        cluster_ref: "{{ item.cluster_ref }}"
+        schedule_policy_ref: "{{ item.schedule_policy_ref }}"
+        backup_location_ref: "{{ item.backup_location_ref }}"
+        pre_exec_rule_ref: "{{ item.pre_exec_rule_ref | default(omit) }}"
+        post_exec_rule_ref: "{{ item.post_exec_rule_ref | default(omit) }}"
+      register: final_validation
+      loop: "{{ backup_schedules_update }}"
+      loop_control:
+        label: "{{ item.name }}"
+      when: update_result is changed
+
+    - name: Show update results
+      debug:
+        msg: 
+          - "Update Results:"
+          - "----------------------------------------"
+          - "Schedule: {{ item.item.name }}"
+          - "Configuration Update: {{ 'Success' if item is changed else 'No changes needed' }}"
+          - "----------------------------------------"
+      loop: "{{ update_result.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+
+    - name: Summarize update operation
+      debug:
+        msg:
+          - "Update Summary:"
+          - "Total attempted: {{ update_result.results | length }}"
+          - "Successfully updated: {{ update_result.results | selectattr('changed', 'true') | list | length }}"
+          - "Failed updates: {{ update_result.results | selectattr('failed', 'defined') | selectattr('failed', 'true') | list | length }}"
+          - "Updated schedules: {{ update_result.results | selectattr('changed', 'true') | map(attribute='item.name') | list }}"
