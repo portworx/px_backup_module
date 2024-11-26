@@ -12,7 +12,6 @@
       assert:
         that:
           - px_backup_api_url is defined
-          - px_backup_token is defined
           - backup_locations_update is defined
         fail_msg: "Required variables must be defined"
 
@@ -21,6 +20,8 @@
         current_timestamp: "{{ lookup('pipe', 'date +%Y-%m-%d-%H-%M-%S') }}"
 
   tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
     - name: Backup and update locations
       block:
         - name: Get current configurations
