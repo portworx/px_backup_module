@@ -363,20 +363,45 @@ def run_module():
         validate_certs=dict(type='bool', default=True),
         include_secrets=dict(type='bool', default=False),
         labels=dict(type='dict', required=False),
-        ownership=dict(type='dict', required=False, options=dict(
-            owner=dict(type='str'),
-            groups=dict(type='list', elements='dict', options=dict(
-                id=dict(type='str'),
-                access=dict(type='str', choices=['Invalid', 'Read', 'Write', 'Admin'])
-            )),
-            collaborators=dict(type='list', elements='dict', options=dict(
-                id=dict(type='str'),
-                access=dict(type='str', choices=['Invalid', 'Read', 'Write', 'Admin'])
-            )),
-            public=dict(type='dict', options=dict(
-                type=dict(type='str', choices=['Invalid', 'Read', 'Write', 'Admin'])
-            ))
-        )),
+         # metadata-related arguments
+        ownership=dict(
+            type='dict',
+            required=False,
+            options=dict(
+                owner=dict(type='str'),
+                groups=dict(
+                    type='list',
+                    elements='dict',
+                    options=dict(
+                        id=dict(type='str'),
+                        access=dict(
+                            type='str',
+                            choices=['Read', 'Write', 'Admin']
+                        )
+                    )
+                ),
+                collaborators=dict(
+                    type='list',
+                    elements='dict',
+                    options=dict(
+                        id=dict(type='str'),
+                        access=dict(
+                            type='str',
+                            choices=['Read', 'Write', 'Admin']
+                        )
+                    )
+                ),
+                public=dict(
+                    type='dict',
+                    options=dict(
+                        type=dict(
+                            type='str',
+                            choices=['Read', 'Write', 'Admin']
+                        )
+                    )
+                )
+            )
+        ),
     )
 
     result = dict(

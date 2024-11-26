@@ -1,5 +1,5 @@
 ---
-- name: Configure PX-Backup S3 Backup Location
+- name: Configure PX-Backup cloud credentials
   hosts: localhost
   gather_facts: false
 
