@@ -89,6 +89,28 @@ options:
             uid:
                 description: UID of the backup
                 type: str
+    rancher_project_mapping:
+        description: Rancher project mapping
+        type: dict
+        required: false
+        suboptions:
+            key:
+                description: Source rancher project
+                type: str
+            value:
+                description: Destination rancher project
+                type: str
+    rancher_project_name_mapping:
+        description: Rancher project name mapping
+        type: dict
+        required: false
+        suboptions:
+            key:
+                description: Source rancher project name
+                type: str
+            value:
+                description: Destination rancher project name
+                type: str
     cluster_ref:
         description: Reference to cluster
         type: dict
@@ -334,6 +356,8 @@ def build_restore_request(params: Dict[str, Any], module: AnsibleModule, client:
         "cluster_ref": params.get('cluster_ref', {}),
         "include_resources": params.get('include_resources', []),
         "storage_class_mapping": params.get('storage_class_mapping', {}),
+        "rancher_project_mapping": params.get('rancher_project_mapping', {}),
+        "rancher_project_name_mapping": params.get('rancher_project_name_mapping', {})
     })
     
     # Handle namespace mapping if not provided
@@ -632,6 +656,24 @@ def run_module():
             )
         ),
 
+        rancher_project_name_mapping=dict(
+            type='dict',
+            required=False,
+            options=dict(
+                key=dict(type='str', required=True),
+                value=dict(type='str', required=True)
+            )
+        ),
+
+        rancher_project_mapping=dict(
+            type='dict',
+            required=False,
+            options=dict(
+                key=dict(type='str', required=True),
+                value=dict(type='str', required=True)
+            )
+        ),
+        
         # Cluster reference
         cluster_ref=dict(
             type='dict',
