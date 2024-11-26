@@ -373,12 +373,9 @@ def create_backup_location(module: AnsibleModule, client: PXBackupClient) -> Tup
             data=backup_location_request
         )
         
-        # Return the backup_location from the response
-        if isinstance(response, dict) and 'backup_location' in response:
-            return response['backup_location'], True
+        # Return the response
+        return response, True
             
-        # If we get an unexpected response format, raise an error
-        raise ValueError(f"Unexpected API response format: {response}")
         
     except Exception as e:
         error_msg = str(e)
@@ -491,24 +488,6 @@ def delete_backup_location(module, client):
     except Exception as e:
         module.fail_json(msg=f"Failed to delete backup location: {str(e)}")
 
-def validate_google_config(params: Dict[str, Any]) -> None:
-    """Validate Google backup location configuration"""
-    if params['location_type'] == 'Google':
-        if not params.get('google_config'):
-            raise ValidationError("google_config is required for Google backup locations")
-            
-        required_fields = ['project_id', 'json_key']
-        missing = [field for field in required_fields if not params['google_config'].get(field)]
-        if missing:
-            raise ValidationError(f"Google config missing required fields: {', '.join(missing)}")
-            
-        # Validate json_key is valid JSON
-        if params['google_config'].get('json_key'):
-            try:
-                if not isinstance(params['google_config']['json_key'], dict):
-                    json.loads(params['google_config']['json_key'])
-            except json.JSONDecodeError:
-                raise ValidationError("google_config.json_key must be valid JSON")
 
 def build_backup_location_request(params: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -575,8 +554,6 @@ def build_backup_location_request(params: Dict[str, Any]) -> Dict[str, Any]:
             }
         }
 
-    elif params['location_type'] == 'Google' and params.get('google_config'):
-        validate_google_config(params)
 
     elif location_type == 'NFS' and params.get('nfs_config'):
         nfs_config = {}
@@ -829,7 +806,7 @@ def run_module():
         required_if=[
             ('location_type', 'S3', ['s3_config']),
             ('location_type', 'Azure', ['azure_config']),
-            ('location_type', 'Google', ['google_config']),
+            ('location_type', 'Google', ['name', 'path', 'location_type', 'cloud_credential_ref']),
             ('location_type', 'NFS', ['nfs_config'])
         ]
     )
