@@ -5,6 +5,7 @@
 
   vars_files:
     - "{{ inventory_dir}}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/backup_location/enumerate.yaml"
 
   pre_tasks:
     - name: Validate required variables
