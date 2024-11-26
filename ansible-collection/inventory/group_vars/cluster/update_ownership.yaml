@@ -2,20 +2,18 @@
 # Clusters to update
 backup_share_updates:
   - name: "cluster-1"
-    uid: "uid-1"
+    uid: "cluster-1-uid"
     backup_share:
       add:
         groups:
           - id: "group1"
-            access: 1
+            access: "FullAccess"
         collaborators:
-          - id: "user1"
-            access: 3
+          - id: "user2"
+            access: "View"
       delete: 
-        groups:
-          - id: "group1"
-        collaborators:
-          - id: "user1"
+        groups: []
+        collaborators: []
 
 # Global update configuration
 validate_certs: false

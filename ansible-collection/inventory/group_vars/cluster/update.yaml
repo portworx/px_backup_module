@@ -2,7 +2,7 @@
 # Clusters to update
 clusters_update:
   - name: "cluster-1"
-    uid: "uid-1"
+    uid: "cluster-1-uid"
     cloud_type: "OTHERS"
     kubeconfig: "kubeconfig-1"
     labels:
@@ -20,7 +20,7 @@ clusters_update:
           access: "Read"
 
   - name: "cluster-2"
-    uid: "uid-2"
+    uid: "cluster-2-uid"
     cloud_type: "AZURE"
     cloud_credential_ref:
       name: "cloud-cred-name"
