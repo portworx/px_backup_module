@@ -12,12 +12,13 @@
       assert:
         that:
           - px_backup_api_url is defined
-          - px_backup_token is defined
           - restores is defined
           - restores | length > 0
         fail_msg: "Required variables must be defined"
 
   tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
     - name: Create restores
       block:
         - name: Create restore

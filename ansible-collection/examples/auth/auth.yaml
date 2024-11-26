@@ -1,0 +1,39 @@
+---
+- name: Login to Px-Backup using username and password
+  assert:
+    that:
+      - pxcentral_auth_url is defined
+      - pxcentral_client_id is defined
+      - pxcentral_username is defined
+      - pxcentral_password is defined
+    fail_msg: "Required variables must be defined"
+
+- name: Request bearer token
+  auth:
+    auth_url: "{{ pxcentral_auth_url }}"
+    client_id: "{{ pxcentral_client_id }}"
+    username: "{{ pxcentral_username }}"
+    password: "{{ pxcentral_password }}"
+    token_duration: "{{ token_duration | default('7d') }}"
+  register: token_response
+  check_mode: no
+  when: px_backup_token is not defined # Fetch token only if it's not already set
+  no_log: true  # Hide sensitive information in logs
+
+# Set token fact only if we got a valid response
+- name: Set token fact
+  set_fact:
+    px_backup_token: "{{ token_response.access_token }}"
+  when: 
+    - token_response is defined 
+    - token_response.access_token is defined
+    - token_response.access_token | length > 0
+  no_log: true  # Hide sensitive information in logs
+
+# Verify we have a valid token
+- name: Verify token is set
+  assert:
+    that:
+      - px_backup_token is defined
+      - px_backup_token | length > 0
+    fail_msg: "Failed to obtain valid authentication token"

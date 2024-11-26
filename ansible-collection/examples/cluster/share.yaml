@@ -12,10 +12,10 @@
       assert:
         that:
           - px_backup_api_url is defined
-          - px_backup_token is defined
           - clusters_share is defined
         fail_msg: "Required variables must be defined: px_backup_api_url, px_backup_token, and clusters_share"
-
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
     - name: Share PX-Backup clusters with users and groups
       cluster:
         operation: SHARE_CLUSTER

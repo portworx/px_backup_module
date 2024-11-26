@@ -12,10 +12,11 @@
       assert:
         that:
           - px_backup_api_url is defined
-          - px_backup_token is defined
-        fail_msg: "Required variables px_backup_api_url and px_backup_token must be defined"
+        fail_msg: "Required variables px_backup_api_url must be defined"
 
   tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
     - name: Backup Location Enumerate call
       backup_location:
         operation: INSPECT_ALL
