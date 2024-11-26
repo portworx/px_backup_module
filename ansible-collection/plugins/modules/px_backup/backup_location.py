@@ -806,7 +806,6 @@ def run_module():
         required_if=[
             ('location_type', 'S3', ['s3_config']),
             ('location_type', 'Azure', ['azure_config']),
-            ('location_type', 'Google', ['name', 'path', 'location_type', 'cloud_credential_ref']),
             ('location_type', 'NFS', ['nfs_config'])
         ]
     )

@@ -364,30 +364,34 @@ def run_module():
         include_secrets=dict(type='bool', default=False),
         labels=dict(type='dict', required=False),
          # metadata-related arguments
-        ownership=dict(
+        ownership = dict(
             type='dict',
             required=False,
             options=dict(
                 owner=dict(type='str'),
                 groups=dict(
                     type='list',
+                    required=False,
                     elements='dict',
                     options=dict(
-                        id=dict(type='str'),
+                        id=dict(type='str', required=True),
                         access=dict(
                             type='str',
-                            choices=['Read', 'Write', 'Admin']
+                            choices=['Read', 'Write', 'Admin'],
+                            required=True
                         )
                     )
                 ),
                 collaborators=dict(
                     type='list',
+                    required=False,
                     elements='dict',
                     options=dict(
-                        id=dict(type='str'),
+                        id=dict(type='str', required=True),
                         access=dict(
                             type='str',
-                            choices=['Read', 'Write', 'Admin']
+                            choices=['Read', 'Write', 'Admin'],
+                            required=True
                         )
                     )
                 ),
@@ -401,7 +405,7 @@ def run_module():
                     )
                 )
             )
-        ),
+        )
     )
 
     result = dict(
