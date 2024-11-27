@@ -1,0 +1,14 @@
+namespace: purepx
+name: px_backup
+version: 2.8.1
+readme: README.md
+authors:
+- Portworx
+description: Ansible collection for px-backup management
+license:
+- GPL-2.0-or-later
+tags: [portworx, px-backup]
+documentation: https://docs.portworx.com/portworx-backup-on-prem
+repository: https://github.com/portworx/px_backup_module
+
+
