@@ -310,9 +310,12 @@ def update_backup_share(module: AnsibleModule, client: PXBackupClient) -> Tuple[
         'Restorable': 2,
         'FullAccess': 3
         }
-
-        # Get backup share configuration from module params
-        backup_share = module.params.get('backup_share', {})
+        
+        request = {
+            "org_id": module.params['org_id'],
+            "name": module.params['name'],
+            "uid": module.params['uid'],
+        }
 
         # Helper function to map access types
         def map_access_type(items):
@@ -329,24 +332,27 @@ def update_backup_share(module: AnsibleModule, client: PXBackupClient) -> Tuple[
                 })
             return mapped_items
 
-        # Process add and delete backup shares
-        add_backup_share = {
-            "groups": map_access_type(backup_share.get("add", {}).get("groups", [])),
-            "collaborators": map_access_type(backup_share.get("add", {}).get("collaborators", []))
-        }
-
-        del_backup_share = {
-            "groups": map_access_type(backup_share.get("delete", {}).get("groups", [])),
-            "collaborators": map_access_type(backup_share.get("delete", {}).get("collaborators", []))
-}
-
-        request = {
-            "org_id": module.params['org_id'],
-            "name": module.params['name'],
-            "uid": module.params['uid'],
-            "add_backup_share": add_backup_share,
-            "del_backup_share": del_backup_share
-        }
+        # Get backup share configuration from module params
+        if module.params.get('add_backup_share'):
+            add_backup_share = module.params.get('add_backup_share', {})    
+            # Process add and delete backup shares
+            add_backup_share = {
+                "groups": map_access_type(add_backup_share.get("groups", [])),
+                "collaborators": map_access_type(add_backup_share.get("collaborators", []))
+            }
+            request.update({
+                "add_backup_share": add_backup_share
+                })
+        
+        if module.params.get('del_backup_share'):
+            del_backup_share = module.params.get('del_backup_share', {})
+            del_backup_share = {
+                "groups": map_access_type(del_backup_share.get("groups", [])),
+                "collaborators": map_access_type(del_backup_share.get("collaborators", []))
+            }
+            request.update({
+                "del_backup_share": del_backup_share
+            })
         
         response = client.make_request(
             method='PUT',
@@ -725,6 +731,62 @@ def run_module():
                 delete=dict(type='dict')
             )
         ),
+        add_backup_share=dict(
+            type='dict',
+            required=False,
+            options=dict(
+                groups=dict(
+                    type='list',
+                    elements='dict',
+                    options=dict(
+                        id=dict(type='str'),
+                        access=dict(
+                            type='str',
+                            choices=['Invalid', 'View', 'Restorable', 'FullAccess']
+                        )
+                    )
+                ),
+                collaborators=dict(
+                    type='list',
+                    elements='dict',
+                    options=dict(
+                        id=dict(type='str'),
+                        access=dict(
+                            type='str',
+                            choices=['Invalid', 'View', 'Restorable', 'FullAccess']
+                        )
+                    )
+                ),
+            )
+        ),
+        del_backup_share=dict(
+            type='dict',
+            required=False,
+            options=dict(
+                groups=dict(
+                    type='list',
+                    elements='dict',
+                    options=dict(
+                        id=dict(type='str'),
+                        access=dict(
+                            type='str',
+                            choices=['Invalid', 'View', 'Restorable', 'FullAccess']
+                        )
+                    )
+                ),
+                collaborators=dict(
+                    type='list',
+                    elements='dict',
+                    options=dict(
+                        id=dict(type='str'),
+                        access=dict(
+                            type='str',
+                            choices=['Invalid', 'View', 'Restorable', 'FullAccess']
+                        )
+                    )
+                ),
+            )
+        ),
         cluster_share=dict(
             type='dict',
             required=False,
@@ -783,7 +845,7 @@ def run_module():
         'DELETE': ['name', 'org_id'],
         'INSPECT_ONE': ['name', 'uid', 'org_id'],
         'INSPECT_ALL': ['org_id'],
-        'UPDATE_BACKUP_SHARE': ['name', 'uid', 'org_id', 'backup_share'],
+        'UPDATE_BACKUP_SHARE': ['name', 'uid', 'org_id'],
         'SHARE_CLUSTER': ['name', 'uid', 'org_id', 'cluster_share'],
         'UNSHARE_CLUSTER': ['name', 'uid', 'org_id', 'cluster_share']
     }
