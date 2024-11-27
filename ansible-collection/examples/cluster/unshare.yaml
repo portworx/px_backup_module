@@ -24,8 +24,6 @@
         org_id: "{{ item.org_id | default('default') }}"
         name: "{{ item.name }}"
         uid: "{{ item.uid }}"
-        name: "{{ item.name }}"
-        uid: "{{ item.uid }}"
         cluster_share: "{{ item.cluster_share }}"
       loop: "{{ clusters_unshare }}"
       loop_control:
