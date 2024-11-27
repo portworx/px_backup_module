@@ -8,7 +8,7 @@ description: Ansible collection for px-backup management
 license:
 - GPL-2.0-or-later
 tags: [portworx, px-backup]
+documentation: https://docs.portworx.com/portworx-backup-on-prem
 repository: https://github.com/portworx/px_backup_module
-issues: https://github.com/portworx/px_backup_module/issues
 
 
