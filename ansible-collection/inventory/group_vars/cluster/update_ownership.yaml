@@ -1,19 +1,41 @@
 ---
 # Clusters to update
 backup_share_updates:
-  - name: "cluster-1"
-    uid: "cluster-1-uid"
-    backup_share:
-      add:
-        groups:
-          - id: "group1"
-            access: "FullAccess"
-        collaborators:
-          - id: "user2"
-            access: "View"
-      delete: 
-        groups: []
-        collaborators: []
+  - name: "px-source"
+    uid: "ba2a7fb9-9290-471b-a10e-2849439003b3"
+    add_backup_share:
+      groups:
+        - id: "group1"
+          access: "FullAccess"
+      collaborators:
+        - id: "user2"
+          access: "View"
+    del_backup_share: {}
+      # groups:
+      #   - id: "group1"
+      #     access: "FullAccess"
+      # collaborators:
+      #   - id: "user2"
+      #     access: "View"
 
 # Global update configuration
 validate_certs: false
+
+# {
+#   "name": "px-source",
+#   "org_id": "default",
+#   "uid": "ba2a7fb9-9290-471b-a10e-2849439003b3",
+#   "add_backup_share": {
+#     "groups": [],
+#     "collaborators": [
+#       {
+#         "id": "951aa8a1-f230-4fb0-82bb-601cae834465",
+#         "access": 1
+#       }
+#     ]
+#   },
+#   "del_backup_share": {
+#     "groups": [],
+#     "collaborators": []
+#   }
+# }
