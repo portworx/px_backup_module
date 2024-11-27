@@ -8,6 +8,8 @@
     - "{{ inventory_dir }}/group_vars/backup_location/inspect.yaml"
 
   pre_tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
     - name: Debug variables
       debug:
         msg:
@@ -19,11 +21,12 @@
       assert:
         that:
           - px_backup_api_url is defined
-          - px_backup_token is defined
           - backup_locations_inspect is defined
         fail_msg: "Required variables must be defined"
 
   tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
     - name: Inspect backup locations
       block:
         - name: Get backup location details
