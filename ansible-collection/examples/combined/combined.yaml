@@ -105,7 +105,7 @@
 
         - name: Store backup location UID
           set_fact:
-            backup_location_uid: "{{ (ansible_check_mode and 'check-mode-uid') or backup_location_result.backup_location.metadata.uid }}"
+            backup_location_uid: "{{ (ansible_check_mode and 'check-mode-uid') or backup_location_result.backup_location.backup_location.metadata.uid }}"
           when: backup_location_result is defined
 
         - name: Verify backup location creation
@@ -140,8 +140,7 @@
               uid: "{{ cluster_uid }}"
             namespaces: "{{ backups.target_namespaces }}"
             backup_type: "{{ backups.backup_type }}"
-            backup_object_type:
-              type: "{{ backups.backup_object_type.type }}"
+            backup_object_type: "{{ backups.backup_object_type.type }}"
             label_selectors: "{{ backups.label_selectors | default({}) }}"
             resource_types: "{{ backups.resource_types | default(omit) }}"
             exclude_resource_types: "{{ backups.exclude_resource_types | default(omit) }}"
@@ -161,7 +160,7 @@
               - "Backup Status:"
               - "Name: {{ backups.name }}"
               - "UID: {{ backup_uid }}"
-              - "Status: {{ backup_result.backup.backup_info.status.status }}"
+              - "Status: {{ backup_result.backup.metadata.backup_info.status.status }}"
 
         - name: Monitor backup progress
           backup:
