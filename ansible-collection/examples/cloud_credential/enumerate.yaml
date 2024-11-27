@@ -1,0 +1,25 @@
+---
+- name: List all PX-Backup Cloud Credentials
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ inventory_dir}}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/cloud_credential/enumerate_vars.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+        fail_msg: "Required variables px_backup_api_url must be defined"
+
+  tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+    - name: Cloud Credential Enumerate call
+      cloud_credential:
+        operation: INSPECT_ALL
+        api_url: "{{ px_backup_api_url }}"
+        token: "{{ px_backup_token }}"
+        org_id: "{{ org_id | default('default') }}"
