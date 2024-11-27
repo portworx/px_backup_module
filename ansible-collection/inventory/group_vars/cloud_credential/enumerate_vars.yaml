@@ -1,0 +1,3 @@
+---
+# Variables specific to enumeration operations
+include_secrets: false
