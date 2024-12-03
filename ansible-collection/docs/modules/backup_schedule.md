@@ -13,7 +13,7 @@ The backup schedule module enables management of automated backup schedules in P
 ## Requirements
 
 * PX-Backup >= 2.8.1
-* Python >= 3.6
+* Python >= 3.9
 * The `requests` Python package
 
 ## Operations

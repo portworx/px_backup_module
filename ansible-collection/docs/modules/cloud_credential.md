@@ -13,7 +13,7 @@ The cloud credential module manages cloud provider credentials in PX-Backup, ena
 ## Requirements
 
 * PX-Backup >= 2.8.1
-* Python >= 3.6
+* Python >= 3.9
 * The `requests` Python package
 
 ## Operations

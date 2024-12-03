@@ -5,14 +5,14 @@ Ansible collection for managing PX-Backup operations. This collection provides m
 ## Requirements
 
 - Ansible Core >= 2.17.6
-- Python >= 3.6
+- Python >= 3.9
 - PX-Backup >= 2.8.1
 - Python Requests library
 
 ## Installation
 
 ```bash
-ansible-galaxy collection install purepx.px-backup
+ansible-galaxy collection install purepx.px_backup
 ```
 
 For development and reference setup:
@@ -48,7 +48,7 @@ pxcentral_password: "password"
   hosts: localhost
   gather_facts: false
   collections:
-  - purepx.px-backup # Add the collection name to your playbooks
+  - purepx.px_backup # Add the collection name to your playbooks
 
 - name: Create S3 backup location
   backup_location: # Import the modules directly
