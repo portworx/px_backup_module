@@ -1,0 +1,122 @@
+---
+- name: Configure PX-Backup Schedules with PVC Resource Management
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/combined/scheduled_backup.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - clusters is defined
+        fail_msg: "Required variables must be defined"
+
+  tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+      no_log: true
+
+    # Create cluster first
+    - name: Create cluster
+      block:
+        - name: Create cluster
+          cluster:
+            operation: CREATE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            name: "{{ item.name }}"
+            org_id: "{{ org_id | default('default') }}"
+            cloud_type: "{{ item.cloud_type }}"
+            kubeconfig: "{{ item.kubeconfig }}"
+            cloud_credential_ref: "{{ item.cloud_credential_ref | default(omit) }}"
+            platform_credential_ref: "{{ item.platform_credential_ref | default(omit) }}"
+            px_config: "{{ item.px_config | default(omit) }}"
+            service_token: "{{ item.service_token | default(omit) }}"
+            validate_certs: "{{ item.validate_certs | default(false) }}"
+          loop: "{{ clusters }}"
+          register: cluster_result
+          loop_control:
+            label: "{{ item.name }}"
+
+    # Set cluster reference from created cluster
+    - name: Set cluster reference
+      set_fact:
+        cluster_ref:
+          name: "{{ cluster_result.results[0].item.name }}"
+          uid: "{{ cluster_result.results[0].cluster.metadata.uid }}"
+
+    # Get supported resource types using the created cluster
+    - name: Get supported resource types
+      resource_collector:
+        api_url: "{{ px_backup_api_url }}"
+        token: "{{ px_backup_token }}"
+        org_id: "{{ org_id | default('default') }}"
+        cluster_ref: "{{ cluster_ref }}"
+      register: resource_types_result
+
+    - name: Set PVC resource type fact
+      set_fact:
+        pvc_resource: "{{ resource_types_result.resource_types | select('match', 'PersistentVolumeClaim') | list | first }}"
+
+    # Create backup schedules
+    - name: Create Backup Schedule
+      block:
+        - name: Create Backup Schedules
+          backup_schedule:
+            operation: CREATE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            name: "{{ item.name }}"
+            org_id: "{{ org_id | default('default') }}"
+            reclaim_policy: "{{ item.reclaim_policy }}"
+            namespaces: "{{ item.namespaces | default(omit) }}"
+            label_selectors: "{{ item.label_selectors | default(omit) }}"
+            pre_exec_rule: "{{ item.pre_exec_rule | default(omit)}}"
+            post_exec_rule: "{{ item.post_exec_rule | default(omit) }}"
+            include_resources: "{{ item.include_resources | default(omit) }}"
+            resource_types: "{{ item.resource_types | default(omit) }}"
+            schedule_policy_ref: "{{ item.schedule_policy_ref | default(omit) }}"
+            backup_location_ref: "{{ item.backup_location_ref }}"
+            pre_exec_rule_ref: "{{ item.pre_exec_rule_ref | default(omit) }}"
+            post_exec_rule_ref: "{{ item.post_exec_rule_ref | default(omit) }}"
+            backup_type: "{{ item.backup_type }}"
+            ns_label_selectors: "{{ item.ns_label_selectors | default(omit) }}"
+            cluster_ref: "{{ cluster_ref }}"  # Using the cluster ref from created cluster
+            backup_object_type: "{{ item.backup_object_type }}"
+            skip_vm_auto_exec_rules: "{{ item.skip_vm_auto_exec_rules | default(omit) }}"
+            volume_snapshot_class_mapping: "{{ item.volume_snapshot_class_mapping | default(omit) }}"
+            direct_kdmp: "{{ item.direct_kdmp }}"
+            owner: "{{ item.owner | default('admin') }}"
+            exclude_resource_types: "{{ item.exclude_resource_types | default(omit) }}"
+          loop: "{{ backup_schedules }}"
+          register: backup_result
+          loop_control:
+            label: "{{ item.name }}"
+
+    # Display results
+    - name: Display cluster creation results
+      debug:
+        msg:
+          - "Cluster Creation Results:"
+          - "Name: {{ cluster_result.results[0].item.name }}"
+          - "UID: {{ cluster_result.results[0].cluster.metadata.uid }}"
+      when: cluster_result is defined
+
+    - name: Display backup schedule results
+      debug:
+        msg:
+          - "Backup Schedule Results:"
+          - "Schedule Name: {{ item.item.name }}"
+          - "Status: {{ 'Created' if item.changed else 'Already exists' }}"
+          - "Resource Types: {{ item.item.resource_types | default([]) }}"
+          - "Excluded Resources: {{ item.item.exclude_resource_types | default([]) }}"
+          - "Namespaces: {{ item.item.namespaces | default([]) }}"
+          - "Backup Type: {{ item.item.backup_type }}"
+      loop: "{{ backup_result.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+      when: backup_result is defined

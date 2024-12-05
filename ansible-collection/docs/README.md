@@ -45,6 +45,11 @@ Complete documentation for the PX-Backup Ansible collection modules, playbooks, 
   - Restore operations
   - Monitor restore execution status
 
+### Resource Collector Module
+
+- [resource_collector](modules/resource_collector.md)
+  - List the available resources on a cluster for backup
+
 ## Configuration
 
 ### Authentication

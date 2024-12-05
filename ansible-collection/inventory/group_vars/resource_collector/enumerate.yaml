@@ -1,0 +1,4 @@
+# Define cluster reference
+cluster_ref:
+  name: "your-cluster-name"
+  uid: "your-cluster-uid"
