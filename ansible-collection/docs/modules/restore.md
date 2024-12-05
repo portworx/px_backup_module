@@ -13,6 +13,7 @@ The restore module enables management of backup restoration operations in PX-Bac
 ## Requirements
 
 * PX-Backup >= 2.8.1
+* Stork >= 24.3.3
 * Python >= 3.9
 * The `requests` Python package
 

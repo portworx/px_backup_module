@@ -12,7 +12,6 @@ The auth module handles authentication for PX-Backup, providing secure token gen
 
 ## Requirements
 
-* PX-Backup >= 2.8.1
 * Python >= 3.9
 * The `requests` Python package
 

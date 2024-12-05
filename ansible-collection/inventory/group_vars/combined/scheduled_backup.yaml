@@ -1,0 +1,80 @@
+---
+# --- TASK: Create cluster first --- 
+clusters:
+  # Vanilla k8s
+  - name: "example-cluster"
+    cloud_type: "OTHERS"
+    kubeconfig: "example-kubeconfig"
+
+# --- TASK: Create backup schedules ---
+# Define Backup Schedule list
+backup_schedules:
+  # Schedule with only PVC resource type
+  - name: "pvc-only-backup-resource-type"
+    reclaim_policy: "Retain"
+    namespaces:
+      - "example-namespace"
+    resource_types:
+      - "{{ pvc_resource }}"  # Uses the PVC resource type from resource collector API
+    schedule_policy_ref:
+      name: "example-schedule-policy"
+      uid: "example-schedule-policy-uid"
+    backup_location_ref:
+      name: "example-backup-location"
+      uid: "example-backup-location-uid"
+    backup_type: "Normal"
+    cluster_ref:
+      name: "example-cluster"
+      uid: "example-cluster-uid"
+    backup_object_type:
+      type: "All"
+    direct_kdmp: true
+    owner: "example-owner"
+
+  # Schedule excluding PVC resource type
+  - name: "exclude-pvc-backup"
+    reclaim_policy: "Retain"
+    namespaces:
+      - "example-namespace"
+    exclude_resource_types:
+      - "{{ pvc_resource }}"  # Excludes the PVC resource type from resource collector API
+    backup_location_ref:
+      name: "example-backup-location"
+      uid: "example-backup-location-uid"
+    backup_type: "Normal"
+    cluster_ref:
+      name: "example-cluster"
+      uid: "example-cluster-uid"
+    backup_object_type:
+      type: "All"
+    direct_kdmp: false
+    schedule_policy_ref:
+      name: "example-schedule-policy"
+      uid: "example-schedule-policy-uid"
+    owner: "example-owner"
+
+  # Schedule with include resources
+  - name: "include-resources-pvc"
+    reclaim_policy: "Retain"
+    namespaces:
+      - "example-namespace"
+    include_resources:
+      - name: "example-resource"
+        namespace: "example-namespace"
+        group: ""
+        kind: "{{ pvc_resource }}"
+        version: "v1"
+    backup_location_ref:
+      name: "example-backup-location"
+      uid: "example-backup-location-uid"
+    backup_type: "Normal"
+    cluster_ref:
+      name: "example-cluster"
+      uid: "example-cluster-uid"
+    backup_object_type:
+      type: "All"
+    direct_kdmp: false
+    schedule_policy_ref:
+      name: "example-schedule-policy"
+      uid: "example-schedule-policy-uid"
+    owner: "example-owner"

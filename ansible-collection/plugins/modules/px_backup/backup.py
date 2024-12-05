@@ -217,7 +217,7 @@ options:
         default: true
 
 requirements:
-    - python >= 3.6
+    - python >= 3.9
     - requests
 
 notes:

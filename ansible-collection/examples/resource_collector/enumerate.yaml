@@ -1,0 +1,48 @@
+- name: Get PX-Backup Resource Types
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/resource_collector/enumerate.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - cluster_ref is defined
+        fail_msg: "Required variables must be defined"
+
+  tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+      no_log: true
+
+    - name: Get supported resource types
+      block:
+        - name: Query resource types
+          resource_collector:
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            org_id: "{{ org_id | default('default') }}"
+            cluster_ref: "{{ cluster_ref }}"
+          register: resource_result
+
+      rescue:
+        - name: Display error details
+          debug:
+            msg: "Failed to get resource types: {{ resource_result }}"
+          when: resource_result is defined
+
+        - name: Fail with error message
+          fail:
+            msg: "Failed to get resource types. See above for details."
+
+    - name: Display resource types
+      debug:
+        msg: 
+          - "Successfully retrieved resource types:"
+          - "Found types: {{ resource_result.resource_types }}"
+          - "Total count: {{ resource_result.resource_types | length }}"
+      when: resource_result is defined
