@@ -36,10 +36,11 @@
             cluster_ref: "{{ item.cluster_ref }}"
             backup_object_type: "{{ item.backup_object_type }}"
             skip_vm_auto_exec_rules: "{{ item.skip_vm_auto_exec_rules | default(omit) }}"
-            volume_snapshot_class_mapping: "{{ item.volume_snapshot_class_mapping }}"
+            volume_snapshot_class_mapping: "{{ item.volume_snapshot_class_mapping | default(omit) }}"
             direct_kdmp: "{{ item.direct_kdmp }}"
             owner: "admin"
             exclude_resource_types: "{{ item.exclude_resource_types | default(omit) }}"
+            labels: "{{ item.labels | default(omit) }}"
           loop: "{{ backup_schedules }}"
           register: backup_result
           loop_control:
