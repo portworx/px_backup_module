@@ -20,7 +20,8 @@ backup_schedules_update:
     backup_location_ref:
       name: "s3-backup-loc"
       uid: "backup-loc-uid"
-
+    labels:
+      key: value
 
 # Global update configuration
 backup_configs: true

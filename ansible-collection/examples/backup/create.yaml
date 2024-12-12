@@ -45,6 +45,7 @@
             volume_snapshot_class_mapping: "{{ item.volume_snapshot_class_mapping | default(omit) }}"
             direct_kdmp: "{{ item.direct_kdmp | default(omit) }}"
             validate_certs: "{{ item.validate_certs | default(true) }}"
+            labels: "{{ item.labels | default(omit) }}"
           loop: "{{ backups }}"
           register: backup_result
           loop_control:
