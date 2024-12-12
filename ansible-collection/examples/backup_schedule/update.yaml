@@ -5,7 +5,7 @@
 
   vars_files:
     - "{{ inventory_dir }}/group_vars/common/all.yaml"
-    - "{{ inventory_dir }}/group_vars/backup_schedule/update.yaml"
+    - "{{ inventory_dir }}/group_vars/backup_schedule/update_vars.yaml"
 
   pre_tasks:
     - name: Validate required variables
@@ -20,6 +20,8 @@
         current_timestamp: "{{ lookup('pipe', 'date +%Y-%m-%d-%H-%M-%S') }}"
 
   tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
     - name: Backup and update schedules
       block:
         - name: Get current configurations
@@ -36,6 +38,7 @@
             backup_location_ref: "{{ item.backup_location_ref }}"
             pre_exec_rule_ref: "{{ item.pre_exec_rule_ref | default(omit) }}"
             post_exec_rule_ref: "{{ item.post_exec_rule_ref | default(omit) }}"
+            labels: "{{ item.labels | default(omit) }}"
           register: current_configs
           loop: "{{ backup_schedules_update }}"
           loop_control:
@@ -64,6 +67,7 @@
             backup_location_ref: "{{ item.backup_location_ref }}"
             pre_exec_rule_ref: "{{ item.pre_exec_rule_ref | default(omit) }}"
             post_exec_rule_ref: "{{ item.post_exec_rule_ref | default(omit) }}"
+            labels: "{{ item.labels | default(omit) }}"
           register: update_result
           loop: "{{ backup_schedules_update }}"
           loop_control:
@@ -92,6 +96,7 @@
         backup_location_ref: "{{ item.backup_location_ref }}"
         pre_exec_rule_ref: "{{ item.pre_exec_rule_ref | default(omit) }}"
         post_exec_rule_ref: "{{ item.post_exec_rule_ref | default(omit) }}"
+        labels: "{{ item.labels | default(omit) }}"
       register: final_validation
       loop: "{{ backup_schedules_update }}"
       loop_control:
