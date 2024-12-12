@@ -1,0 +1,8 @@
+---
+# Backup schedules to inspect
+backup_schedules_inspect:
+  - name: "bs-1"
+    uid: "uid-1"
+
+  - name: "bl-2"
+    uid: "uid-1"
