@@ -1,0 +1,16 @@
+---
+# Rules to update
+rule_ownership_updates:
+  - name: "test-rule-1"
+    uid: "test-rule-1-uid"
+    ownership:
+      owner: "owner-name"
+      groups:
+        - id: "test-grp-0"
+          access: "Write"
+      collaborators:
+        - id: "test-user-0"
+          access: "Read"
+
+# Global update configuration
+validate_certs: false
