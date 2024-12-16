@@ -1,0 +1,15 @@
+# List of rules to update
+rule_updates:
+  - name: "test-rule-1"
+    uid: "test-rule-1-uid"
+    rules:
+      - container: null
+        actions:
+          - value: "new-command-1"
+        pod_selector:
+          app: "app-1"
+          db: "app-2"
+    # Optional updates - only include fields you want to update
+    labels:
+      environment: "testing"
+      team: "test-team"
