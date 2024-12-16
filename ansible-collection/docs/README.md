@@ -50,6 +50,12 @@ Complete documentation for the PX-Backup Ansible collection modules, playbooks, 
 - [resource_collector](modules/resource_collector.md)
   - List the available resources on a cluster for backup
 
+### Rule Module
+- [rule](modules/rule.md)
+  - Manage rule operations
+  - Control rule access
+  - Update rule configurations
+
 ## Configuration
 
 ### Authentication
