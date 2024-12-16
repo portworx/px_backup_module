@@ -1,0 +1,62 @@
+---
+- name: Configure PX-Backup Rules
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/rule/create.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - rules is defined
+          - rules | length > 0
+        fail_msg: "Required variables must be defined"
+
+  tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+    - name: Create rules
+      block:
+        - name: Debug payload
+          debug:
+            var: item
+          loop: "{{ rules }}"
+        - name: Create rule
+          rule:
+            operation: CREATE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            name: "{{ item.name }}"
+            org_id: "{{ org_id | default('default') }}"
+            validate_certs: "{{ item.validate_certs | default(true) }}"
+            labels: "{{ item.labels | default(omit) }}"
+            rules: "{{ item.rules }}"
+          loop: "{{ rules }}"
+          register: rule_result
+          loop_control:
+            label: "{{ item.name }}"
+
+      rescue:
+        - name: Display error details
+          debug:
+            msg: "Failed to create rule: {{ rule_result.results | selectattr('failed', 'true') | map(attribute='msg') | list }}"
+          when: rule_result is defined and rule_result.results is defined
+
+        - name: Fail with error message
+          fail:
+            msg: "Failed to create rules. See above for details."
+
+    - name: Display creation results
+      debug:
+        msg: 
+          - "Successfully created rules"
+          - "Created rules: {{ rule_result.results | map(attribute='item.name') | list }}"
+          - "Changed status: {{ rule_result.results | map(attribute='changed') | list }}"
+      when: 
+        - rule_result is defined 
+        - rule_result.results is defined
+        - (rule_result.results | selectattr('failed', 'defined') | selectattr('failed', 'true') | list | length) == 0
