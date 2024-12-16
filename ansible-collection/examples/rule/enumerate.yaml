@@ -1,0 +1,74 @@
+# ansible-collection/examples/rule/enumerate.yaml
+---
+- name: Enumerate PX-Backup Rules
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/rule/enumerate.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - org_id is defined
+        fail_msg: "Required variables must be defined"
+
+  tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+    - name: Enumerate rules
+      block:
+        - name: Get list of rules
+          rule:
+            operation: INSPECT_ALL
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            org_id: "{{ org_id }}"
+            # Optional filters
+            labels: "{{ labels | default(omit) }}"
+            max_objects: "{{ max_objects | default(omit) }}"
+            validate_certs: "{{ validate_certs | default(true) }}"
+          register: rule_result
+
+        - name: Display rule list summary
+          debug:
+            msg: 
+              - "Total rules found: {{ rule_result.rules | length }}"
+
+        - name: Display detailed backup information
+          debug:
+            msg: |
+              Rule Details:
+              {% for rule in rule_result.rules %}
+              - Name: {{ rule.metadata.name }}
+                UID: {{ rule.metadata.uid }}
+                Creation Time: {{ rule.metadata.create_time }}
+                Last Update: {{ rule.metadata.last_update_time }}
+                Owner: {{ rule.metadata.ownership.owner }}
+                Rules:
+                - Rules Info: {{ rule.rules_info | length }} 
+                {% for sub_rule in rule.rules_info.rules %}
+                    Pod Selectors:
+                    {% for ps in sub_rule.pod_selector %}
+                      - {{ ps }}
+                    {% endfor %}
+                    Actions:
+                    {% for action in sub_rule.actions %}
+                      - {{ action }}
+                    {% endfor %}
+                {% endfor %}
+              {% endfor %}
+          when: rule_result.rules | length > 0
+
+      rescue:
+        - name: Display error details
+          debug:
+            msg: "Failed to enumerate rules: {{ rule_result.msg if rule_result.msg is defined else 'Unknown error occurred' }}"
+          when: rule_result is defined
+
+        - name: Fail with error message
+          fail:
+            msg: "Failed to enumerate rules. See above for details."
