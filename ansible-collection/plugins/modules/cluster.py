@@ -46,14 +46,14 @@ options:
     operation:
         description:
             - Operation to perform on the cluster
-            - 'CREATE' creates a new cluster
-            - 'UPDATE' modifies an existing cluster
-            - 'DELETE' removes a cluster
-            - 'INSPECT_ONE' retrieves details of a specific cluster
-            - 'INSPECT_ALL' lists all clusters
-            - 'UPDATE_BACKUP_SHARE' updates backup sharing settings
-            - 'SHARE_CLUSTER' shares cluster access with users/groups
-            - 'UNSHARE_CLUSTER' removes shared access
+            - CREATE: creates a new cluster
+            - UPDATE: modifies an existing cluster
+            - DELETE: removes a cluster
+            - INSPECT_ONE: retrieves details of a specific cluster
+            - INSPECT_ALL: lists all clusters
+            - UPDATE_BACKUP_SHARE: updates backup sharing settings
+            - SHARE_CLUSTER: shares cluster access with users/groups
+            - UNSHARE_CLUSTER: removes shared access
         required: true
         type: str
         choices: ['CREATE', 'UPDATE', 'DELETE', 'INSPECT_ONE', 'INSPECT_ALL', 

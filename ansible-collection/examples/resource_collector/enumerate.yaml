@@ -1,7 +1,9 @@
 - name: Get PX-Backup Resource Types
   hosts: localhost
   gather_facts: false
-
+  collections:
+  - purepx.px_backup
+  
   vars_files:
     - "{{ inventory_dir }}/group_vars/common/all.yaml"
     - "{{ inventory_dir }}/group_vars/resource_collector/enumerate.yaml"

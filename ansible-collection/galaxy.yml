@@ -10,5 +10,3 @@ license:
 tags: [portworx, px-backup]
 documentation: https://docs.portworx.com/portworx-backup-on-prem
 repository: https://github.com/portworx/px_backup_module
-
-

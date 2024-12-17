@@ -22,7 +22,7 @@ import logging
 from dataclasses import dataclass
 
 from ansible.module_utils.basic import AnsibleModule
-from ansible_collections.purepx.px_backup.plugins.module_utils.px_backup.api import PXBackupClient
+from ansible.module_utils.px_backup.api import PXBackupClient
 import requests
 
 DOCUMENTATION = r'''
@@ -43,16 +43,22 @@ description:
 options:
     operation:
         description:
-            - Operation to perform on the backup
-            - 'CREATE' creates a new backup
-            - 'UPDATE' modifies an existing backup
-            - 'DELETE' removes a backup
-            - 'INSPECT_ONE' retrieves details of a specific backup
-            - 'INSPECT_ALL' lists all backups
-            - 'UPDATE_BACKUP_SHARE' updates backup sharing settings
+            - "Operation to perform on the backup"
+            - " - CREATE: creates a new backup"
+            - " - UPDATE: modifies an existing backup"
+            - " - DELETE: removes a backup"
+            - " - INSPECT_ONE: retrieves details of a specific backup"
+            - " - INSPECT_ALL: lists all backups"
+            - " - UPDATE_BACKUP_SHARE: updates backup sharing settings"
         required: true
         type: str
-        choices: ['CREATE', 'UPDATE', 'DELETE', 'INSPECT_ONE', 'INSPECT_ALL', 'UPDATE_BACKUP_SHARE']
+        choices:
+            - CREATE
+            - UPDATE
+            - DELETE
+            - INSPECT_ONE
+            - INSPECT_ALL
+            - UPDATE_BACKUP_SHARE
     api_url:
         description: PX-Backup API URL
         required: true
@@ -220,14 +226,6 @@ requirements:
     - python >= 3.9
     - requests
 
-notes:
-    - "Operation-specific required parameters:"
-    - "CREATE: name, backup_location_ref, cluster_ref"
-    - "UPDATE: name, uid"
-    - "DELETE: name, uid"
-    - "INSPECT_ONE: name, uid"
-    - "INSPECT_ALL: cluster_name_filter, cluster_uid_filter, org_id"
-    - "UPDATE_BACKUP_SHARE: name, uid, backup_share"
 '''
 
 EXAMPLES = r'''
