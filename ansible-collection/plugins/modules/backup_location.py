@@ -46,13 +46,13 @@ options:
     operation:
         description:
             - Operation to perform on the backup location
-            - 'CREATE' creates a new backup location
-            - 'UPDATE' modifies an existing backup location
-            - 'DELETE' removes a backup location
-            - 'VALIDATE' validates a backup location configuration
-            - 'INSPECT_ONE' retrieves details of a specific backup location
-            - 'INSPECT_ALL' lists all backup locations
-            - 'UPDATE_OWNERSHIP' updates ownership settings of a backup location
+            - " - CREATE: creates a new backup location"
+            - " - UPDATE: modifies an existing backup location"
+            - " - DELETE: removes a backup location"
+            - " - VALIDATE: validates a backup location configuration"
+            - " - INSPECT_ONE: retrieves details of a specific backup location"
+            - " - INSPECT_ALL: lists all backup locations"
+            - " - UPDATE_OWNERSHIP: updates ownership settings of a backup location"
         required: true
         type: str
         choices: ['CREATE', 'UPDATE', 'DELETE', 'VALIDATE', 'INSPECT_ONE', 'INSPECT_ALL', 'UPDATE_OWNERSHIP']
@@ -223,17 +223,6 @@ requirements:
     - python >= 3.9
     - requests
 
-notes:
-    - "Operation-specific required parameters:"
-    - "CREATE: name, location_type, path"
-    - "UPDATE: name, uid, location_type, path"
-    - "DELETE: name, uid"
-    - "VALIDATE: name, uid"
-    - "INSPECT_ONE: name, uid"
-    - "INSPECT_ALL: org_id"
-    - "UPDATE_OWNERSHIP: name, uid, ownership"
-    - "S3 locations require s3_config parameter"
-    - "NFS locations require nfs_config parameter"
 '''
 
 EXAMPLES = r'''
