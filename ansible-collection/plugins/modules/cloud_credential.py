@@ -1,4 +1,4 @@
-#!/usr/bin/python
+"- #!/usr/bin/python"
 # -*- coding: utf-8 -*-
 
 """
@@ -40,12 +40,12 @@ options:
     operation:
         description: 
             - Operation to be perform
-            - 'CREATE'  create new cloud credential
-            - 'DELETE'  delete cloud credential
-            - 'UPDATE'  update cloud credential
-            - 'UPDATE_OWNERSHIP' updates ownership settings of a cloud credential
-            - 'INSPECT_ALL' lists all cloud credentials
-            - 'INSPECT_ONE' retrieves details of a specific cloud credential
+            - "- CREATE:  create new cloud credential"
+            - "- DELETE:  delete cloud credential"
+            - "- UPDATE:  update cloud credential"
+            - "- UPDATE_OWNERSHIP: updates ownership settings of a cloud credential"
+            - "- INSPECT_ALL: lists all cloud credentials"
+            - "- INSPECT_ONE: retrieves details of a specific cloud credential"
         choices: ['CREATE', 'DELETE', 'UPDATE', 'UPDATE_OWNERSHIP','INSPECT_ALL','INSPECT_ONE']
         default: CREATE
         type: str

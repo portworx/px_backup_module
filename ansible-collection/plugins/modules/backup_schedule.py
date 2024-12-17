@@ -32,11 +32,11 @@ options:
     operation:
         description: 
             - Operation to be perform
-            - 'CREATE'  create new backup Schedule
-            - 'DELETE'  delete backup Schedule
-            - 'UPDATE'  update backup Schedule
-            - 'INSPECT_ALL' lists all backup Schedule
-            - 'INSPECT_ONE' retrieves details of a specific backup Schedule
+            - "- CREATE:  create new backup Schedule"
+            - "- DELETE:  delete backup Schedule"
+            - "- UPDATE:  update backup Schedule"
+            - "- INSPECT_ALL: lists all backup Schedule"
+            - "- INSPECT_ONE: retrieves details of a specific backup Schedule"
         choices: ['CREATE', 'DELETE', 'UPDATE','INSPECT_ALL','INSPECT_ONE']
         type: str
     name:
@@ -205,11 +205,11 @@ options:
             owners:
                 description: Owner of the Backup Schedule
                 type: str
-            backup_object_type
+            backup_object_type:
                 description: Backup type of the Backup Schedule
                 choices: ['Invalid', 'Read', 'Write', 'Admin']
                 type: str
-            status
+            status:
                 description: Status of the Backup Schedule
                 choices: ['Invalid', 'Read', 'Write', 'Admin']
                 type: str

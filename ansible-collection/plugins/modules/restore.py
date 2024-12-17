@@ -48,10 +48,10 @@ options:
     operation:
         description:
             - Operation to perform on the restore
-            - 'CREATE' creates a new restore
-            - 'DELETE' removes a restore
-            - 'INSPECT_ONE' retrieves details of a specific restore
-            - 'INSPECT_ALL' lists all restores
+            - "- CREATE: creates a new restore"
+            - "- DELETE: removes a restore"
+            - "- INSPECT_ONE: retrieves details of a specific restore"
+            - "- INSPECT_ALL: lists all restores"
         required: true
         type: str
         choices: ['CREATE', 'DELETE', 'INSPECT_ONE', 'INSPECT_ALL']
