@@ -42,13 +42,13 @@ description:
 options:
     operation:
         description:
-            - Operation to perform on the rule
-            - 'CREATE' creates a new rule
-            - 'UPDATE' modifies an existing rule
-            - 'DELETE' removes a rule
-            - 'INSPECT_ONE' retrieves details of a specific rule
-            - 'INSPECT_ALL' lists all rules
-            - 'UPDATE_OWNERSHIP' updates ownership settings of a rule
+            - " Operation to perform on the rule "
+            - " CREATE creates a new rule "
+            - " UPDATE modifies an existing rule "
+            - " DELETE removes a rule "
+            - " INSPECT_ONE retrieves details of a specific rule "
+            - " INSPECT_ALL lists all rules "
+            - " UPDATE_OWNERSHIP' updates ownership settings of a rule "
         required: true
         type: str
         choices: ['CREATE', 'UPDATE', 'DELETE', 'INSPECT_ONE', 'INSPECT_ALL', 'UPDATE_OWNERSHIP']
@@ -84,6 +84,37 @@ options:
         description: Verify SSL certificates
         type: bool
         default: true
+    rules:
+        description: 
+            - List of rules to apply
+            - Required for CREATE and UPDATE operations
+        required: false
+        type: list
+        suboptions:
+            pod_selector:
+                description: Pod selector for the rule
+                type: dict
+                required: true
+            actions:
+                description: List of actions to perform
+                type: list
+                elements: dict
+                required: false
+                suboptions:
+                    background:
+                        description: Run the action in the background
+                        type: bool
+                        default: true
+                    run_in_single_pod:
+                        description: Run the action in a single pod
+                        type: bool
+                        default: true
+                    value:
+                        description: Action to perform
+                        type: str
+            container:
+                description: Container to apply the rule to
+                type: str
     ownership:
         description: 
             - Ownership configuration for the rule
