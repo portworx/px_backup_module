@@ -38,7 +38,7 @@
             msg: 
               - "Total rules found: {{ rule_result.rules | length }}"
 
-        - name: Display detailed backup information
+        - name: Display detailed rule information
           debug:
             msg: |
               Rule Details:
