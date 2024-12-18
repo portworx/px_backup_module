@@ -37,7 +37,7 @@ version_added: "2.8.1"
 description: 
     - Manage rules in PX-Backup using different operations
     - Supports CRUD operations, and ownership management
-    - Provides both single location and bulk inspection capabilities
+    - Provides both single rule and bulk inspection capabilities
 
 options:
     operation:
@@ -48,7 +48,7 @@ options:
             - " DELETE removes a rule "
             - " INSPECT_ONE retrieves details of a specific rule "
             - " INSPECT_ALL lists all rules "
-            - " UPDATE_OWNERSHIP' updates ownership settings of a rule "
+            - " UPDATE_OWNERSHIP updates ownership settings of a rule "
         required: true
         type: str
         choices: ['CREATE', 'UPDATE', 'DELETE', 'INSPECT_ONE', 'INSPECT_ALL', 'UPDATE_OWNERSHIP']
@@ -402,7 +402,7 @@ def perform_operation(module: AnsibleModule, client: PXBackupClient, operation: 
                 success=True,
                 changed=changed,
                 data={'rule': rule},
-                message="rule created successfully"
+                message="Rule created successfully"
             )
         
         elif operation == 'INSPECT_ALL':
@@ -429,7 +429,7 @@ def perform_operation(module: AnsibleModule, client: PXBackupClient, operation: 
             success=True,
             changed=changed,
             data={'rule': rule},
-            message="rule updated successfully"
+            message="Rule updated successfully"
             )
 
         elif operation == 'UPDATE_OWNERSHIP':
@@ -438,7 +438,7 @@ def perform_operation(module: AnsibleModule, client: PXBackupClient, operation: 
                 success=True,
                 changed=changed,
                 data={'rule': rule},
-                message="rule ownership updated successfully"
+                message="Rule ownership updated successfully"
             )
         
         elif operation == 'DELETE':
@@ -447,7 +447,7 @@ def perform_operation(module: AnsibleModule, client: PXBackupClient, operation: 
             success=True,
             changed=changed,
             data={'rule': rule},
-            message="rule deleted successfully"
+            message="Rule deleted successfully"
             )
 
     except Exception as e:
