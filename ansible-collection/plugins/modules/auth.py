@@ -8,35 +8,117 @@ short_description: Get Auth Token For PX-Backup
 
 version_added: "2.8.1"
 
-description: 
-    - Generate auth token
-    - Requires Username, Password and client_id
+description:
+    - Generate authentication token for PX-Backup operations
+    - Supports username/password authentication
+    - Handles token duration configuration
+    - Manages client authentication
+    - Provides secure token generation and retrieval
 
 options:
     auth_url:
-        description: Auth URL
+        description: 
+            - URL of the authentication server
+            - Used as the base URL for token generation
         required: true
         type: str
     grant_type:
-        description: Auth Type
+        description:
+            - Type of authentication grant to use
+            - Currently only supports "password" grant type
         required: false
         type: str
+        default: "password"
     client_id:
-        description: Client ID
+        description:
+            - Client identifier for authentication
+            - Used to identify the application requesting access
         required: true
         type: str
+        no_log: true
     username:
-        description: Username for auth
+        description:
+            - Username for authentication
+            - Must be a valid user with appropriate permissions
         required: true
         type: str
+        no_log: true
     password:
-        description: Password
+        description:
+            - Password for authentication
+            - Used in combination with username for authentication
         required: true
         type: str
+        no_log: true
     token_duration:
-        description: Duration of Token
+        description:
+            - Duration for which the token should be valid
+            - "Format examples: '7d' for 7 days, '24h' for 24 hours"
+            - Default is 7 days if not specified
         required: false
         type: str
+        default: "7d"
+
+requirements:
+    - python >= 3.9
+    - requests
+
+notes:
+    - "Token generation requires valid credentials"
+    - "The token should be securely stored and handled"
+    - "Token duration affects security - shorter durations are more secure"
+    - "Invalid credentials will result in authentication failure"
+    - "Network connectivity to auth server required"
+'''
+
+EXAMPLES = r'''
+# Generate a token with default settings
+- name: Get PX-Backup auth token
+  auth:
+    auth_url: "https://px-backup-auth.example.com"
+    client_id: "px-backup"
+    username: "admin"
+    password: "{{ admin_password }}"
+
+# Generate a token with custom duration
+- name: Get short-lived token
+  auth:
+    auth_url: "https://px-backup-auth.example.com"
+    client_id: "px-backup"
+    username: "admin"
+    password: "{{ admin_password }}"
+    token_duration: "1h"
+    
+# Generate and store token for later use
+- name: Get and store token
+  auth:
+    auth_url: "{{ px_backup_auth_url }}"
+    client_id: "{{ px_backup_client_id }}"
+    username: "{{ px_backup_username }}"
+    password: "{{ px_backup_password }}"
+  register: auth_result
+
+- name: Use generated token
+  set_fact:
+    px_backup_token: "{{ auth_result.access_token }}"
+'''
+
+RETURN = r'''
+access_token:
+    description: The generated authentication token
+    type: str
+    returned: success
+    sample: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
+error:
+    description: Error message if token generation failed
+    type: str
+    returned: failure
+    sample: "Authentication failed: Invalid credentials"
+changed:
+    description: Whether the token generation changed anything
+    type: bool
+    returned: always
+    sample: false
 '''
 from ansible.module_utils.basic import AnsibleModule
 import requests

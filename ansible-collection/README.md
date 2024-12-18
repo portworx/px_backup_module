@@ -68,8 +68,8 @@ pxcentral_password: "password"
 ## Documentation
 
 Detailed documentation is available in the following locations:
-- [Module Documentation](ansible-collection/docs/README.md)
-- [Example Playbooks](ansible-collection/examples/)
+- [Module Documentation (GITHUB LINK)](ansible-collection/docs/README.md)
+- [Example Playbooks (GITHUB LINK)](ansible-collection/examples/)
 - [PX-Backup Documentation](https://docs.portworx.com/portworx-backup-on-prem)
 
 ## License
