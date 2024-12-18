@@ -1,0 +1,66 @@
+# ansible-collection/examples/role/enumerate.yaml
+---
+- name: Enumerate PX-Backup Roles
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/role/enumerate.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - org_id is defined
+        fail_msg: "Required variables must be defined"
+
+  tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+    - name: Enumerate roles
+      block:
+        - name: Get list of roles
+          role:
+            operation: INSPECT_ALL
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            org_id: "{{ org_id }}"
+            # Optional filters
+            labels: "{{ labels | default(omit) }}"
+            max_objects: "{{ max_objects | default(omit) }}"
+            validate_certs: "{{ validate_certs | default(true) }}"
+          register: role_result
+
+        - name: Display role list summary
+          debug:
+            msg: 
+              - "Total roles found: {{ role_result.roles | length }}"
+
+        - name: Display detailed role information
+          debug:
+            msg: |
+              Role Details:
+              {% for role in role_result.roles %}
+              - Name: {{ role.metadata.name }}
+                UID: {{ role.metadata.uid }}
+                Creation Time: {{ role.metadata.create_time }}
+                Last Update: {{ role.metadata.last_update_time }}
+                Owner: {{ role.metadata.ownership.owner }}
+                - Rules: {{ role.rules | length }} 
+                {% for sub_role in role.rules %}
+                    - {{ sub_role }}
+                {% endfor %}
+              {% endfor %}
+          when: role_result.roles | length > 0
+
+      rescue:
+        - name: Display error details
+          debug:
+            msg: "Failed to enumerate roles: {{ role_result.msg if role_result.msg is defined else 'Unknown error occurred' }}"
+          when: role_result is defined
+
+        - name: Fail with error message
+          fail:
+            msg: "Failed to enumerate roles. See above for details."

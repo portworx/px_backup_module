@@ -1,0 +1,83 @@
+---
+- name: Inspect PX-Backup Roles
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/role/inspect.yaml"
+
+  pre_tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+    - name: Debug variables
+      debug:
+        msg:
+          - "API URL: {{ px_backup_api_url }}"
+          - "Token: {{ px_backup_token }}"
+          - "Total roles to inspect: {{ roles_inspect | length }}"
+
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - roles_inspect is defined
+        fail_msg: "Required variables must be defined"
+
+  tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+    - name: Inspect roles
+      block:
+        - name: Get role details
+          role:
+            operation: INSPECT_ONE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            name: "{{ item.name }}"
+            uid: "{{ item.uid }}"
+            org_id: "{{ org_id | default('default') }}"
+          register: inspect_result
+          loop: "{{ roles_inspect }}"
+          loop_control:
+            label: "{{ item.name }}"
+
+      rescue:
+        - name: Display error details
+          debug:
+            msg: "Failed to inspect roles: {{ inspect_result.results | selectattr('failed', 'true') | map(attribute='msg') | list }}"
+          when: inspect_result is defined and inspect_result.results is defined
+
+        - name: Fail with error message
+          fail:
+            msg: "Failed to inspect roles. See above for details."
+
+    - name: Process and display inspection results
+      block:
+        - name: Display inspection results for each role
+          debug:
+            msg: >
+              [
+                "Role Details:",
+                "----------------------------------------",
+                "Name: {{ item.role.role.metadata.name }}",
+                "Created: {{ item.role.role.metadata.create_time }}",
+                "Last Updated: {{ item.role.role.metadata.last_update_time }}",
+                "Owner: {{ item.role.role.metadata.ownership.owner }}",
+                "UID: {{ item.role.role.metadata.uid }}",
+                "Roles Info: {{ item.role.role.rules }}",
+                "----------------------------------------"
+              ]
+          loop: "{{ inspect_result.results }}"
+          loop_control:
+            label: "{{ item.role.role.metadata.name }}"
+          when: item.role is defined
+
+    - name: Summarize inspection
+      debug:
+        msg:
+          - "Inspection Summary:"
+          - "Total roles inspected: {{ inspect_result.results | length }}"
+          - "Successful inspections: {{ inspect_result.results | selectattr('role', 'defined') | list | length }}"
+          - "Failed inspections: {{ inspect_result.results | selectattr('failed', 'defined') | selectattr('failed', 'true') | list | length }}"
+      when: inspect_result is defined and inspect_result.results is defined
