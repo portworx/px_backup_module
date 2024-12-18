@@ -33,16 +33,17 @@
         - name: Display role list summary
           debug:
             msg: 
-              - "Total rules found: {{ role_result | length }}"
+              - "Total rules found: {{ role_result.rules | length }}"
 
         - name: Display detailed role information
           debug:
             msg: |
               Rule Details:
-              {% for rule in role_result %}
-              - {{ rule }}
+              {% for key, value in role_result.rules.items() %}
+              - Rule Name: {{ key }}
+                Full Access: {{ value.full_access }}
               {% endfor %}
-          when: role_result | length > 0
+          when: role_result.rules | length > 0
 
       rescue:
         - name: Display error details

@@ -88,6 +88,16 @@ options:
         description: 
         required: False
         type: list
+        elements: dict
+        suboptions:
+            services:
+                description: List of services
+                type: list
+                elements: str
+            apis:
+                description: List of APIs allowed
+                type: list
+                elements: str
     ownership:
         description: Ownership configuration for the role
         required: false
@@ -238,18 +248,18 @@ def update_role(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict[str
     except Exception as e:
         module.fail_json(msg=f"Failed to update role: {str(e)}")
 
-def permission(module, client):
-    """Fetch permissions of a role"""
+def permission_role(module, client):
+    """Fetch all permissions"""
 
     params = {
         'org_id': module.params.get('org_id', "")
     }
     
     try:
-        response = client.make_request('GET', 'v1/role', params=params)
-        return response
+        response = client.make_request('GET', f"v1/role", params=params)
+        return response['rules']
     except Exception as e:
-        module.fail_json(msg=f"Failed to fetch role permission: {str(e)}")
+        module.fail_json(msg=f"Failed to fetch permissions: {str(e)}")
 
 def enumerate_roles(module, client):
     """List all roles"""
@@ -403,11 +413,11 @@ def perform_operation(module: AnsibleModule, client: PXBackupClient, operation: 
             )
 
         elif operation == 'PERMISSION':
-            role = permission(module, client)
+            rules = permission_role(module, client)
             return OperationResult(
                 success=True,
                 changed=False,
-                data={'role': role},
+                data={'rules': rules},
                 message="Role permissions fetched successfully"
             )
         
