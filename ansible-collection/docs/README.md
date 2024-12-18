@@ -56,6 +56,12 @@ Complete documentation for the PX-Backup Ansible collection modules, playbooks, 
   - Control rule access
   - Update rule configurations
 
+### Role Module
+- [role](modules/role.md)
+  - Manage role operations
+  - Update role configurations
+  - Fetch role permissions
+
 ## Configuration
 
 ### Authentication
