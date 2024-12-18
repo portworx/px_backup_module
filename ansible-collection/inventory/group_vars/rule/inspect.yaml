@@ -1,5 +1,5 @@
 ---
-# Backup locations to inspect
+# Rules to inspect
 rules_inspect:
   - name: "test-rule-1"
     uid: "test-rule-1-uid"
