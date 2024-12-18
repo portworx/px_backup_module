@@ -1,0 +1,13 @@
+# List of roles to update
+role_updates:
+  - name: "test-role-1"
+    uid: "test-role-1-uid"
+    rules:
+      api_1:
+        full_access: true
+      api_2:
+        full_access: true
+    # Optional updates - only include fields you want to update
+    labels:
+      environment: "testing"
+      team: "test-team"

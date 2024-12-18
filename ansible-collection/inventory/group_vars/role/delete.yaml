@@ -1,0 +1,13 @@
+# Roles to delete
+roles_delete:
+  # - name: "test-role-1"
+  #   uid: "test-role-1-uid"
+
+  # - name: "test-role-2"
+  #   uid: "test-role-2-uid"
+
+  - name: "test-role-0"
+    uid: "fd27d8ee-69b2-469b-82e4-b3b46a32954a"
+
+# Global delete configuration
+validate_certs: false

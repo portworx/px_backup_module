@@ -1,0 +1,17 @@
+---
+# Roles to inspect
+roles_inspect:
+  # - name: "test-role-1"
+  #   uid: "test-role-1-uid"
+
+  # - name: "test-role-2"
+  #   uid: "test-role-2-uid"
+
+  - name: "px-backup-super.admin"
+    uid: "9385fe03-72da-4708-9e2c-d0f9e04eb70c"
+
+  - name: "px-backup-infra.admin"
+    uid: "d83631ae-eab0-4955-9b5b-fad5ef92efd9"
+
+# Global inspect configuration
+validate_certs: false
