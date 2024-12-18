@@ -42,13 +42,13 @@ description:
 options:
     operation:
         description:
-            - " Operation to perform on the role "
-            - " CREATE creates a new role "
-            - " UPDATE modifies an existing role "
-            - " DELETE removes a role "
-            - " INSPECT_ONE retrieves details of a specific role "
-            - " INSPECT_ALL lists all roles "
-            - " PERMISSION returns list of services, APIs permission for given user"
+            - "- Operation to perform on the role "
+            - "- CREATE creates a new role "
+            - "- UPDATE modifies an existing role "
+            - "- DELETE removes a role "
+            - "- INSPECT_ONE retrieves details of a specific role "
+            - "- INSPECT_ALL lists all roles "
+            - "- PERMISSION returns list of services, APIs permission for given user"
         required: true
         type: str
         choices: ['CREATE', 'UPDATE', 'DELETE', 'INSPECT_ONE', 'INSPECT_ALL', 'PERMISSION']
@@ -303,9 +303,12 @@ def build_role_request(params: Dict[str, Any]) -> Dict[str, Any]:
         "metadata": {
             "name": params.get('name'),
             "org_id": params.get('org_id')
-        },
-        "rules": params.get('rules'),
+        }
     }
+
+    # Add rules if provided
+    if params.get('rules'):
+        request['rules'] = params['rules']
 
     # Add optional configurations safely
     if params.get('labels'):
@@ -445,20 +448,20 @@ def run_module():
         name=dict(type='str', required=False),
         org_id=dict(type='str', required=True),
         uid=dict(type='str', required=False),
-        rules = dict(
-            type='list',  
-            required=False, 
-            elements=dict(
-                type='dict', 
-                schema=dict( 
-                    services=dict(
-                        type='list',  
-                        elements=dict(type='str')  
-                    ),
-                    apis=dict(
-                        type='list',  
-                        elements=dict(type='str')  
-                    )
+        rules=dict(
+            type='list',
+            elements='dict',
+            required=False,
+            options=dict(
+                services=dict(
+                    type='list',
+                    elements='str',
+                    required=True
+                ),
+                apis=dict(
+                    type='list',
+                    elements='str',
+                    required=True
                 )
             )
         ),

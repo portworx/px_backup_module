@@ -1,13 +1,11 @@
 # List of roles to update
 role_updates:
   - name: "test-role-1"
-    uid: "test-role-1-uid"
-    rules:
-      api_1:
-        full_access: true
-      api_2:
-        full_access: true
-    # Optional updates - only include fields you want to update
+    uid: "6decb54d-b9d8-4b53-9d8f-161f02cfa4e7"
     labels:
-      environment: "testing"
-      team: "test-team"
+      app: "app-1"
+    rules:
+      - apis: ["inspect*", "enumerate*"]
+        services: ["cloudcredential"]
+      - apis: ["inspect*", "enumerate*"]
+        services: ["schedulepolicy"]
