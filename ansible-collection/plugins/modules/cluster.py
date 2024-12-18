@@ -46,14 +46,14 @@ options:
     operation:
         description:
             - Operation to perform on the cluster
-            - CREATE: creates a new cluster
-            - UPDATE: modifies an existing cluster
-            - DELETE: removes a cluster
-            - INSPECT_ONE: retrieves details of a specific cluster
-            - INSPECT_ALL: lists all clusters
-            - UPDATE_BACKUP_SHARE: updates backup sharing settings
-            - SHARE_CLUSTER: shares cluster access with users/groups
-            - UNSHARE_CLUSTER: removes shared access
+            - "- CREATE: creates a new cluster"
+            - "- UPDATE: modifies an existing cluster"
+            - "- DELETE: removes a cluster"
+            - "- INSPECT_ONE: retrieves details of a specific cluster"
+            - "- INSPECT_ALL: lists all clusters"
+            - "- UPDATE_BACKUP_SHARE: updates backup sharing settings"
+            - "- SHARE_CLUSTER: shares cluster access with users/groups"
+            - "- UNSHARE_CLUSTER: removes shared access"
         required: true
         type: str
         choices: ['CREATE', 'UPDATE', 'DELETE', 'INSPECT_ONE', 'INSPECT_ALL', 
@@ -177,6 +177,64 @@ options:
                 description: Whether to share existing backups
                 type: bool
                 default: false
+
+    ownership:
+        description: Cluster ownership and access control configuration
+        type: dict
+        required: false
+        suboptions:
+            owner:
+                description:
+                - Owner of the cluster
+                type: str
+                required: false
+            groups:
+                description:
+                - List of group access configurations
+                type: list
+                elements: dict
+                required: false
+                suboptions:
+                    id:
+                        description:
+                        - Group identifier
+                        type: str
+                        required: true
+                    access:
+                        description:
+                        - Access level for the group
+                        type: str
+                        required: true
+                        choices: ['Read', 'Write', 'Admin']
+            collaborators:
+                description: List of collaborator access configurations
+                type: list
+                elements: dict
+                required: false
+                suboptions:
+                    id:
+                        description:
+                        - Collaborator identifier
+                        type: str
+                        required: true
+                    access:
+                        description:
+                        - Access level for the collaborator
+                        type: str
+                        required: true
+                        choices: ['Read', 'Write', 'Admin']
+            public:
+                description:
+                - Public access configuration
+                type: dict
+                required: false
+                suboptions:
+                    type:
+                        description:
+                        - Public access level
+                        type: str
+                        required: false
+                        choices: ['Read', 'Write', 'Admin']
 
 requirements:
     - python >= 3.9
