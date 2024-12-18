@@ -1,0 +1,6 @@
+---
+# Variables specific to enumeration operations
+labels: {}  # Optional labels for filtering
+
+# Optional filters
+max_results: 100

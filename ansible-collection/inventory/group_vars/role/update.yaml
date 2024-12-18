@@ -1,0 +1,11 @@
+# List of roles to update
+role_updates:
+  - name: "test-role-1"
+    uid: "test-role-1-uid"
+    labels:
+      app: "app-1"
+    rules:
+      - apis: ["inspect*", "enumerate*"]
+        services: ["cloudcredential"]
+      - apis: ["inspect*", "enumerate*"]
+        services: ["schedulepolicy"]

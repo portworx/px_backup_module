@@ -1,0 +1,66 @@
+---
+- name: Configure PX-Backup Roles
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/role/create.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - roles is defined
+          - roles | length > 0
+        fail_msg: "Required variables must be defined"
+
+  tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+    - name: Create roles
+      block:
+        - name: Debug payload
+          debug:
+            var: item
+          loop: "{{ roles }}"
+        - name: Debug role payload
+          debug:
+            msg: "Rules for {{ item.name }}: {{ item.rules }}"
+          loop: "{{ roles }}"
+        - name: Create role
+          role:
+            operation: CREATE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            name: "{{ item.name }}"
+            org_id: "{{ org_id | default('default') }}"
+            validate_certs: "{{ item.validate_certs | default(true) }}"
+            labels: "{{ item.labels | default(omit) }}"
+            rules: "{{ item.rules }}"
+          loop: "{{ roles }}"
+          register: role_result
+          loop_control:
+            label: "{{ item.name }}"
+
+      rescue:
+        - name: Display error details
+          debug:
+            msg: "Failed to create role: {{ role_result.results | selectattr('failed', 'true') | map(attribute='msg') | list }}"
+          when: role_result is defined and role_result.results is defined
+
+        - name: Fail with error message
+          fail:
+            msg: "Failed to create roles. See above for details."
+
+    - name: Display creation results
+      debug:
+        msg: 
+          - "Successfully created roles"
+          - "Created roles: {{ role_result.results | map(attribute='item.name') | list }}"
+          - "Changed status: {{ role_result.results | map(attribute='changed') | list }}"
+      when: 
+        - role_result is defined 
+        - role_result.results is defined
+        - (role_result.results | selectattr('failed', 'defined') | selectattr('failed', 'true') | list | length) == 0
