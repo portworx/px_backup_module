@@ -1,0 +1,55 @@
+---
+- name: Delete PX-Backup Roles
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/role/delete.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - roles_delete is defined
+        fail_msg: "Required variables must be defined"
+
+  tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+    - name: Delete roles
+      block:
+        - name: Delete role
+          role:
+            operation: DELETE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            org_id: "{{ org_id | default('default') }}"
+            name: "{{ item.name }}"
+            uid: "{{ item.uid }}"
+          register: delete_result
+          loop: "{{ roles_delete }}"
+          loop_control:
+            label: "{{ item.name }}"
+
+      rescue:
+        - name: Display error details
+          debug:
+            msg: "Failed to delete roles: {{ delete_result.results | selectattr('failed', 'true') | map(attribute='msg') | list }}"
+          when: delete_result is defined and delete_result.results is defined
+
+        - name: Fail with error message
+          fail:
+            msg: "Failed to delete roles. See above for details."
+
+    - name: Show deletion results
+      debug:
+        msg:
+          - "Deletion Results:"
+          - "Total attempted: {{ delete_result.results | length }}"
+          - "Successfully deleted: {{ delete_result.results | selectattr('changed', 'true') | list | length }}"
+          - "Failed: {{ delete_result.results | selectattr('failed', 'defined') | selectattr('failed', 'true') | list | length }}"
+          - "Deleted roles:"
+          - "{{ delete_result.results | selectattr('changed', 'true') | map(attribute='item') | list | json_query('[*].{name: name, uid: uid }') }}"
+      when: delete_result is defined and delete_result.results is defined

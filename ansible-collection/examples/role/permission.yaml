@@ -1,0 +1,55 @@
+# ansible-collection/examples/role/enumerate.yaml
+---
+- name: Fetch PX-Backup Permissions
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - org_id is defined
+        fail_msg: "Required variables must be defined"
+
+  tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+    - name: Fetch permissions
+      block:
+        - name: Get list of permissions
+          role:
+            operation: PERMISSION
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            org_id: "{{ org_id }}"
+            # Optional filters
+            validate_certs: "{{ validate_certs | default(true) }}"
+          register: role_result
+
+        - name: Display role list summary
+          debug:
+            msg: 
+              - "Total rules found: {{ role_result | length }}"
+
+        - name: Display detailed role information
+          debug:
+            msg: |
+              Rule Details:
+              {% for rule in role_result %}
+              - {{ rule }}
+              {% endfor %}
+          when: role_result | length > 0
+
+      rescue:
+        - name: Display error details
+          debug:
+            msg: "Failed to fetch permissions: {{ role_result.msg if role_result.msg is defined else 'Unknown error occurred' }}"
+          when: role_result is defined
+
+        - name: Fail with error message
+          fail:
+            msg: "Failed to fetch permissions. See above for details."
