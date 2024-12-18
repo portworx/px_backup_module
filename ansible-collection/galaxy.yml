@@ -4,7 +4,7 @@ version: 2.8.1
 readme: README.md
 authors:
 - Portworx
-description: Ansible collection for px-backup management
+description: Collection for managing Portworx Backup application on kubernetes cluster 
 license:
 - GPL-2.0-or-later
 tags: [portworx, px-backup]
