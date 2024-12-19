@@ -1,0 +1,6 @@
+---
+# Define receiver to delete
+receivers_to_delete:
+  - name: "receiver_name"
+    uid: "receiver_uid"
+    validate_certs: false

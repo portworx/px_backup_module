@@ -1,0 +1,5 @@
+---
+# Define recipients to delete
+recipients_to_delete:
+  - name: "recipient_name"
+    uid: "recipient_uid"

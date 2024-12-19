@@ -1,0 +1,70 @@
+# ansible-collection/examples/recipient/inspect.yaml
+- name: Inspect PX-Backup Recipient
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/recipient/inspect.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - recipient_name is defined
+          - recipient_uid is defined
+        fail_msg: "Required variables must be defined"
+
+  tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+
+    - name: Inspect recipient
+      block:
+        - name: Get recipient details
+          recipient:
+            operation: INSPECT_ONE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            org_id: "{{ org_id | default('default') }}"
+            name: "{{ recipient_name }}"
+            uid: "{{ recipient_uid }}"
+            validate_certs: "{{ validate_certs | default(true) }}"
+          register: recipient_info
+
+        - name: Set recipient details
+          set_fact:
+            formatted_recipient:
+              name: "{{ recipient_info.recipient.metadata.name }}"
+              type: "{{ recipient_info.recipient.recipient_info.type }}"
+              recipient_ids: "{{ recipient_info.recipient.recipient_info.recipient_id }}"
+              active: "{{ recipient_info.recipient.recipient_info.active | default(true) }}"
+              severity: "{{ recipient_info.recipient.recipient_info.severity }}"
+              org_id: "{{ recipient_info.recipient.metadata.org_id }}"
+              created: "{{ recipient_info.recipient.metadata.create_time }}"
+              receiver:
+                name: "{{ recipient_info.recipient.recipient_info.receiver_ref.name }}"
+                uid: "{{ recipient_info.recipient.recipient_info.receiver_ref.uid }}"
+              metadata:
+                owner: "{{ recipient_info.recipient.metadata.ownership.owner }}"
+                uid: "{{ recipient_info.recipient.metadata.uid }}"
+                last_updated: "{{ recipient_info.recipient.metadata.last_update_time }}"
+          when: recipient_info.recipient is defined
+
+        - name: Display recipient details
+          debug:
+            msg:
+              - "Recipient Details:"
+              - "{{ formatted_recipient | to_nice_yaml }}"
+          when: formatted_recipient is defined
+
+      rescue:
+        - name: Display error details
+          debug:
+            msg: "Failed to inspect recipient: {{ ansible_failed_result | default('Unknown error') }}"
+          when: ansible_failed_result is defined
+
+        - name: Fail with error message
+          fail:
+            msg: "Failed to inspect recipient. See above for details."

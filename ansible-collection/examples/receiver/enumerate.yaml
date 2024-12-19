@@ -1,0 +1,63 @@
+---
+- name: List PX-Backup Receivers
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+        fail_msg: "Required variables must be defined"
+
+  tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+
+    - name: List all receivers
+      block:
+        - name: Enumerate receivers
+          receiver:
+            operation: INSPECT_ALL
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            org_id: "{{ org_id | default('default') }}"
+            validate_certs: "{{ validate_certs | default(true) }}"
+            include_secrets: "{{ include_secrets | default(false) }}"
+          register: receiver_list
+
+        - name: Set receiver information
+          set_fact:
+            receiver_info: []
+          when: receiver_list.receivers | length > 0
+
+        - name: Build receiver information
+          set_fact:
+            receiver_info: "{{ receiver_info + [{'name': item.metadata.name, 'type': item.receiver_info.type, 'created': item.metadata.create_time}] }}"
+          loop: "{{ receiver_list.receivers }}"
+          when: receiver_list.receivers | length > 0
+
+        - name: Display receivers information
+          debug:
+            msg: 
+              - "Total receivers found: {{ receiver_list.receivers | length }}"
+              - "Receivers:"
+              - "{{ receiver_info | to_nice_yaml }}"
+          when: receiver_list.receivers | length > 0
+
+        - name: Display when no receivers found
+          debug:
+            msg: "No receivers found in the organization"
+          when: receiver_list.receivers | length == 0
+
+      rescue:
+        - name: Display error details
+          debug:
+            msg: "Failed to list receivers: {{ ansible_failed_result | default('Unknown error') }}"
+
+        - name: Fail with error message
+          fail:
+            msg: "Failed to list receivers. See above for details."

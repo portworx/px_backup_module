@@ -1,0 +1,16 @@
+---
+# Define SMTP configuration to validate
+smtp_configs:
+  - name: "smtp_name"
+    validate_certs: true
+    recipient_id: 
+      - "recipient@example.com"
+    email_config:
+      from_address: "sender@example.com"
+      host: "smtp.example.com"
+      port: "25"
+      encryption_ssl: false
+      encryption_starttls: true
+      authentication: true
+      auth_username: "username@example.com"
+      auth_password: "your_password_here"  # Define this in vault or secure vars

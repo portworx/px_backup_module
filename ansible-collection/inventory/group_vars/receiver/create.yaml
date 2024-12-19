@@ -1,0 +1,14 @@
+---
+# Define email receiver configuration
+email_receivers:
+  - name: "smtp"
+    receiver_type: "EMAIL"
+    email_config:
+      from_address: "example@example.com"
+      host: "smtp.example.com"
+      port: "25"
+      encryption_ssl: false
+      encryption_starttls: false
+      authentication: true
+      auth_username: "example@example.com"
+      auth_password: "your_password_here"  # Define this in vault or secure vars

@@ -1,0 +1,64 @@
+---
+- name: Configure PX-Backup Recipients
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/recipient/create.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - recipients is defined
+        fail_msg: "Required variables must be defined"
+
+  tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+
+    - name: Create recipients
+      block:
+        - name: Create recipient configuration
+          recipient:
+            operation: CREATE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            name: "{{ item.name }}"
+            org_id: "{{ org_id | default('default') }}"
+            recipient_type: "{{ item.recipient_type | default('EMAIL') }}"
+            recipient_ids: "{{ item.recipient_ids }}"
+            receiver_ref:
+              name: "{{ item.receiver_ref.name }}"
+              uid: "{{ item.receiver_ref.uid }}"
+            severity: "{{ item.severity | default('CRITICAL') }}"
+            active: "{{ item.active | default(true) }}"
+            validate_certs: "{{ item.validate_certs | default(true) }}"
+          loop: "{{ recipients }}"
+          register: recipient_result
+          loop_control:
+            label: "{{ item.name }}"
+
+        - name: Set recipient details
+          set_fact:
+            created_recipients: "{{ recipient_result.results | map(attribute='recipient') | list }}"
+          when: recipient_result.results is defined
+
+        - name: Display creation results
+          debug:
+            msg:
+              - "Successfully created recipients:"
+              - "{{ created_recipients | to_nice_yaml }}"
+          when: created_recipients is defined
+
+      rescue:
+        - name: Display error details
+          debug:
+            msg: "Failed to create recipients: {{ ansible_failed_result | default('Unknown error') }}"
+          when: ansible_failed_result is defined
+
+        - name: Fail with error message
+          fail:
+            msg: "Failed to create recipients. See above for details."

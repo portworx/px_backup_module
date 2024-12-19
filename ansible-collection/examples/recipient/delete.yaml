@@ -1,0 +1,63 @@
+---
+- name: Delete PX-Backup Recipients
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/recipient/delete.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - recipients_to_delete is defined
+        fail_msg: "Required variables must be defined"
+
+  tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+
+    - name: Delete recipients
+      block:
+        - name: Delete recipient configuration
+          recipient:
+            operation: DELETE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            name: "{{ item.name }}"
+            uid: "{{ item.uid }}"
+            org_id: "{{ org_id | default('default') }}"
+            validate_certs: "{{ item.validate_certs | default(true) }}"
+          loop: "{{ recipients_to_delete }}"
+          register: delete_result
+          loop_control:
+            label: "{{ item.name }}"
+
+        - name: Set deletion status
+          set_fact:
+            deletion_info: "{{ delete_result.results | map(attribute='item') | list }}"
+          when: delete_result.results is defined
+
+        - name: Display successful deletions
+          debug:
+            msg: 
+              - "Successfully deleted the following recipients:"
+              - "{{ deletion_info | to_nice_yaml }}"
+          when: deletion_info is defined and (deletion_info | length > 0)
+
+        - name: Display when no recipients deleted
+          debug:
+            msg: "No recipients were deleted"
+          when: not deletion_info is defined or (deletion_info | length == 0)
+
+      rescue:
+        - name: Display error details
+          debug:
+            msg: "Failed to delete recipients: {{ ansible_failed_result | default('Unknown error') }}"
+          when: ansible_failed_result is defined
+
+        - name: Fail with error message
+          fail:
+            msg: "Failed to delete recipients. See above for details."
