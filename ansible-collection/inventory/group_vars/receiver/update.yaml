@@ -1,0 +1,16 @@
+---
+# Define receivers to update
+receivers_to_update:
+  - name: "smtp"  # Name of the receiver to update
+    uid: "aa8741d9-3839-46f0-8779-507610b02673"  # UID of the receiver
+    receiver_type: "EMAIL"
+    validate_certs: true
+    email_config:
+      from_address: "pxdevautomation+1@gmail.com"
+      host: "smtp.gmail.com"
+      port: "587"  # Updated port
+      encryption_ssl: false
+      encryption_starttls: true
+      authentication: true
+      auth_username: "pxdevautomation@gmail.com"
+      auth_password: "abdcasdiofuahsdifujashdfiausdhfia"  # Define this in vault or secure vars

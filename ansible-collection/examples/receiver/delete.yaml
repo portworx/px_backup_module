@@ -1,0 +1,58 @@
+---
+- name: Delete PX-Backup Receiver
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/receiver/delete.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - receivers_to_delete is defined
+        fail_msg: "Required variables must be defined"
+
+  tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+
+    - name: Delete receivers
+      block:
+        - name: Delete receiver configuration
+          receiver:
+            operation: DELETE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            name: "{{ item.name }}"
+            uid: "{{ item.uid }}"
+            org_id: "{{ org_id | default('default') }}"
+            validate_certs: "{{ item.validate_certs | default(true) }}"
+          loop: "{{ receivers_to_delete }}"
+          register: delete_result
+          loop_control:
+            label: "{{ item.name }}"
+
+        - name: Set deletion information
+          set_fact:
+            deleted_receivers: "{{ delete_result.results | map(attribute='item') | list }}"
+          when: delete_result.results is defined
+
+        - name: Display successful deletions
+          debug:
+            msg: 
+              - "Successfully deleted receivers:"
+              - "{{ deleted_receivers | to_nice_yaml }}"
+          when: deleted_receivers is defined
+
+      rescue:
+        - name: Display error details
+          debug:
+            msg: "Failed to delete receivers: {{ ansible_failed_result | default('Unknown error') }}"
+          when: ansible_failed_result is defined
+
+        - name: Fail with error message
+          fail:
+            msg: "Failed to delete receivers. See above for details."

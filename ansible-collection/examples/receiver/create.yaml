@@ -1,0 +1,66 @@
+---
+- name: Configure PX-Backup Email Receiver
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/receiver/create.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - email_receivers is defined
+        fail_msg: "Required variables must be defined"
+
+  tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+
+    - name: Create email receivers
+      block:
+        - name: Create email receiver
+          receiver:
+            operation: CREATE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            name: "{{ item.name }}"
+            org_id: "{{ org_id | default('default') }}"
+            receiver_type: "{{ item.receiver_type }}"
+            email_config:
+              from_address: "{{ item.email_config.from_address }}"
+              host: "{{ item.email_config.host }}"
+              port: "{{ item.email_config.port }}"
+              encryption_ssl: "{{ item.email_config.encryption_ssl | default(false) }}"
+              encryption_starttls: "{{ item.email_config.encryption_starttls | default(false) }}"
+              authentication: "{{ item.email_config.authentication | default(false) }}"
+              auth_username: "{{ item.email_config.auth_username | default(omit) }}"
+              auth_password: "{{ item.email_config.auth_password | default(omit) }}"
+            validate_certs: "{{ item.validate_certs | default(true) }}"
+          loop: "{{ email_receivers }}"
+          register: receiver_result
+          loop_control:
+            label: "{{ item.name }}"
+
+      rescue:
+        - name: Display error details
+          debug:
+            msg: "Failed to create email receiver: {{ receiver_result.results | selectattr('failed', 'true') | map(attribute='msg') | list }}"
+          when: receiver_result is defined and receiver_result.results is defined
+
+        - name: Fail with error message
+          fail:
+            msg: "Failed to create email receivers. See above for details."
+
+    - name: Display creation results
+      debug:
+        msg: 
+          - "Successfully created email receivers:"
+          - "Created receivers: {{ receiver_result.results | map(attribute='item.name') | list }}"
+          - "Changed status: {{ receiver_result.results | map(attribute='changed') | list }}"
+      when: 
+        - receiver_result is defined 
+        - receiver_result.results is defined
+        - (receiver_result.results | selectattr('failed', 'defined') | selectattr('failed', 'true') | list | length) == 0

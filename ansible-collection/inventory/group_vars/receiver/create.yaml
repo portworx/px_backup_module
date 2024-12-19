@@ -1,0 +1,14 @@
+---
+# Define email receiver configuration
+email_receivers:
+  - name: "smtp"
+    receiver_type: "EMAIL"
+    email_config:
+      from_address: "pxdevautomation@gmail.com"
+      host: "smtp.gmail.com"
+      port: "25"
+      encryption_ssl: false
+      encryption_starttls: false
+      authentication: true
+      auth_username: "pxdevautomation@gmail.com"
+      auth_password: "jfexhrldocgtozjq"  # Define this in vault or secure vars

@@ -1,0 +1,68 @@
+---
+- name: Update PX-Backup Receiver
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/receiver/update.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - receivers_to_update is defined
+        fail_msg: "Required variables must be defined"
+
+  tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+
+    - name: Update receivers
+      block:
+        - name: Update receiver configuration
+          receiver:
+            operation: UPDATE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            name: "{{ item.name }}"
+            uid: "{{ item.uid }}"
+            org_id: "{{ org_id | default('default') }}"
+            receiver_type: "{{ item.receiver_type }}"
+            email_config:
+              from_address: "{{ item.email_config.from_address }}"
+              host: "{{ item.email_config.host }}"
+              port: "{{ item.email_config.port }}"
+              encryption_ssl: "{{ item.email_config.encryption_ssl | default(false) }}"
+              encryption_starttls: "{{ item.email_config.encryption_starttls | default(false) }}"
+              authentication: "{{ item.email_config.authentication | default(false) }}"
+              auth_username: "{{ item.email_config.auth_username | default(omit) }}"
+              auth_password: "{{ item.email_config.auth_password | default(omit) }}"
+            validate_certs: "{{ item.validate_certs | default(true) }}"
+          loop: "{{ receivers_to_update }}"
+          register: update_result
+          loop_control:
+            label: "{{ item.name }}"
+
+        - name: Set update details
+          set_fact:
+            update_info: "{{ update_result.results | map(attribute='receiver') | list }}"
+          when: update_result.results is defined
+
+        - name: Display update results
+          debug:
+            msg:
+              - "Update Results:"
+              - "Successfully updated receivers:"
+              - "{{ update_info | to_nice_yaml }}"
+          when: update_info is defined
+
+      rescue:
+        - name: Display error details
+          debug:
+            msg: "Failed to update receivers: {{ ansible_failed_result | default('Unknown error') }}"
+
+        - name: Fail with error message
+          fail:
+            msg: "Failed to update receivers. See above for details."

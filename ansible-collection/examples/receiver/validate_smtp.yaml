@@ -1,0 +1,68 @@
+---
+- name: Validate SMTP Configuration for PX-Backup Receiver
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/receiver/validate_smtp.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - smtp_configs is defined
+        fail_msg: "Required variables must be defined"
+
+  tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+
+    - name: Validate SMTP configurations
+      block:
+        - name: Validate SMTP settings
+          receiver:
+            operation: VALIDATE_SMTP
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            name: "{{ item.name }}"
+            org_id: "{{ org_id | default('default') }}"
+            receiver_type: "EMAIL"
+            email_config:
+              from_address: "{{ item.email_config.from_address }}"
+              host: "{{ item.email_config.host }}"
+              port: "{{ item.email_config.port }}"
+              encryption_ssl: "{{ item.email_config.encryption_ssl | default(false) }}"
+              encryption_starttls: "{{ item.email_config.encryption_starttls | default(false) }}"
+              authentication: "{{ item.email_config.authentication | default(false) }}"
+              auth_username: "{{ item.email_config.auth_username | default(omit) }}"
+              auth_password: "{{ item.email_config.auth_password | default(omit) }}"
+            validate_certs: "{{ item.validate_certs | default(true) }}"
+            recipient_id: "{{ item.recipient_id | default([]) }}"
+          loop: "{{ smtp_configs }}"
+          register: validate_result
+          loop_control:
+            label: "{{ item.name }}"
+
+        - name: Set validation results
+          set_fact:
+            validation_info: "{{ validate_result.results | map(attribute='item') | list }}"
+          when: validate_result.results is defined
+
+        - name: Display validation results
+          debug:
+            msg:
+              - "SMTP Validation Results:"
+              - "{{ validation_info | to_nice_yaml }}"
+          when: validation_info is defined
+
+      rescue:
+        - name: Display error details
+          debug:
+            msg: "Failed to validate SMTP configurations: {{ ansible_failed_result | default('Unknown error') }}"
+          when: ansible_failed_result is defined
+
+        - name: Fail with error message
+          fail:
+            msg: "Failed to validate SMTP configurations. See above for details."

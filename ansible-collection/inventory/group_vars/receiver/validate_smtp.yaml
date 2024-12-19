@@ -1,0 +1,16 @@
+---
+# Define SMTP configuration to validate
+smtp_configs:
+  - name: "smtp"
+    validate_certs: true
+    recipient_id: 
+      - "nthomas@purestorage.com"
+    email_config:
+      from_address: "pxdevautomation@gmail.com"
+      host: "smtp.gmail.com"
+      port: "25"
+      encryption_ssl: false
+      encryption_starttls: true
+      authentication: true
+      auth_username: "pxdevautomation@gmail.com"
+      auth_password: "jfexhrldocgtozjq"  # Define this in vault or secure vars

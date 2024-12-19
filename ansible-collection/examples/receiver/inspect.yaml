@@ -1,0 +1,68 @@
+---
+- name: Inspect PX-Backup Receiver
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/receiver/inspect.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - receiver_name is defined
+          - receiver_uid is defined
+        fail_msg: "Required variables must be defined"
+
+  tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+
+    - name: Inspect receiver
+      block:
+        - name: Get receiver details
+          receiver:
+            operation: INSPECT_ONE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            org_id: "{{ org_id | default('default') }}"
+            name: "{{ receiver_name }}"
+            uid: "{{ receiver_uid }}"
+            validate_certs: "{{ validate_certs | default(true) }}"
+            include_secrets: "{{ include_secrets | default(false) }}"
+          register: receiver_info
+
+        - name: Set receiver details
+          set_fact:
+            formatted_receiver:
+              name: "{{ receiver_info.receiver.metadata.name }}"
+              type: "{{ receiver_info.receiver.receiver_info.type }}"
+              created: "{{ receiver_info.receiver.metadata.create_time }}"
+              org_id: "{{ receiver_info.receiver.metadata.org_id }}"
+              owner: "{{ receiver_info.receiver.metadata.ownership.owner }}"
+              email_config:
+                from: "{{ receiver_info.receiver.receiver_info.email_config.from }}"
+                host: "{{ receiver_info.receiver.receiver_info.email_config.host }}"
+                port: "{{ receiver_info.receiver.receiver_info.email_config.port }}"
+                authentication: "{{ receiver_info.receiver.receiver_info.email_config.authentication }}"
+                encryption_ssl: "{{ receiver_info.receiver.receiver_info.email_config.encryption_ssl | default(false) }}"
+                encryption_starttls: "{{ receiver_info.receiver.receiver_info.email_config.encryption_starttls | default(false) }}"
+          when: receiver_info.receiver is defined
+
+        - name: Display receiver details
+          debug:
+            msg: 
+              - "Receiver Details:"
+              - "{{ formatted_receiver | to_nice_yaml }}"
+          when: formatted_receiver is defined
+
+      rescue:
+        - name: Display error details
+          debug:
+            msg: "Failed to inspect receiver: {{ ansible_failed_result | default('Unknown error') }}"
+
+        - name: Fail with error message
+          fail:
+            msg: "Failed to inspect receiver. See above for details."

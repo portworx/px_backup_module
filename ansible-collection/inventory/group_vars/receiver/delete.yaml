@@ -1,0 +1,6 @@
+---
+# Define receiver to delete
+receivers_to_delete:
+  - name: "smtp"
+    uid: "aa79bdd8-3692-44f7-858b-688eb2ba6794"
+    validate_certs: false

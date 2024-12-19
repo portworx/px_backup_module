@@ -1,0 +1,8 @@
+---
+# Receiver details for inspection
+receiver_name: "smtp"  # Name of the receiver to inspect
+receiver_uid: "aa8741d9-3839-46f0-8779-507610b02673"  # UID of the receiver to inspect
+
+# Optional parameters
+include_secrets: false  # Set to true to include sensitive information
+validate_certs: false   # Set to false to skip SSL certificate validation
