@@ -1,0 +1,12 @@
+---
+# Define recipients configuration
+recipients:
+  - name: "dev-team"
+    recipient_type: "EMAIL"
+    recipient_ids:
+      - "dev1@example.com"
+      - "dev2@example.com"
+    receiver_ref:
+      name: "smtp"  # Name of your SMTP receiver
+      uid: "dcb57dbb-594b-4eb8-a47b-707678f10d94"  # UID of your SMTP receiver
+    active: true

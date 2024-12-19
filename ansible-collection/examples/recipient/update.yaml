@@ -1,0 +1,66 @@
+---
+- name: Update PX-Backup Recipients
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/recipient/update.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - recipients_to_update is defined
+        fail_msg: "Required variables must be defined"
+
+  tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+
+    - name: Update recipients
+      block:
+        - name: Update recipient configuration
+          recipient:
+            operation: UPDATE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            name: "{{ item.name }}"
+            uid: "{{ item.uid }}"
+            org_id: "{{ org_id | default('default') }}"
+            recipient_type: "{{ item.recipient_type | default('EMAIL') }}"
+            recipient_ids: "{{ item.recipient_ids }}"
+            receiver_ref:
+              name: "{{ item.receiver_ref.name }}"
+              uid: "{{ item.receiver_ref.uid }}"
+            severity: "{{ item.severity | default('WARNING') }}"
+            active: "{{ item.active | default(true) }}"
+            validate_certs: "{{ item.validate_certs | default(true) }}"
+          loop: "{{ recipients_to_update }}"
+          register: update_result
+          loop_control:
+            label: "{{ item.name }}"
+
+        - name: Set update status
+          set_fact:
+            updated_recipients: "{{ update_result.results | map(attribute='recipient') | list }}"
+          when: update_result.results is defined
+
+        - name: Display update results
+          debug:
+            msg:
+              - "Update Results:"
+              - "Successfully updated recipients:"
+              - "{{ updated_recipients | to_nice_yaml }}"
+          when: updated_recipients is defined
+
+      rescue:
+        - name: Display error details
+          debug:
+            msg: "Failed to update recipients: {{ ansible_failed_result | default('Unknown error') }}"
+          when: ansible_failed_result is defined
+
+        - name: Fail with error message
+          fail:
+            msg: "Failed to update recipients. See above for details."

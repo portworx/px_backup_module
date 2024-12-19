@@ -1,0 +1,4 @@
+---
+# Recipient details for inspection
+recipient_name: "recipient-name"  # Name of the recipient to inspect
+recipient_uid: "recipient-uid"  # UID of the recipient to inspect

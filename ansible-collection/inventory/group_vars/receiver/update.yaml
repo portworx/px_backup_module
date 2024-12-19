@@ -1,0 +1,16 @@
+---
+# Define receivers to update
+receivers_to_update:
+  - name: "smtp"  # Name of the receiver to update
+    uid: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"  # UID of the receiver
+    receiver_type: "EMAIL"
+    validate_certs: true
+    email_config:
+      from_address: "example+1@example.com"
+      host: "smtp.example.com"
+      port: "587"  # Updated port
+      encryption_ssl: false
+      encryption_starttls: true
+      authentication: true
+      auth_username: "example@example.com"
+      auth_password: "your_secure_password"  # Define this in vault or secure vars
