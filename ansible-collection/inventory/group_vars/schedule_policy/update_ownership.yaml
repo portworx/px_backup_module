@@ -1,0 +1,16 @@
+---
+# Policies to update
+schedule_policy_ownership_updates:
+  - name: "test-policy-1"
+    uid: "test-policy-1-uid"
+    ownership:
+      owner: "owner-name"
+      groups:
+        - id: "test-grp-0"
+          access: "Write"
+      collaborators:
+        - id: "test-user-0"
+          access: "Read"
+
+# Global update configuration
+validate_certs: false

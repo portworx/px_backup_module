@@ -1,0 +1,14 @@
+# List of schedule_policies to update
+schedule_policy_updates:
+  - name: "test-policy-1"
+    uid: "test-policy-1-uid"
+    schedule_policy:
+      interval:
+        minutes: "15"  
+        retain: "5" 
+        incremental_count:
+          count: "6"
+    # Optional updates - only include fields you want to update
+    labels:
+      environment: "testing"
+      team: "test-team"
