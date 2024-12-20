@@ -1,0 +1,14 @@
+# List of schedule_policies to update
+schedule_policy_updates:
+  - name: "generic-policy"
+    uid: "00000000-0000-0000-0000-000000000000"
+    schedule_policy:
+      interval:
+        minutes: 10
+        retain: 5 
+        incremental_count:
+          count: 5
+    # Optional updates - only include fields you want to update
+    labels:
+      environment: "generic"
+      team: "generic-team"

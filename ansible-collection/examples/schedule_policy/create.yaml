@@ -1,0 +1,62 @@
+---
+- name: Configure PX-Backup Schedule Policies
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/schedule_policy/create.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - schedule_policies is defined
+          - schedule_policies | length > 0
+        fail_msg: "Required variables must be defined"
+
+  tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+    - name: Create schedule policies
+      block:
+        - name: Debug payload
+          debug:
+            var: item
+          loop: "{{ schedule_policies }}"
+        - name: Create schedule policy
+          schedule_policy:
+            operation: CREATE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            name: "{{ item.name }}"
+            org_id: "{{ org_id | default('default') }}"
+            validate_certs: "{{ item.validate_certs | default(true) }}"
+            labels: "{{ item.labels | default(omit) }}"
+            schedule_policy: "{{ item.schedule_policy }}"
+          loop: "{{ schedule_policies }}"
+          register: schedule_policy_result
+          loop_control:
+            label: "{{ item.name }}"
+
+      rescue:
+        - name: Display error details
+          debug:
+            msg: "Failed to create schedule_policy: {{ schedule_policy_result.results | selectattr('failed', 'true') | map(attribute='msg') | list }}"
+          when: schedule_policy_result is defined and schedule_policy_result.results is defined
+
+        - name: Fail with error message
+          fail:
+            msg: "Failed to create schedule policies. See above for details."
+
+    - name: Display creation results
+      debug:
+        msg: 
+          - "Successfully created schedule_policies"
+          - "Created schedule policies: {{ schedule_policy_result.results | map(attribute='item.name') | list }}"
+          - "Changed status: {{ schedule_policy_result.results | map(attribute='changed') | list }}"
+      when: 
+        - schedule_policy_result is defined 
+        - schedule_policy_result.results is defined
+        - (schedule_policy_result.results | selectattr('failed', 'defined') | selectattr('failed', 'true') | list | length) == 0

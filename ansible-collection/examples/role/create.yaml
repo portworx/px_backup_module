@@ -25,10 +25,6 @@
           debug:
             var: item
           loop: "{{ roles }}"
-        - name: Debug role payload
-          debug:
-            msg: "Rules for {{ item.name }}: {{ item.rules }}"
-          loop: "{{ roles }}"
         - name: Create role
           role:
             operation: CREATE

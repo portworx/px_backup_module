@@ -62,6 +62,12 @@ Complete documentation for the PX-Backup Ansible collection modules, playbooks, 
   - Update role configurations
   - Fetch role permissions
 
+### Schedule Policy Module
+- [schedule_policy](modules/schedule_policy.md)
+  - Manage schedule policy operations
+  - Update schedule policy configurations
+  - Control policy access
+
 ## Configuration
 
 ### Authentication

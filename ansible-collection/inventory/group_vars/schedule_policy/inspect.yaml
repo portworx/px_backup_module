@@ -1,0 +1,12 @@
+---
+# Policies to inspect
+schedule_policies_inspect:
+  - name: "test-policy-1"
+    uid: "test-policy-1-uid"
+
+  - name: "test-policy-2"
+    uid: "test-policy-2-uid"
+
+# Global inspect configuration
+validate_certs: false
+

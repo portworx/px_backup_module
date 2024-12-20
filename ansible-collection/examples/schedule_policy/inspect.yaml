@@ -1,0 +1,83 @@
+---
+- name: Inspect PX-Backup Schedule Policies
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/schedule_policy/inspect.yaml"
+
+  pre_tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+    - name: Debug variables
+      debug:
+        msg:
+          - "API URL: {{ px_backup_api_url }}"
+          - "Token: {{ px_backup_token }}"
+          - "Total schedule policies to inspect: {{ schedule_policies_inspect | length }}"
+
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - schedule_policies_inspect is defined
+        fail_msg: "Required variables must be defined"
+
+  tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+    - name: Inspect schedule policies
+      block:
+        - name: Get schedule_policy details
+          schedule_policy:
+            operation: INSPECT_ONE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            name: "{{ item.name }}"
+            uid: "{{ item.uid }}"
+            org_id: "{{ org_id | default('default') }}"
+          register: inspect_result
+          loop: "{{ schedule_policies_inspect }}"
+          loop_control:
+            label: "{{ item.name }}"
+
+      rescue:
+        - name: Display error details
+          debug:
+            msg: "Failed to inspect schedule policies: {{ inspect_result.results | selectattr('failed', 'true') | map(attribute='msg') | list }}"
+          when: inspect_result is defined and inspect_result.results is defined
+
+        - name: Fail with error message
+          fail:
+            msg: "Failed to inspect schedule policies. See above for details."
+
+    - name: Process and display inspection results
+      block:
+        - name: Display inspection results for each schedule policy
+          debug:
+            msg: >
+              [
+                "Policy Details:",
+                "----------------------------------------",
+                "Name: {{ item.schedule_policy.metadata.name }}",
+                "Created: {{ item.schedule_policy.metadata.create_time }}",
+                "Last Updated: {{ item.schedule_policy.metadata.last_update_time }}",
+                "Owner: {{ item.schedule_policy.metadata.ownership.owner }}",
+                "UID: {{ item.schedule_policy.metadata.uid }}",
+                "Schedule Policies Info: {{ item.schedule_policy.schedule_policy_info }}",
+                "----------------------------------------"
+              ]
+          loop: "{{ inspect_result.results }}"
+          loop_control:
+            label: "{{ item.schedule_policy.metadata.name }}"
+          when: item.schedule_policy is defined
+
+    - name: Summarize inspection
+      debug:
+        msg:
+          - "Inspection Summary:"
+          - "Total schedule policies inspected: {{ inspect_result.results | length }}"
+          - "Successful inspections: {{ inspect_result.results | selectattr('schedule_policy', 'defined') | list | length }}"
+          - "Failed inspections: {{ inspect_result.results | selectattr('failed', 'defined') | selectattr('failed', 'true') | list | length }}"
+      when: inspect_result is defined and inspect_result.results is defined
