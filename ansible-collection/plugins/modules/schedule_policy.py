@@ -32,7 +32,7 @@ version_added: "2.8.1"
 
 description: 
     - Manage schedule policy in PX-Backup
-    - Supports create, update, delete, and list operations
+    - Supports create, update, update_ownership, delete, and list operations
 
 options:
     api_url:
@@ -356,60 +356,80 @@ def run_module():
         validate_certs=dict(type='bool', default=True),
         include_secrets=dict(type='bool', default=False),
         labels=dict(type='dict', required=False),
-        schedule_policy = dict(
-            interval=dict(
-                minutes=dict(type='str', required=False),
-                retain=dict(type='str', required=False),
-                incremental_count=dict(
+        schedule_policy=dict(
+            type='dict',
+            required=False,
+            options=dict(
+                interval=dict(
                     type='dict',
                     required=False,
                     options=dict(
-                        count=dict(type='str', required=False)
+                        minutes=dict(type='int', required=False),
+                        retain=dict(type='int', required=False),
+                        incremental_count=dict(
+                            type='dict',
+                            required=False,
+                            options=dict(
+                                count=dict(type='int', required=False)
+                            )
+                        )
                     )
-                )
-            ),
-            daily=dict(
-                time=dict(type='str', required=False),
-                retain=dict(type='str', required=False),
-                incremental_count=dict(
+                ),
+                daily=dict(
                     type='dict',
                     required=False,
                     options=dict(
-                        count=dict(type='str', required=False)
+                        time=dict(type='str', required=False),
+                        retain=dict(type='int', required=False),   
+                        incremental_count=dict(
+                            type='dict',
+                            required=False,
+                            options=dict(
+                                count=dict(type='int', required=False)  
+                            )
+                        )
                     )
-                )
-            ),
-            weekly=dict(
-                day=dict(type='str', required=False),
-                time=dict(type='str', required=False),
-                retain=dict(type='str', required=False),
-                incremental_count=dict(
+                ),
+                weekly=dict(
                     type='dict',
                     required=False,
                     options=dict(
-                        count=dict(type='str', required=False)
+                        day=dict(type='str', required=False),
+                        time=dict(type='str', required=False),
+                        retain=dict(type='int', required=False),   
+                        incremental_count=dict(
+                            type='dict',
+                            required=False,
+                            options=dict(
+                                count=dict(type='int', required=False)  
+                            )
+                        )
                     )
-                )
-            ),
-            monthly=dict(
-                date=dict(type='str', required=False),
-                time=dict(type='str', required=False),
-                retain=dict(type='str', required=False),
-                incremental_count=dict(
+                ),
+                monthly=dict(
                     type='dict',
                     required=False,
                     options=dict(
-                        count=dict(type='str', required=False)
+                        date=dict(type='int', required=False),     
+                        time=dict(type='str', required=False),
+                        retain=dict(type='int', required=False),   
+                        incremental_count=dict(
+                            type='dict',
+                            required=False,
+                            options=dict(
+                                count=dict(type='int', required=False)  
+                            )
+                        )
                     )
-                )
-            ),
-            backup_schedule=dict(
-                type='list',
-                required=False,
-                elements='str'
-            ),
-            for_object_lock=dict(type='bool', required=False, default=False),
-            auto_delete=dict(type='bool', required=False, default=False)
+                ),
+                backup_schedule=dict(
+                    type='list',
+                    required=False,
+                    elements='str'
+                ),
+                for_object_lock=dict(type='bool', required=False, default=False),
+                auto_delete=dict(type='bool', required=False, default=False)
+            )
         ),
          # metadata-related arguments
         ownership = dict(

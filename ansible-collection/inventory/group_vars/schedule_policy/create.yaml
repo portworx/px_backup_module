@@ -2,13 +2,13 @@
 # Define policies list
 schedule_policies:
   # Example policy 1
-  - name: "test-policy-1"
+  - name: "test-policy-2"
     validate_certs: true
     labels:
       policy-label: "test-label"
     schedule_policy:
       interval:
-        minutes: "15"  
-        retain: "5" 
+        minutes: 15
+        retain: 5
         incremental_count:
-          count: "6"
+          count: 6
