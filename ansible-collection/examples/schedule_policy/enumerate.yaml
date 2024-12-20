@@ -1,0 +1,62 @@
+---
+- name: Enumerate PX-Backup Schedule Policies
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/schedule_policy/enumerate.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - org_id is defined
+        fail_msg: "Required variables must be defined"
+
+  tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+    - name: Enumerate schedule policies
+      block:
+        - name: Get list of schedule policies
+          schedule_policy:
+            operation: INSPECT_ALL
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            org_id: "{{ org_id }}"
+            # Optional filters
+            labels: "{{ labels | default(omit) }}"
+            max_objects: "{{ max_objects | default(omit) }}"
+            validate_certs: "{{ validate_certs | default(true) }}"
+          register: schedule_policy_result
+
+        - name: Display schedule policy list summary
+          debug:
+            msg: 
+              - "Total schedule policies found: {{ schedule_policy_result.schedule_policies | length }}"
+
+        - name: Display detailed schedule_policy information
+          debug:
+            msg: |
+              Schedule Policy Details:
+              {% for schedule_policy in schedule_policy_result.schedule_policies %}
+              - Name: {{ schedule_policy.metadata.name }}
+                UID: {{ schedule_policy.metadata.uid }}
+                Creation Time: {{ schedule_policy.metadata.create_time }}
+                Last Update: {{ schedule_policy.metadata.last_update_time }}
+                Owner: {{ schedule_policy.metadata.ownership.owner }}
+                Policy Info: {{ schedule_policy.schedule_policy_info}}
+              {% endfor %}
+          when: schedule_policy_result.schedule_policies | length > 0
+
+      rescue:
+        - name: Display error details
+          debug:
+            msg: "Failed to enumerate schedule policies: {{ schedule_policy_result.msg if schedule_policy_result.msg is defined else 'Unknown error occurred' }}"
+          when: schedule_policy_result is defined
+
+        - name: Fail with error message
+          fail:
+            msg: "Failed to enumerate schedule policies. See above for details."
