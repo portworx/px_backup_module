@@ -61,20 +61,20 @@ The module supports the following operations:
 
 | Parameter                        | Type   | Required | Choices          | Description               |
 | ---------------------------------- | -------- | ---------- | ------------------ | --------------------------- |
-interval.minutes	| string	| 	yes		|  		| Defines the interval in minutes for periodic scheduling.
-interval.retain		| string		| yes		|  		| Specifies the number of periodic backups to retain.
-interval.incremental_count.count		| string		| no		|  		| Number of incremental backups to retain within the periodic schedule.
+interval.minutes	| int	| 	yes		|  		| Defines the interval in minutes for periodic scheduling.
+interval.retain		| int		| yes		|  		| Specifies the number of periodic backups to retain.
+interval.incremental_count.count		| int		| no		|  		| Number of incremental backups to retain within the periodic schedule.
 daily.time		| string		| yes		|  		| Specifies the time of day for daily backups (format: HH:MMAM/PM, e.g., 01:00AM).
-daily.retain		| string		| yes		|  		| Number of daily backups to retain.
-daily.incremental_count.count		| string		| no		|  		| Number of incremental backups to retain within the daily schedule.
+daily.retain		| int		| yes		|  		| Number of daily backups to retain.
+daily.incremental_count.count		| int		| no		|  		| Number of incremental backups to retain within the daily schedule.
 weekly.day		| string		| yes		| Monday-Sunday		| Day of the week for weekly backups (e.g., Sunday).
 weekly.time		| string		| yes		|  		| Time of day for weekly backups (format: HH:MMAM/PM).
-weekly.retain		| string		| yes		|  		| Number of weekly backups to retain.
-weekly.incremental_count.count		| string		| no		|  	| 	Number of incremental backups to retain within the weekly schedule.
+weekly.retain		| int		| yes		|  		| Number of weekly backups to retain.
+weekly.incremental_count.count		| int		| no		|  	| 	Number of incremental backups to retain within the weekly schedule.
 monthly.date		| string		| yes		| 1-31		| Day of the month for monthly backups (e.g., 1 for the 1st day of the month).
 monthly.time		| string		| yes		|  		| Time of day for monthly backups (format: HH:MMAM/PM).
-monthly.retain		| string		| yes		|  		| Number of monthly backups to retain.
-monthly.incremental_count.count		| string		| no		|  		| Number of incremental backups to retain within the monthly schedule.
+monthly.retain		| int		| yes		|  		| Number of monthly backups to retain.
+monthly.incremental_count.count		| int		| no		|  		| Number of incremental backups to retain within the monthly schedule.
 backup_schedule		| list		| no		|  		| A list of custom backup schedules (each schedule as a string).
 for_object_lock		| bool		| no		| true/false		| Enables a locked schedule policy for object-locked backups.
 auto_delete		| bool		| no		| true/false		| Specifies whether backups are automatically deleted after the retention period expires.
