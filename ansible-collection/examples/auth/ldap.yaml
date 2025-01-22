@@ -1,0 +1,43 @@
+# update_ldap.yml
+---
+- name: Update LDAP Configuration
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    auth_url: "http://10.13.195.199:31990"  
+    ldap_component_id: "8ae66f40-cd65-4eb1-98f5-92fdbcec2839" 
+
+  tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+    - name: Update LDAP configuration
+      ldap:
+        operation: UPDATE
+        auth_url: "{{ auth_url }}"
+        token: "{{ px_backup_token }}" 
+        name: "ldap"
+        org_id: "default"
+        # uid: "{{ ldap_component_id }}"
+        ldap_config:
+          connection_url: "ldap://testingad.pwd.dev.purestorage.com" 
+          bind_dn: "CN=Administrator,CN=Users,DC=testingad,DC=pwx,DC=dev,DC=purestorage,DC=com"
+          bind_credential: "Password1"  
+          users_dn: "CN=Users,DC=testingad,DC=pwx,DC=dev,DC=purestorage,DC=com"
+          username_attribute: "cn"
+          user_object_classes: "person,organizationalPerson,user"
+          vendor: "ad"
+          search_scope: "2"
+          uuid_attribute: "objectGUID"
+          connection_pooling: false
+          pagination: false
+          start_tls: false
+          import_enabled: true
+          sync_registrations: true
+          validate_certs: false
+        validate_certs: false
+      register: ldap_result
+
+    - name: Display update result
+      debug:
+        var: ldap_result
