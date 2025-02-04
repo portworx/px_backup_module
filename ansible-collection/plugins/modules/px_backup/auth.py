@@ -41,7 +41,7 @@ options:
 from ansible.module_utils.basic import AnsibleModule
 import requests
 
-def request_bearer_token(auth_url, grant_type, client_id, username, password, token_duration):
+def request_bearer_token(auth_url, grant_type, client_id, username, password, token_duration, verify_ssl=True):
     """Send request to retrieve the bearer token."""
     headers = {'Content-Type': 'application/x-www-form-urlencoded'}
 
@@ -57,7 +57,7 @@ def request_bearer_token(auth_url, grant_type, client_id, username, password, to
         'token-duration': token_duration
     }
     try:
-        response = requests.post(url, headers=headers, data=data)
+        response = requests.post(url, headers=headers, data=data, verify=verify_ssl)
         response.raise_for_status()  # Raises HTTPError for bad responses (4xx or 5xx)
         return response.json()
     except requests.exceptions.RequestException as e:
@@ -71,7 +71,8 @@ def run_module():
         client_id=dict(type='str', required=True, no_log=True),
         username=dict(type='str', required=True, no_log=True),
         password=dict(type='str', required=True, no_log=True),
-        token_duration=dict(type='str', required=False, default="7d")
+        token_duration=dict(type='str', required=False, default="7d"),
+        verify_ssl=dict(type='bool', required=False, default=True)
     )
 
     result = dict(
@@ -90,10 +91,11 @@ def run_module():
     username = module.params['username']
     password = module.params['password']
     token_duration = module.params['token_duration']
+    verify_ssl = module.params['verify_ssl']
 
     try:
         # Make the API request to get the token
-        token_response = request_bearer_token(auth_url, grant_type, client_id, username, password, token_duration)
+        token_response = request_bearer_token(auth_url, grant_type, client_id, username, password, token_duration, verify_ssl)
         
         # Extract the access token from the response
         access_token = token_response.get('access_token')
