@@ -43,6 +43,7 @@ The module handles authentication operations:
 | ---------------- | --------- | ---------- | ------------ | ---------------------------------------- |
 | grant_type     | string  | no       | `password` | Authentication grant type              |
 | token_duration | string  | no       | `7d`       | Duration for which token remains valid |
+| verify_ssl     | bool    | no       | `true`     | Enable SSL verification                |
 
 
 ## Error Handling
