@@ -37,11 +37,16 @@ options:
         description: Duration of Token
         required: false
         type: str
+    verify_ssl:
+        description: Enable SSl verification
+        required: false
+        type: bool
+        default: true
 '''
 from ansible.module_utils.basic import AnsibleModule
 import requests
 
-def request_bearer_token(auth_url, grant_type, client_id, username, password, token_duration, verify_ssl=True):
+def request_bearer_token(auth_url, grant_type, client_id, username, password, token_duration, verify_ssl):
     """Send request to retrieve the bearer token."""
     headers = {'Content-Type': 'application/x-www-form-urlencoded'}
 
