@@ -15,6 +15,7 @@
     username: "{{ pxcentral_username }}"
     password: "{{ pxcentral_password }}"
     token_duration: "{{ token_duration | default('7d') }}"
+    verify_ssl: "{{ pxcentral_verify_ssl | default(true) }}"
   register: token_response
   check_mode: no
   when: px_backup_token is not defined # Fetch token only if it's not already set
