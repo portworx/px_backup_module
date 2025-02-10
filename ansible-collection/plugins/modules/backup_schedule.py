@@ -14,7 +14,7 @@ module: backup_schedule
 
 short_description: Manage backup Schedule in PX-Backup
 
-version_added: "2.8.1"
+version_added: "2.8.3"
 
 description: 
     - Manage backup Schedule in PX-Backup
@@ -214,7 +214,7 @@ options:
                 choices: ['Invalid', 'Read', 'Write', 'Admin']
                 type: str
             time_range:
-                description: Time Range fillter configurations
+                description: Time Range filter configurations
                 type: list
                 elements: dict
                 suboptions:
@@ -224,6 +224,19 @@ options:
                     end_time:
                         description: End time of Backup Schedule
                         type: str
+    exclude_resource_types:
+        description: List of resources to exclude during backup
+        type: list
+        elements: str
+        required: false
+    parallel_backup:
+        description: option to enable parallel schedule backups
+        required: false
+        type: bool
+    keep_cr_status:
+        description: option to enable to keep the CR status of the resources in the backup schedule
+        required: false
+        type: bool
 
 '''
 
@@ -330,6 +343,8 @@ def backup_schedule_request_body(module):
         "cluster_ref": module.params['cluster_ref'],
         "backup_object_type": module.params['backup_object_type'],
         "direct_kdmp": module.params['direct_kdmp'],
+        "parallel_backup": module.params['parallel_backup'],
+        "keep_cr_status": module.params['keep_cr_status'],
 
     }
 
@@ -443,6 +458,8 @@ def run_module():
         exclude_resource_types=dict(type='list', elements='str', required=False),
         namespaces=dict(type='list', elements='str'),
         volume_snapshot_class_mapping=dict(type='dict', required=False),
+        parallel_backup=dict(type='bool', required=False),
+        keep_cr_status=dict(type='bool', required=False),
 
         validate_certs=dict(type='bool', default=True),
         label_selectors=dict(type='dict', required=False),
