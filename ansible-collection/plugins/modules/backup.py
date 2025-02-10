@@ -31,7 +31,7 @@ module: backup
 
 short_description: Manage backups in PX-Backup
 
-version_added: "2.8.1"
+version_added: "2.8.3"
 
 description:
     - Manage backups in PX-Backup using different operations
@@ -221,6 +221,14 @@ options:
         description: Verify SSL certificates
         type: bool
         default: true
+    parallel_backup:
+        description: option to enable parallel schedule backups
+        required: false
+        type: bool
+    keep_cr_status:
+        description: option to enable to keep the CR status of the resources in the backup schedule
+        required: false
+        type: bool
 
 requirements:
     - python >= 3.9
@@ -481,7 +489,9 @@ def build_backup_request(params: Dict[str, Any]) -> Dict[str, Any]:
         'skip_vm_auto_exec_rules',
         'volume_snapshot_class_mapping',
         'direct_kdmp',
-        'exclude_resource_types'
+        'exclude_resource_types',
+        'parallel_backup',
+        'keep_cr_status'
     ]
 
     for field in optional_fields:
@@ -1089,6 +1099,8 @@ def run_module():
             type='bool', required=False, default=False),
         volume_snapshot_class_mapping=dict(type='dict', required=False),
         direct_kdmp=dict(type='bool', required=False, default=False),
+        parallel_backup=dict(type='bool', required=False, default=False),
+        keep_cr_status=dict(type='bool', required=False, default=False),
 
         # Backup share configuration
         backup_share=dict(

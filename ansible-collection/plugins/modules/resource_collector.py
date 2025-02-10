@@ -28,7 +28,7 @@ module: resource_collector
 
 short_description: Get supported resource types in PX-Backup
 
-version_added: "2.8.1"
+version_added: "2.8.3"
 
 description:
     - Query supported Kubernetes resource types for backup operations

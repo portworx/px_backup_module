@@ -12,7 +12,7 @@ The receiver module provides comprehensive management of PX-Backup alert receive
 
 ## Requirements
 
-* PX-Backup >= 2.8.1
+* PX-Backup >= 2.8.3
 * Python >= 3.9
 * The `requests` Python package
 
