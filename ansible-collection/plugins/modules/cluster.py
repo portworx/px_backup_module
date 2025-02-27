@@ -486,7 +486,7 @@ def enumerate_clusters(module: AnsibleModule, client: PXBackupClient) -> List[Di
             endpoint=f"v1/cluster/{module.params['org_id']}",
             params=params
         )
-        return response['clusters']
+        return response.get('clusters', [])
         
     except Exception as e:
         module.fail_json(msg=f"Failed to enumerate clusters: {str(e)}")
