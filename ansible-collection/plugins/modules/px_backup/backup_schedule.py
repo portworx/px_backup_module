@@ -367,6 +367,9 @@ def backup_schedule_request_body(module):
     if module.params.get('volume_snapshot_class_mapping'):
         backup_schedule_request['volume_snapshot_class_mapping'] = module.params['volume_snapshot_class_mapping']
 
+    if module.params.get('labels'):
+        backup_schedule_request['metadata']['labels'] = module.params['labels']
+
     return backup_schedule_request
 
 def run_module():
