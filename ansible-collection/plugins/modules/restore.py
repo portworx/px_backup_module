@@ -530,7 +530,7 @@ def inspect_restore(module: AnsibleModule, client: PXBackupClient) -> Dict[str, 
         # Return the processed response
         return {
             'restore': response.get('restore', {}),
-            'message': "Successfully retrieved backup details",
+            'message': "Successfully retrieved restore details",
             'changed': False
         }
 
@@ -544,7 +544,7 @@ def inspect_restore(module: AnsibleModule, client: PXBackupClient) -> Dict[str, 
                 error_msg = f"{error_msg}: {e.response.text}"
             if hasattr(e.response, 'status_code'):
                 error_msg = f"API returned status code {e.response.status_code}: {error_msg}"
-        module.fail_json(msg=f"Failed to inspect backup: {error_msg}")
+        module.fail_json(msg=f"Failed to inspect restore: {error_msg}")
 
 def handle_api_error(e: Exception, operation: str) -> str:
     """

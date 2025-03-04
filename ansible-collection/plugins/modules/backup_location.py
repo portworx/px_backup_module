@@ -445,7 +445,7 @@ def enumerate_backup_locations(module, client):
     
     try:
         response = client.make_request('GET', f"v1/backuplocation/{module.params['org_id']}", params=params)
-        return response['backup_locations']
+        return response.get('backup_locations', [])
     except Exception as e:
         module.fail_json(msg=f"Failed to enumerate backup locations: {str(e)}")
 

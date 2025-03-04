@@ -273,7 +273,7 @@ def enumerate_schedule_policies(module, client):
     }
     try:
         response = client.make_request('GET', f"v1/schedulepolicy/{module.params['org_id']}", params=params)
-        return response['schedule_policies']
+        return response.get('schedule_policies', [])
     except Exception as e:
         module.fail_json(msg=f"Failed to enumerate Schedule Policy: {str(e)}")
 
