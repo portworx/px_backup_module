@@ -290,7 +290,7 @@ def enumerate_rules(module, client):
     
     try:
         response = client.make_request('GET', f"v1/rule/{module.params['org_id']}", params=params)
-        return response['rules']
+        return response.get('rules', [])
     except Exception as e:
         module.fail_json(msg=f"Failed to enumerate rules: {str(e)}")
 

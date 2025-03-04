@@ -247,7 +247,7 @@ def enumerate_cloud_credentials(module, client):
     }
     try:
         response = client.make_request('GET', f"v1/cloudcredential/{module.params['org_id']}", params=params)
-        return response['cloud_credentials']
+        return response.get('cloud_credentials', [])
     except Exception as e:
         module.fail_json(msg=f"Failed to enumerate Cloud Credential: {str(e)}")
 

@@ -269,7 +269,7 @@ def enumerate_roles(module, client):
     
     try:
         response = client.make_request('GET', f"v1/role/{module.params['org_id']}", params=params)
-        return response['roles']
+        return response.get('roles', [])
     except Exception as e:
         module.fail_json(msg=f"Failed to enumerate roles: {str(e)}")
 

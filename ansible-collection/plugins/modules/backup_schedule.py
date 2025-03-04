@@ -290,7 +290,7 @@ def enumerate_backup_schedules(module, client):
     try:
         response = client.make_request('GET', f"v1/backupschedule/{module.params['org_id']}", params=params)
 
-        return response['backup_schedules']
+        return response.get('backup_schedules', [])
     except Exception as e:
         module.fail_json(msg=f"Failed to enumerate Backup Schedule: {str(e)}")
 
@@ -542,7 +542,7 @@ def run_module():
         elif module.params['operation'] == 'INSPECT_ONE':
             # Update existing backup location
             backup_schedule = inspect_backup_schedules(module, client)
-            result['message'] = "Backup schedule Found successfully"
+            result['message'] = "Backup schedule found successfully"
             result['backup_schedule']= backup_schedule
 
         elif module.params['operation'] == 'DELETE':
