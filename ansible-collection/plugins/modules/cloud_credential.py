@@ -1,4 +1,4 @@
-"- #!/usr/bin/python"
+#!/usr/bin/python
 # -*- coding: utf-8 -*-
 
 """
@@ -21,7 +21,7 @@ module: cloud_credential
 
 short_description: Manage cloud credential in PX-Backup
 
-version_added: "2.8.3"
+version_added: "2.9.0"
 
 description: 
     - Manage cloud credential in PX-Backup
