@@ -6,7 +6,7 @@ module: auth
 
 short_description: Get Auth Token For PX-Backup
 
-version_added: "2.8.3"
+version_added: "2.9.0"
 
 description:
     - Generate authentication token for PX-Backup operations

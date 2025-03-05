@@ -32,7 +32,7 @@ module: role
 
 short_description: Manage roles in PX-Backup
 
-version_added: "2.8.3"
+version_added: "2.9.0"
 
 description: 
     - Manage roles in PX-Backup using different operations
