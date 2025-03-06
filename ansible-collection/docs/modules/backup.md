@@ -43,7 +43,7 @@ The module supports the following operations:
 | name           | string  | varies   |         | Name of the backup (required for all operations except INSPECT_ALL)                          |
 | org_id         | string  | yes      |         | Organization ID                                                                              |
 | operation      | string  | yes      |         | Operation to perform                                                                         |
-| uid            | string  | varies   |         | Backup unique identifier (required for UPDATE, DELETE, INSPECT_ONE, and UPDATE_BACKUP_SHARE) |
+| uid            | string  | varies   |         | Backup unique identifier (required for UPDATE, DELETE, and UPDATE_BACKUP_SHARE) |
 | validate_certs | boolean | no       | true    | Whether to validate SSL certificates                                                         |
 
 ### Backup Configuration Parameters

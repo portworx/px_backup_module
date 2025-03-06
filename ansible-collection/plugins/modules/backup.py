@@ -1155,7 +1155,7 @@ def run_module():
 
         'DELETE': ['name', 'uid'],
 
-        'INSPECT_ONE': ['name', 'uid'],
+        'INSPECT_ONE': ['name'],
 
         'INSPECT_ALL': ['cluster_name_filter', 'cluster_uid_filter', 'org_id'],
 
@@ -1173,7 +1173,7 @@ def run_module():
 
             ('operation', 'DELETE', ['name', 'uid']),
 
-            ('operation', 'INSPECT_ONE', ['name', 'uid']),
+            ('operation', 'INSPECT_ONE', ['name']),
             
             ('operation', 'INSPECT_ALL', ['cluster_name_filter', 'cluster_uid_filter', 'org_id']),
 
