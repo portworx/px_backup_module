@@ -480,6 +480,11 @@ def build_backup_request(params: Dict[str, Any]) -> Dict[str, Any]:
         }
         request['backup_type'] = backup_type_map.get(params['backup_type'], 0)
 
+    # Add backup object type if provided
+    if params.get('backup_object_type'):
+        request['backup_object_type'] = {"type": params['backup_object_type']} if params.get('backup_object_type') else {"type": "Invalid"}
+
+
     # Add optional fields if they exist
     optional_fields = [
         'cluster',
