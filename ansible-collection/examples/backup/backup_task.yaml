@@ -1,0 +1,58 @@
+---
+- name: Login and fetch Px-Backup token
+  include_tasks: "{{ playbook_dir | dirname }}/ansible-collection/examples/auth/auth.yaml"
+
+- name: Debug passed variables
+  debug:
+    msg:
+      - "Namespaces: {{ vm_namespaces  | to_nice_yaml }}"
+      - "Include Resources: {{ include_resources | to_nice_yaml }}"
+
+- name: Create backups
+  block:
+    - name: Create backup
+      backup:
+        operation: CREATE
+        api_url: "{{ px_backup_api_url }}"
+        token: "{{ px_backup_token }}"
+        name: "{{ backups[0].name }}"
+        org_id: "{{ org_id | default('default') }}"
+        backup_location_ref: "{{ backups[0].backup_location_ref }}"
+        cluster_ref: "{{ backups[0].cluster_ref }}"
+        namespaces: "{{ vm_namespaces }}"
+        include_resources: "{{ include_resources }}"
+        label_selectors: "{{ backups[0].label_selectors | default({}) }}"
+        resource_types: "{{ backups[0].resource_types | default([]) }}"
+        backup_type: "{{ backups[0].backup_type | default('Normal') }}"
+        pre_exec_rule_ref: "{{ backups[0].pre_exec_rule_ref | default(omit) }}"
+        post_exec_rule_ref: "{{ backups[0].post_exec_rule_ref | default(omit) }}"
+        exclude_resource_types: "{{ backups[0].exclude_resource_types | default(omit) }}"
+        ns_label_selectors: "{{ backups[0].ns_label_selectors | default(omit) }}"
+        backup_object_type: "{{ backups[0].backup_object_type | default(omit) }}"
+        skip_vm_auto_exec_rules: "{{ backups[0].skip_vm_auto_exec_rules | default(omit) }}"
+        volume_snapshot_class_mapping: "{{ backups[0].volume_snapshot_class_mapping | default(omit) }}"
+        direct_kdmp: "{{ backups[0].direct_kdmp | default(omit) }}"
+        validate_certs: "{{ backups[0].validate_certs | default(true) }}"
+        labels: "{{ backups[0].labels | default(omit) }}"
+      register: backup_result
+
+  rescue:
+    - name: Display error details
+      debug:
+        msg: "Failed to create backup: {{ backup_result.results | selectattr('failed', 'true') | map(attribute='msg') | list }}"
+      when: backup_result is defined and backup_result.results is defined
+
+    - name: Fail with error message
+      fail:
+        msg: "Failed to create backups. See above for details."
+
+- name: Display creation results
+  debug:
+    msg: 
+      - "Successfully created backups"
+      - "Created backups: {{ backup_result.results | map(attribute='item.name') | list }}"
+      - "Changed status: {{ backup_result.results | map(attribute='changed') | list }}"
+  when: 
+    - backup_result is defined 
+    - backup_result.results is defined
+    - (backup_result.results | selectattr('failed', 'defined') | selectattr('failed', 'true') | list | length) == 0
