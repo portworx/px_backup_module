@@ -1,3 +1,4 @@
+import base64
 import json
 import os
 import re
@@ -38,6 +39,26 @@ def get_failed_volumes(file_path):
     return dict(failed_map), backup_name
 
 
+def get_cluster_info(file_path):
+    """
+    Reads the backup JSON file at 'file_path' and returns the cluster name and UID.
+    These values are extracted from the 'cluster_ref' section under 'backup_info'.
+
+    Args:
+        file_path (str): The path to the backup JSON file.
+
+    Returns:
+        tuple: A tuple (cluster_name, cluster_uid). If not found, returns (None, None).
+    """
+    with open(file_path, 'r') as f:
+        data = json.load(f)
+
+    cluster_ref = data.get("backup_info", {}).get("cluster_ref", {})
+    cluster_name = cluster_ref.get("name")
+    cluster_uid = cluster_ref.get("uid")
+    return cluster_name, cluster_uid
+
+
 def extract_pvc_name_from_volume(vol):
     """
     Extracts the PVC name reference from a volume in a VirtualMachine spec.
@@ -56,7 +77,7 @@ def extract_pvc_name_from_volume(vol):
     return None
 
 
-def get_kubevirt_vms_by_namespace(failed_map):
+def get_kubevirt_vms_by_namespace(failed_map, kubeconfig_file):
     """
     Uses the Kubernetes CustomObjectsApi to list all KubeVirt VirtualMachines in each namespace
     from the failed_map. For each VirtualMachine, it inspects its pod template volumes (located at
@@ -67,8 +88,8 @@ def get_kubevirt_vms_by_namespace(failed_map):
     Returns a dictionary mapping each namespace to a list of VM names.
     """
     # Load the kubeconfig (adjust config_file argument if your kubeconfig is in a non-default location)
-    # config.load_kube_config()
-    config.load_incluster_config()
+    config.load_kube_config(kubeconfig_file)
+    # config.load_incluster_config()
     custom_api = client.CustomObjectsApi()
 
     vm_map = {}
@@ -136,6 +157,125 @@ def get_backup_name(file_path):
         data = json.load(f)
     return data.get("metadata", {}).get("name", "output")
 
+
+def inspect_cluster(cluster_name, cluster_uid):
+    """
+    Runs an Ansible playbook to inspect a cluster and extracts cluster details from the output.
+
+    The playbook used is assumed to output a section labeled "TASK [Get cluster details]"
+    containing a JSON structure between "cluster" and "clusters". The extracted JSON is saved
+    to a file named "cluster_data_<cluster_name>.json" under LOG_DIR.
+
+    Args:
+        cluster_name (str): The name of the cluster to inspect.
+        cluster_uid (str): The UID of the cluster to inspect.
+
+    Returns:
+        str: The file path to the saved JSON data.
+    """
+    print(f"[INFO] Running Ansible playbook for cluster: {cluster_name}, UID: {cluster_uid}")
+
+    # Construct extra-vars as a JSON object
+    extra_vars = json.dumps({
+        "clusters_inspect": [{
+            "name": cluster_name,
+            "uid": cluster_uid,
+            "include_secrets": True
+        }]
+    })
+
+    cmd = [
+        "ansible-playbook", "examples/cluster/inspect.yaml", "-vvvv",
+        "--extra-vars", extra_vars
+    ]
+
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    print(f"[DEBUG] Ansible command completed with return code: {result.returncode}")
+
+    stdout_text = result.stdout
+    if not stdout_text:
+        print("[ERROR] No output from Ansible playbook.")
+        exit(1)
+
+    # Step 1: Locate the "Get cluster details" task output
+    task_match = re.search(r"TASK \[Get cluster details].*?\n(.*?)\nTASK ", stdout_text, re.DOTALL)
+    if not task_match:
+        print("[ERROR] Could not find 'Get cluster details' task output.")
+        output_file = os.path.join(LOG_DIR, "cluster_inspect_full_output.log")
+        with open(output_file, "w") as log_file:
+            log_file.write(stdout_text)
+        print(f"[INFO] Full Ansible output saved to {output_file}")
+        exit(1)
+
+    task_output = task_match.group(1)
+
+    # Step 2: Extract JSON between "cluster" and "clusters"
+    json_match = re.search(r'"cluster"\s*:\s*({.*?})\s*,\s*"clusters"', task_output, re.DOTALL)
+    if not json_match:
+        print("[ERROR] Could not extract JSON between 'cluster' and 'clusters'.")
+        output_file = os.path.join(LOG_DIR, "cluster_inspect_full_output.log")
+        with open(output_file, "w") as log_file:
+            log_file.write(stdout_text)
+        print(f"[INFO] Full Ansible output saved to {output_file}")
+        exit(1)
+
+    raw_json = json_match.group(1)
+
+    # Step 3: Parse JSON and save to file
+    try:
+        parsed_json = json.loads(raw_json)
+        output_file = os.path.join(LOG_DIR, f"cluster_data_{cluster_name}.json")
+        with open(output_file, "w") as json_file:
+            json.dump(parsed_json, json_file, indent=4)
+        print(f"[SUCCESS] Extracted cluster data successfully. File saved as {output_file}")
+        return output_file
+
+    except json.JSONDecodeError as e:
+        print(f"[ERROR] JSON parsing failed: {str(e)}")
+        output_file = os.path.join(LOG_DIR, "cluster_inspect_full_output.log")
+        with open(output_file, "w") as log_file:
+            log_file.write(stdout_text)
+        print(f"[INFO] Full Ansible output saved to {output_file}")
+
+
+def create_kubeconfig(cluster_file):
+    """
+    Reads the cluster JSON file at 'cluster_file', extracts the base64 encoded kubeconfig text from the
+    'clusterinfo' section, decodes it, and writes it to a file named '<cluster_name>_kubeconfig'.
+
+    Args:
+        cluster_file (str): Path to the JSON file containing cluster information.
+
+    Returns:
+        str: The filename of the created kubeconfig file.
+    """
+    # Load the JSON data from the file
+    with open(cluster_file, 'r') as f:
+        data = json.load(f)
+
+    # Extract the cluster name from metadata; default to "unknown" if not present
+    cluster_name = data.get("cluster", {}).get("metadata", {}).get("name", "unknown")
+
+    # Extract the base64 encoded kubeconfig text from the clusterinfo section
+    kubeconfig_b64 = data.get("cluster", {}).get("clusterInfo", {}).get("kubeconfig", "")
+
+    if not kubeconfig_b64:
+        raise ValueError("No kubeconfig data found in the cluster file.")
+
+    # Decode the base64 encoded kubeconfig
+    try:
+        kubeconfig_text = base64.b64decode(kubeconfig_b64).decode("utf-8")
+    except Exception as e:
+        raise ValueError(f"Failed to decode kubeconfig: {e}")
+
+    # Define the output filename based on the cluster name
+    filename = f"{cluster_name}_kubeconfig"
+
+    # Write the decoded kubeconfig text to the file
+    with open(filename, "w") as f:
+        f.write(kubeconfig_text)
+
+    return filename
 
 def inspect_backup(backup_name, backup_uid):
     print(f"[INFO] Running Ansible playbook for backup: {backup_name}, UID: {backup_uid}")
@@ -336,13 +476,23 @@ if __name__ == "__main__":
     backup_uid = sys.argv[2]
     print(f"Backup name: {backup_name}, Backup UID: {backup_uid}")
 
-    LOG_DIR = "/app/logs"
+    LOG_DIR = "/tmp/logs"
     if not os.path.exists(LOG_DIR):
         os.makedirs(LOG_DIR)
 
     # Inspect Backup
     file_path = inspect_backup(backup_name, backup_uid)
     print(f"Backup data saved to {file_path}")
+
+    # Get cluster info
+    cluster_name, cluster_uid = get_cluster_info(file_path)
+    print(f"Cluster name: {cluster_name}, Cluster UID: {cluster_uid}")
+    if cluster_name and cluster_uid:
+        cluster_file = inspect_cluster(cluster_name, cluster_uid)
+        print(f"Cluster data saved to {cluster_file}")
+
+    # Create kubeconfig file
+    kubeconfig_file = create_kubeconfig(cluster_file)
 
     # Build the mapping of namespace -> list of failed PVCs and get the backup name
     failed_volumes, backup_name = get_failed_volumes(file_path)
@@ -351,7 +501,7 @@ if __name__ == "__main__":
     print(f"\nBackup name (for YAML output): {backup_name}")
 
     # Get the mapping of namespace -> list of KubeVirt VM names that reference a failed PVC
-    vm_by_ns = get_kubevirt_vms_by_namespace(failed_volumes)
+    vm_by_ns = get_kubevirt_vms_by_namespace(failed_volumes, kubeconfig_file)
     print("\nMapping of namespace to KubeVirt VM names referencing a failed PVC:")
     print(json.dumps(vm_by_ns, indent=2))
 
