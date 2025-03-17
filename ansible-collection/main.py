@@ -74,10 +74,28 @@ def extract_pvc_name_from_volume(vol):
         return vol["dataVolume"].get("name")
     elif "containerDisk" in vol:
         return vol.get("name")
+    elif "cloudInitNoCloud" in vol:
+        return vol.get("name")
+    elif "cloudInitConfigDrive" in vol:
+        return vol.get("name")
+    elif "ephemeral" in vol:
+        return vol.get("name")
+    elif "emptydisk" in vol:
+        return vol.get("name")
+    elif "hostDisk" in vol:
+        return vol.get("name")
+    elif "configMap" in vol:
+        return vol.get("name")
+    elif "secret" in vol:
+        return vol.get("name")
+    elif "serviceAccount" in vol:
+        return vol.get("name")
+    elif "downwardMetrics" in vol:
+        return vol.get("name")
     return None
 
 
-def get_kubevirt_vms_by_namespace(failed_map, kubeconfig_file):
+def get_kubevirt_vms_by_namespace(failed_map, vms_in_backup, kubeconfig_file):
     """
     Uses the Kubernetes CustomObjectsApi to list all KubeVirt VirtualMachines in each namespace
     from the failed_map. For each VirtualMachine, it inspects its pod template volumes (located at
@@ -100,28 +118,30 @@ def get_kubevirt_vms_by_namespace(failed_map, kubeconfig_file):
     for namespace, pvc_list in failed_map.items():
         ns_vm_list = []
         try:
-            # List VirtualMachine custom objects in the current namespace
-            vms = custom_api.list_namespaced_custom_object(
-                group=group,
-                version=version,
-                namespace=namespace,
-                plural=plural
-            )
+            # List VirtualMachine custom objects for the namespace from the vms_in_backup mapping
+            vms = vms_in_backup.get(namespace, [])
+            # Create the list of Virtual Machine objects for the given VM names in vms
+            for vm_name in vms:
+                vm_obj = custom_api.get_namespaced_custom_object(
+                    group=group,
+                    version=version,
+                    namespace=namespace,
+                    plural=plural,
+                    name=vm_name
+                )
+                # Navigate to the pod template volumes in the VM spec
+                volumes = vm_obj.get("spec", {}).get("template", {}).get("spec", {}).get("volumes", [])
+                # Check each volume for a reference to a failed PVC
+                for vol in volumes:
+                    pvc_name = extract_pvc_name_from_volume(vol)
+                    if pvc_name and pvc_name in pvc_list:
+                        ns_vm_list.append(vm_name)
+                        break
+
         except Exception as e:
             print(f"Error listing VirtualMachines in namespace {namespace}: {e}")
             continue
 
-        # Process each VM in the namespace
-        for vm in vms.get("items", []):
-            vm_name = vm.get("metadata", {}).get("name")
-            # Navigate to the pod template volumes in the VM spec
-            volumes = vm.get("spec", {}).get("template", {}).get("spec", {}).get("volumes", [])
-            # Check each volume for a reference to a failed PVC
-            for vol in volumes:
-                pvc_name = extract_pvc_name_from_volume(vol)
-                if pvc_name and pvc_name in pvc_list:
-                    ns_vm_list.append(vm_name)
-                    break  # Found a matching volume; no need to check further for this VM
         vm_map[namespace] = ns_vm_list
     return vm_map
 
@@ -146,16 +166,6 @@ def create_yaml_file(vm_map, output_filename):
         yaml.safe_dump(output_list, f, default_flow_style=False)
     print(f"YAML output written to {yaml_filename}")
     return yaml_filename
-
-
-def get_backup_name(file_path):
-    """
-    Reads the backup JSON file and returns the value of the metadata "name".
-    This value is used to name the output YAML file.
-    """
-    with open(file_path, 'r') as f:
-        data = json.load(f)
-    return data.get("metadata", {}).get("name", "output")
 
 
 def inspect_cluster(cluster_name, cluster_uid):
@@ -464,6 +474,20 @@ def load_json(file_path):
         return json.load(f)
 
 
+def get_all_vms_from_backup(file_path):
+    with open(file_path, 'r') as f:
+        data = json.load(f)
+
+    resources = data.get("backup_info", {}).get("include_resources", [])
+    vm_map = {}
+    for resource in resources:
+        if resource.get("group") == "kubevirt.io" and resource.get("kind") == "VirtualMachine":
+            ns = resource.get("namespace")
+            vm_name = resource.get("name")
+            if ns:
+                vm_map.setdefault(ns, []).append(vm_name)
+    return vm_map
+
 if __name__ == "__main__":
     # Accept two command line arguments: backup name and backup UID
     # Example usage: python main.py backup-name backup-uid
@@ -501,7 +525,9 @@ if __name__ == "__main__":
     print(f"\nBackup name (for YAML output): {backup_name}")
 
     # Get the mapping of namespace -> list of KubeVirt VM names that reference a failed PVC
-    vm_by_ns = get_kubevirt_vms_by_namespace(failed_volumes, kubeconfig_file)
+
+    vms_in_backup = get_all_vms_from_backup(file_path)
+    vm_by_ns = get_kubevirt_vms_by_namespace(failed_volumes, vms_in_backup, kubeconfig_file)
     print("\nMapping of namespace to KubeVirt VM names referencing a failed PVC:")
     print(json.dumps(vm_by_ns, indent=2))
 
