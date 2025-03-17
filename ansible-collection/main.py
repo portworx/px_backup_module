@@ -161,7 +161,7 @@ def create_yaml_file(vm_map, output_filename):
             "vmlist": vm_list
         })
 
-    yaml_filename = os.path.join(LOG_DIR, f"{output_filename}.yaml")
+    yaml_filename = f"{output_filename}.yaml"
     with open(yaml_filename, "w") as f:
         yaml.safe_dump(output_list, f, default_flow_style=False)
     print(f"YAML output written to {yaml_filename}")
@@ -174,7 +174,7 @@ def inspect_cluster(cluster_name, cluster_uid):
 
     The playbook used is assumed to output a section labeled "TASK [Get cluster details]"
     containing a JSON structure between "cluster" and "clusters". The extracted JSON is saved
-    to a file named "cluster_data_<cluster_name>.json" under LOG_DIR.
+    to a file named "cluster_data_<cluster_name>.json".
 
     Args:
         cluster_name (str): The name of the cluster to inspect.
@@ -211,10 +211,6 @@ def inspect_cluster(cluster_name, cluster_uid):
     task_match = re.search(r"TASK \[Get cluster details].*?\n(.*?)\nTASK ", stdout_text, re.DOTALL)
     if not task_match:
         print("[ERROR] Could not find 'Get cluster details' task output.")
-        output_file = os.path.join(LOG_DIR, "cluster_inspect_full_output.log")
-        with open(output_file, "w") as log_file:
-            log_file.write(stdout_text)
-        print(f"[INFO] Full Ansible output saved to {output_file}")
         exit(1)
 
     task_output = task_match.group(1)
@@ -223,10 +219,6 @@ def inspect_cluster(cluster_name, cluster_uid):
     json_match = re.search(r'"cluster"\s*:\s*({.*?})\s*,\s*"clusters"', task_output, re.DOTALL)
     if not json_match:
         print("[ERROR] Could not extract JSON between 'cluster' and 'clusters'.")
-        output_file = os.path.join(LOG_DIR, "cluster_inspect_full_output.log")
-        with open(output_file, "w") as log_file:
-            log_file.write(stdout_text)
-        print(f"[INFO] Full Ansible output saved to {output_file}")
         exit(1)
 
     raw_json = json_match.group(1)
@@ -242,10 +234,6 @@ def inspect_cluster(cluster_name, cluster_uid):
 
     except json.JSONDecodeError as e:
         print(f"[ERROR] JSON parsing failed: {str(e)}")
-        output_file = os.path.join(LOG_DIR, "cluster_inspect_full_output.log")
-        with open(output_file, "w") as log_file:
-            log_file.write(stdout_text)
-        print(f"[INFO] Full Ansible output saved to {output_file}")
 
 
 def create_kubeconfig(cluster_file):
@@ -303,6 +291,7 @@ def inspect_backup(backup_name, backup_uid):
 
     # Extract stdout
     stdout_text = result.stdout
+    print(f"[DEBUG] Ansible stdout: {stdout_text}")
 
     if not stdout_text:
         print("[ERROR] No output from Ansible playbook.")
@@ -313,10 +302,6 @@ def inspect_backup(backup_name, backup_uid):
 
     if not task_match:
         print("[ERROR] Could not find 'Get backup details' task output.")
-        output_file = os.path.join(LOG_DIR, "backup_inspect_full_output.log")
-        with open(output_file, "w") as log_file:
-            log_file.write(stdout_text)
-        print(f"[INFO] Full Ansible output saved to {output_file}")
         exit(1)
 
     task_output = task_match.group(1)
@@ -326,10 +311,6 @@ def inspect_backup(backup_name, backup_uid):
 
     if not json_match:
         print("[ERROR] Could not extract JSON between 'backup' and 'backups'.")
-        output_file = os.path.join(LOG_DIR, "backup_inspect_full_output.log")
-        with open(output_file, "w") as log_file:
-            log_file.write(stdout_text)
-        print(f"[INFO] Full Ansible output saved to {output_file}")
         exit(1)
 
     raw_json = json_match.group(1)
@@ -337,7 +318,7 @@ def inspect_backup(backup_name, backup_uid):
     # **Step 3: Parse JSON and save to file**
     try:
         parsed_json = json.loads(raw_json)
-        output_file = os.path.join(LOG_DIR, f"backup_data_{backup_name}.json")
+        output_file = f"backup_data_{backup_name}.json"
         with open(output_file, "w") as json_file:
             json.dump(parsed_json, json_file, indent=4)
         print(f"[SUCCESS] Extracted backup data successfully. File saved as {output_file}")
@@ -345,10 +326,6 @@ def inspect_backup(backup_name, backup_uid):
 
     except json.JSONDecodeError as e:
         print(f"[ERROR] JSON parsing failed: {str(e)}")
-        output_file = os.path.join(LOG_DIR, "backup_inspect_full_output.log")
-        with open(output_file, "w") as log_file:
-            log_file.write(stdout_text)
-        print(f"[INFO] Full Ansible output saved to {output_file}")
 
 def invoke_backup(vm_map, backup_info):
     """
@@ -419,30 +396,29 @@ def invoke_backup(vm_map, backup_info):
 
     print(f"[INFO] Ansible playbook written to {playbook_file}")
 
-    # Define log file for Ansible execution
-    log_file = os.path.join(LOG_DIR, "backup_create.log")
-    json_output_file = os.path.join(LOG_DIR, f"{new_backup_name}.json")
+    json_output_file = f"{new_backup_name}.json"
 
-    # Invoke the Ansible playbook and capture logs
+    # Invoke the Ansible playbook and print the output
     ansible_cmd = [
         "ansible-playbook", playbook_file, "-vvvv",
        "--extra-vars", f"vm_namespaces='{json.dumps(vm_namespaces)}'",
        "--extra-vars", f"include_resources='{json.dumps(include_resources)}'",
     ]
 
-    with open(log_file, "w") as log:
-        result = subprocess.run(ansible_cmd, stdout=log, stderr=log, text=True)
+    result = subprocess.run(ansible_cmd, capture_output=True, text=True)
+
+    print(f"[DEBUG] Ansible stdout: {result.stdout}")
 
     print(f"[DEBUG] Ansible command completed with return code: {result.returncode}")
 
     if result.returncode != 0:
-        print(f"[ERROR] Backup playbook execution failed. Logs saved to {log_file}")
+        print(f"[ERROR] Backup playbook execution failed.")
 
         # Save failure response as JSON
         response = {
             "status": "failure",
             "backup_name": new_backup_name,
-            "error": f"Backup execution failed. Check {log_file} for details.",
+            "error": f"Backup execution failed.",
             "ansible_return_code": result.returncode
         }
 
@@ -500,10 +476,6 @@ if __name__ == "__main__":
     backup_name = sys.argv[1]
     backup_uid = sys.argv[2]
     print(f"Backup name: {backup_name}, Backup UID: {backup_uid}")
-
-    LOG_DIR = "/tmp/logs"
-    if not os.path.exists(LOG_DIR):
-        os.makedirs(LOG_DIR)
 
     # Inspect Backup
     file_path = inspect_backup(backup_name, backup_uid)
