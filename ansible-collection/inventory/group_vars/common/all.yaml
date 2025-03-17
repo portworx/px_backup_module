@@ -1,11 +1,12 @@
 ---
 # Common variables used across all playbooks
-px_backup_api_url: "http://px-backup:10001"
+px_backup_api_url: "http://10.38.2.226:31401"
 #px_backup_token: ""
 org_id: "default"
-pxcentral_auth_url: "http://px-central-ui:80"
+pxcentral_auth_url: "http://10.38.2.226:30526"
 pxcentral_client_id: "pxcentral"
-pxcentral_username: "{{ lookup('env', 'PXCENTRAL_USERNAME') }}"
-pxcentral_password: "{{ lookup('env', 'PXCENTRAL_PASSWORD') }}"
+# Pull username and password from environment variables, falling back to "admin" if not set
+pxcentral_username: "{{ lookup('env', 'PXCENTRAL_USERNAME') | default('admin', true) }}"
+pxcentral_password: "{{ lookup('env', 'PXCENTRAL_PASSWORD') | default('admin', true) }}"
 token_duration: "365d"
 pxcentral_verify_ssl: "false"
