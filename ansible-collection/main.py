@@ -234,10 +234,10 @@ def inspect_cluster(cluster_name, cluster_uid):
     # Step 3: Parse JSON and save to file
     try:
         parsed_json = json.loads(raw_json)
-        output_file = os.path.join(LOG_DIR, f"cluster_data_{cluster_name}.json")
+        output_file = f"cluster_data_{cluster_name}.json"
         with open(output_file, "w") as json_file:
             json.dump(parsed_json, json_file, indent=4)
-        print(f"[SUCCESS] Extracted cluster data successfully. File saved as {output_file}")
+        print(f"[SUCCESS] Extracted cluster data successfully.")
         return output_file
 
     except json.JSONDecodeError as e:
@@ -386,6 +386,7 @@ def invoke_backup(vm_map, backup_info):
                 })
 
     # Define backup config
+    skip_vm_auto_exec_rules = os.getenv("SKIP_VM_AUTO_EXEC_RULES", "True").lower() == "true"
     playbook_data = [{
         "name": "Create VM Backup",
         "hosts": "localhost",
@@ -397,7 +398,7 @@ def invoke_backup(vm_map, backup_info):
                 "cluster_ref": cluster_ref,
                 "backup_type": "Normal",
                 "backup_object_type": "VirtualMachine",
-                "skip_vm_auto_exec_rules": True,
+                "skip_vm_auto_exec_rules": skip_vm_auto_exec_rules,
                 "validate_certs": True
             }],
             "vm_namespaces": vm_namespaces,   # Pass extracted namespaces
@@ -513,7 +514,7 @@ if __name__ == "__main__":
     print(f"Cluster name: {cluster_name}, Cluster UID: {cluster_uid}")
     if cluster_name and cluster_uid:
         cluster_file = inspect_cluster(cluster_name, cluster_uid)
-        print(f"Cluster data saved to {cluster_file}")
+        print(f"Cluster data saved")
 
     # Create kubeconfig file
     kubeconfig_file = create_kubeconfig(cluster_file)
