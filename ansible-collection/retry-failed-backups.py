@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo
 import yaml
 
 
-def enumerate_cluster():
+def enumerate_cluster(cluster_name):
     print("[INFO] Running Ansible playbook for enumerate clusters")
 
     # Define the Ansible command
@@ -52,9 +52,14 @@ def enumerate_cluster():
     try:
         decoder = json.JSONDecoder()
         parsed_json, idx = decoder.raw_decode(raw_json)
+        # loop through the clusters and check if the cluster name is matching
+        for cluster in parsed_json.get("clusters", []):
+            if cluster.get("metadata", {}).get("name") == cluster_name:
+                cluster_uid = cluster.get("metadata", {}).get("uid")
+                return cluster_uid
         # Get cluster UID from the first cluster
-        cluster_uid = parsed_json.get("clusters", [{}])[0].get("metadata", {}).get("uid")
-        return cluster_uid
+        # cluster_uid = parsed_json.get("clusters", [{}])[0].get("metadata", {}).get("uid")
+        # return cluster_uid
 
     except json.JSONDecodeError as e:
         print(f"[ERROR] JSON parsing failed: {str(e)}")
@@ -306,7 +311,6 @@ def invoke_backup(resources, backup_info):
     #             })
 
     # Define backup config
-    skip_vm_auto_exec_rules = backup_info.get("skip_vm_auto_exec_rules", True)
     playbook_data = [{
         "name": "Create VM Backup",
         "hosts": "localhost",
@@ -318,7 +322,7 @@ def invoke_backup(resources, backup_info):
                 "cluster_ref": cluster_ref,
                 "backup_type": "Normal",
                 "backup_object_type": "VirtualMachine",
-                "skip_vm_auto_exec_rules": skip_vm_auto_exec_rules,
+                "skip_vm_auto_exec_rules": True,
             }],
             "vm_namespaces": vm_namespaces,  # Pass extracted namespaces
             "include_resources": resources  # Pass extracted include_resources
@@ -466,7 +470,7 @@ if __name__ == "__main__":
                         help="Timestamp for filtering failed backups in MM/DD/YYYY HH:MMAM/PM format e.g., 03/18/2025 07:25AM")
 
     args = parser.parse_args()
-    cluster_uid = enumerate_cluster()
+    cluster_uid = enumerate_cluster(args.cluster_name)
     print(f"[INFO] Backing up cluster: {args.cluster_name} with uid {cluster_uid}")
     enumerate_response = get_all_backups(args.cluster_name, cluster_uid)
     failed_backups = get_failed_backups(enumerate_response, args.timestamp)

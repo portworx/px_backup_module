@@ -527,8 +527,7 @@ def create_vm_backup_schedule(vm, namespace, policy_name, policy_uid, backup_loc
         "type": "VirtualMachine"
     }
     
-    skip_vm_auto_exec_rules = os.getenv("SKIP_VM_AUTO_EXEC_RULES", "True").lower() == "true"
-    
+
     playbook_data = [{
         "name": "Configure VM Backup Schedule",
         "hosts": "localhost",
@@ -541,7 +540,7 @@ def create_vm_backup_schedule(vm, namespace, policy_name, policy_uid, backup_loc
                 "cluster_ref": cluster_ref,
                 "backup_type": "Normal",
                 "backup_object_type": backup_object_type,
-                "skip_vm_auto_exec_rules": skip_vm_auto_exec_rules,
+                "skip_vm_auto_exec_rules": True,
                 "validate_certs": True,
                 "labels": {
                     "vm-name": vm,
