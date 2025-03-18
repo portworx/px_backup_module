@@ -905,7 +905,8 @@ def get_inventory(kubeconfig_file):
     # Setup the cert
     configuration = client.Configuration.get_default_copy()
     configuration.ssl_ca_cert = "ca.crt"
-    custom_api = client.CustomObjectsApi()
+    api_client = client.ApiClient(configuration)
+    custom_api = client.CustomObjectsApi(api_client)
 
     group = "kubevirt.io"
     version = "v1"
