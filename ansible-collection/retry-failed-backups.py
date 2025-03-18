@@ -499,4 +499,4 @@ if __name__ == "__main__":
         new_backup_name = invoke_backup(resources, backup_info)
         print("Created retry backup for failed VMs: ", new_backup_name)
         # sleep for 2 minutes
-        time.sleep(5)
+        time.sleep(120)
