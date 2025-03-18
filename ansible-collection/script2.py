@@ -1,3 +1,4 @@
+import argparse
 import datetime
 import json
 import os
@@ -9,13 +10,63 @@ from zoneinfo import ZoneInfo
 import yaml
 
 
-def get_all_backups(cluster_name_filter, cluster_uid_filter):
+def enumerate_cluster():
+    print("[INFO] Running Ansible playbook for enumerate clusters")
+
+    # Define the Ansible command
+    cmd = ["ansible-playbook", "examples/cluster/enumerate.yaml", "-vvvv"]
+
+    # Run the command
+    result = subprocess.run(cmd, capture_output=True, text=True)
+
+    print(f"[DEBUG] Ansible command completed with return code: {result.returncode}")
+
+    # Extract stdout
+    stdout_text = result.stdout
+
+    if not stdout_text:
+        print("[ERROR] No output from Ansible playbook.")
+        exit(1)
+
+    # **Step 1: Locate the "Get list of clusters" task output**
+    task_match = re.search(r"TASK \[Cluster Enumerate call].*?\n(.*?)\nRead vars_file ", stdout_text, re.DOTALL)
+
+    if not task_match:
+        print("[ERROR] Could not find 'Get list of clusters' task output.")
+        exit(1)
+
+    task_output = task_match.group(1)
+    print(f"[DEBUG] Ansible task output: {task_output}")
+
+    # **Step 2: Extract everything between "cluster" and "clusters"**
+    pattern = r"ok:\s*\[localhost\]\s*=>\s*(\{.*\})"
+    json_match = re.search(pattern, task_output, re.DOTALL)
+
+    if not json_match:
+        print("[ERROR] Could not extract JSON between 'cluster' and 'clusters'.")
+        exit(1)
+
+    raw_json = json_match.group(1)
+
+    # **Step 3: Parse JSON and save to file**
+    try:
+        decoder = json.JSONDecoder()
+        parsed_json, idx = decoder.raw_decode(raw_json)
+        # Get cluster UID from the first cluster
+        cluster_uid = parsed_json.get("clusters", [{}])[0].get("metadata", {}).get("uid")
+        return cluster_uid
+
+    except json.JSONDecodeError as e:
+        print(f"[ERROR] JSON parsing failed: {str(e)}")
+
+def get_all_backups(cluster_name_filter, cluster_uid):
     print(f"[INFO] Running Ansible playbook for enumerate backups")
+
 
     # Define the Ansible command with extra-vars
     cmd = [
         "ansible-playbook", "examples/backup/enumerate_vm_backups.yaml", "-vvvv",
-        "--extra-vars", f"cluster_name_filter={cluster_name_filter} cluster_uid_filter={cluster_uid_filter}"
+        "--extra-vars", f"cluster_name_filter={cluster_name_filter} cluster_uid_filter={cluster_uid}"
     ]
 
     # Run the command
@@ -25,7 +76,6 @@ def get_all_backups(cluster_name_filter, cluster_uid_filter):
 
     # Extract stdout
     stdout_text = result.stdout
-    print(f"[DEBUG] Ansible stdout: {stdout_text}")
 
     if not stdout_text:
         print("[ERROR] No output from Ansible playbook.")
@@ -146,7 +196,6 @@ def inspect_backup(backup_name, backup_uid):
 
     # Extract stdout
     stdout_text = result.stdout
-    print(f"[DEBUG] Ansible stdout: {stdout_text}")
 
     if not stdout_text:
         print("[ERROR] No output from Ansible playbook.")
@@ -347,10 +396,80 @@ def get_all_vms_from_backup(file_path):
                 vm_map.setdefault(ns, []).append(vm_name)
     return vm_map
 
+def inspect_cluster(cluster_name):
+    """
+    Runs an Ansible playbook to inspect a cluster and extracts cluster details from the output.
+
+    The playbook used is assumed to output a section labeled "TASK [Get cluster details]"
+    containing a JSON structure between "cluster" and "clusters". The extracted JSON is saved
+    to a file named "cluster_data_<cluster_name>.json".
+
+    Args:
+        cluster_name (str): The name of the cluster to inspect.
+
+    Returns:
+        str: Cluster UID.
+    """
+    print(f"[INFO] Running Ansible playbook for cluster: {cluster_name}")
+
+    # Construct extra-vars as a JSON object
+    extra_vars = json.dumps({
+        "clusters_inspect": [{
+            "name": cluster_name,
+            "include_secrets": True
+        }]
+    })
+
+    cmd = [
+        "ansible-playbook", "examples/cluster/inspect.yaml", "-vvvv",
+        "--extra-vars", extra_vars
+    ]
+
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    print(f"[DEBUG] Ansible command completed with return code: {result.returncode}")
+
+    stdout_text = result.stdout
+    if not stdout_text:
+        print("[ERROR] No output from Ansible playbook.")
+        exit(1)
+
+    # Step 1: Locate the "Get cluster details" task output
+    task_match = re.search(r"TASK \[Get cluster details].*?\n(.*?)\nTASK ", stdout_text, re.DOTALL)
+    if not task_match:
+        print("[ERROR] Could not find 'Get cluster details' task output.")
+        exit(1)
+
+    task_output = task_match.group(1)
+
+    # Step 2: Extract JSON between "cluster" and "clusters"
+    json_match = re.search(r'"cluster"\s*:\s*({.*?})\s*,\s*"clusters"', task_output, re.DOTALL)
+    if not json_match:
+        print("[ERROR] Could not extract JSON between 'cluster' and 'clusters'.")
+        exit(1)
+
+    raw_json = json_match.group(1)
+
+    # Step 3: Parse JSON and save to file
+    try:
+        parsed_json = json.loads(raw_json)
+        cluster_uid = parsed_json.get("cluster_info", {}).get("cluster_uid", {})
+        print(f"[SUCCESS] Extracted cluster data successfully.")
+        return cluster_uid
+
+    except json.JSONDecodeError as e:
+        print(f"[ERROR] JSON parsing failed: {str(e)}")
+
 if __name__ == "__main__":
-    # Enumerate the backups
-    enumerate_response = get_all_backups("ocp-pxe", "bbfe26ef-2c8f-4187-9ef3-797c0df9d476")
-    failed_backups = get_failed_backups(enumerate_response, "03/18/2025 3:13PM", "Asia/Kolkata")
+    parser = argparse.ArgumentParser(description="Backup Processing Script")
+    parser.add_argument("--cluster-name", required=True, help="Name of the application cluster")
+    parser.add_argument("--timestamp", required=True,
+                        help="Timestamp for filtering failed backups in MM/DD/YYYY HH:MMAM/PM format e.g., 03/18/2025 07:25AM")
+
+    args = parser.parse_args()
+    cluster_uid = enumerate_cluster()
+    print(f"[INFO] Backing up cluster: {args.cluster_name} with uid {cluster_uid}")
+    enumerate_response = get_all_backups(args.cluster_name, cluster_uid)
+    failed_backups = get_failed_backups(enumerate_response, args.timestamp)
     # Print only the backup name from the failed backups
     failed_backup_names = [backup.get("metadata", {}).get("name") for backup in failed_backups]
     print(f"[SUCCESS] Enumerated backup list: {failed_backup_names}")
