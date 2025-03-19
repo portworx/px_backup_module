@@ -70,7 +70,8 @@ def fetch_schedules():
     if match:
         json_data = match.group(1).strip()
         try:
-            parsed_json = json.loads(json_data)
+            decoder = json.JSONDecoder()
+            parsed_json, idx = decoder.raw_decode(json_data)
             return parsed_json
         except json.JSONDecodeError as e:
             return f"Error parsing JSON: {e}"
@@ -130,6 +131,7 @@ if __name__ == "__main__":
     if not schedules:
         print("No schedules found or failed to fetch schedules.")
         exit(1)
+    print(f"Found {len(schedules)} schedules.")
 
     print("Filtering VM schedules matching pattern:", pattern)
     matching_schedules = filter_schedules(schedules, pattern)
