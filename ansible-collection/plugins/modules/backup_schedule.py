@@ -366,8 +366,7 @@ def backup_schedule_request_body(module):
         backup_schedule_request['post_exec_rule_ref'] = module.params['post_exec_rule_ref']
         backup_schedule_request['post_exec_rule'] = module.params['post_exec_rule']
     
-    if module.params.get('backup_object_type') == 'VirtualMachine' and module.params.get('skip_vm_auto_exec_rules'):
-        backup_schedule_request['backup_object_type'] = module.params['backup_object_type']
+    if module.params.get('backup_object_type').get("type") == 'VirtualMachine' and module.params.get('skip_vm_auto_exec_rules'):
         backup_schedule_request['skip_vm_auto_exec_rules'] = module.params['skip_vm_auto_exec_rules']
 
     if module.params.get('exclude_resource_types'):
