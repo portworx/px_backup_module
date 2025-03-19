@@ -693,22 +693,22 @@ def create_policies_and_schedules(vm_map, backup_location_name, cluster_name):
         policy_time_str = policy_time.strftime('%I:%M%p')
         
         # Create policy
-        policy_name, policy_uid = create_schedule_policy(vm, policy_time, namespace)
-        
-        if not policy_name or not policy_uid:
-            print(f"[ERROR] Failed to create policy for VM: {vm}")
-            results["failed_count"] += 1
-            results["failed_schedules"].append({
-                "vm": vm,
-                "namespace": namespace,
-                "policy_time": policy_time_str,
-                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            })
-            continue
+        # policy_name, policy_uid = create_schedule_policy(vm, policy_time, namespace)
+
+        # if not policy_name or not policy_uid:
+        #     print(f"[ERROR] Failed to create policy for VM: {vm}")
+        #     results["failed_count"] += 1
+        #     results["failed_schedules"].append({
+        #         "vm": vm,
+        #         "namespace": namespace,
+        #         "policy_time": policy_time_str,
+        #         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        #     })
+        #     continue
         
         # Create backup schedule
         success, backup_name = create_vm_backup_schedule(
-            vm, namespace, policy_name, policy_uid, backup_location_ref, cluster_ref
+            vm, namespace, "hardcoded-policy", "hardcoded-uid", backup_location_ref, cluster_ref
         )
         
         # Update results
@@ -720,7 +720,7 @@ def create_policies_and_schedules(vm_map, backup_location_name, cluster_name):
                 "vm": vm,
                 "namespace": namespace,
                 "backup_name": backup_name,
-                "policy_name": policy_name,
+                "policy_name": "hardcoded-policy",
                 "policy_time": policy_time_str,
                 "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             })
@@ -887,7 +887,7 @@ def create_kubeconfig(cluster_file):
     return None
 
 
-def get_inventory(kubeconfig_file):
+def get_inventory(ns_list, kubeconfig_file):
     """
     Get inventory of all VirtualMachine resources in the cluster
     
@@ -912,24 +912,27 @@ def get_inventory(kubeconfig_file):
     plural = "virtualmachines"
     vm_map = {}
 
-    try:
-        # List all VirtualMachine custom objects across the cluster
-        result = custom_api.list_cluster_custom_object(
-            group=group,
-            version=version,
-            plural=plural
-        )
-        # Iterate over each VirtualMachine and group by namespace
-        for item in result.get("items", []):
-            metadata = item.get("metadata", {})
-            namespace = metadata.get("namespace", "default")
-            name = metadata.get("name")
-            if namespace and name:
-                if namespace not in vm_map:
-                    vm_map[namespace] = []
-                vm_map[namespace].append(name)
-    except Exception as e:
-        print(f"Error listing all VirtualMachines: {e}")
+    for ns in ns_list:
+        try:
+            # List all VirtualMachine custom objects across the cluster
+            result = custom_api.list_namespaced_custom_object(
+                group=group,
+                version=version,
+                plural=plural,
+                namespace=ns,
+            )
+            # Iterate over each VirtualMachine and group by namespace
+            for item in result.get("items", []):
+                metadata = item.get("metadata", {})
+                name = metadata.get("name")
+                if ns and name:
+                    if ns not in vm_map:
+                        vm_map[ns] = []
+                    vm_map[ns].append(name)
+        except Exception as e:
+            print(f"Error listing all VirtualMachines: {e}")
+
+
 
     return vm_map
 
@@ -944,7 +947,7 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
 
-    GAP_MINUTES = args.gap_minutes
+    GAP_MINUTES = 0
     DEFAULT_START_TIME = args.default_time
     
     try:
@@ -957,9 +960,27 @@ if __name__ == "__main__":
             raise ValueError("Failed to inspect cluster")
             
         kubeconfig_file = create_kubeconfig(cluster_file)
-        
+
+        ns_list = ["15405-dev", "15405-dev", "199077-dev-vm", "199077-dev-vm", "59893-dev-vm", "186743-test-vm", "187877-dev-vm",
+                   "190445-test-vm", "190577-test-vm", "198675-dev", "198675-dev-vm", "199077-dev-vm", "200579-test-vm",
+                   "202099-dev-vm", "202388-test-vm", "202757-dev", "203720-test-vm", "204588-dev", "206941-dev", "210331-test-vm",
+                   "211640-test-vm", "213389-dev", "215571-test-vm", "217212-test-vm", "217651-test-vm", "232160-test-vm", "232695-test-vm",
+                   "244221-test-vm", "41326-test-vm", "43264-dev-vm", "43266-dev-vm", "47034-dev", "48265-dev", "50067-test-vm", "51684-test-vm",
+                   "54874-dev-vm", "56212-dev", "56365-dev", "58151-dev-vm", "58174-windows-platform", "59893-dev-vm", "6195-dev-vm"]
+
         # Get VM inventory
-        vm_by_ns = get_inventory(kubeconfig_file)
+        vm_by_ns = get_inventory(ns_list, kubeconfig_file)
+
+        print(f"====================================================================")
+        for namespace, vms in vm_by_ns.items():
+            for vm in vms:
+                print(f"Namespace: {namespace}, VM Name: {vm}")
+
+        # Count total VMs
+        total_vm_count = sum(len(vms) for vms in vm_by_ns.values())
+        print(f"Total VM count: {total_vm_count}")
+
+        print(f"====================================================================")
         
         # Count total VMs
         total_vm_count = sum(len(vms) for vms in vm_by_ns.values())
