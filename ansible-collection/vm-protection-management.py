@@ -19,23 +19,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger("vm-schedule-sync")
 
-class VMScheduleInfo:
-    """Class to represent a schedule with its associated VM info"""
-    def __init__(self, schedule_name: str, schedule_uid: str, vm_name: str, namespace: str, suspended: bool):
-        self.schedule_name = schedule_name
-        self.schedule_uid = schedule_uid
-        self.vm_name = vm_name
-        self.namespace = namespace
-        self.vm_id = f"{namespace}-{vm_name}"
-        self.suspended = suspended
-    
-    def __str__(self):
-        status = "Suspended" if self.suspended else "Active"
-        return f"Schedule '{self.schedule_name}' ({status}): VM '{self.vm_id}'"
-    
-    def __repr__(self):
-        return self.__str__()
-
 def get_cluster_info(cluster_name: str) -> Tuple[str, str]:
     """
     Get cluster information for the specified cluster name
@@ -430,14 +413,6 @@ def extract_vm_schedules(schedules):
                 namespace = resource.get("namespace")
                 
                 if vm_name and namespace:
-                    # Create schedule info object
-                    schedule_info = VMScheduleInfo(
-                        schedule_name=schedule_name,
-                        schedule_uid=schedule_uid,
-                        vm_name=vm_name,
-                        namespace=namespace,
-                        suspended=is_suspended
-                    )
 
                     if namespace not in all_ns_vm_schedules:
                         all_ns_vm_schedules[namespace] = {}
@@ -686,12 +661,12 @@ def create_vm_backup_schedule(vm, namespace, policy_name, policy_uid, backup_loc
         tuple: (success, backup_name) where success is a boolean indicating if the operation succeeded
     """
     # Extract time from policy name
-    print(f"[INFO] Creating backup schedule for {vm}")
+    print(f"[INFO] Creating backup schedule for {vm} in namespace {namespace}")
     time_match = re.search(r'-([0-9]{2,4}[ap]m)$', policy_name)
     time_str = time_match.group(1) if time_match else datetime.now().strftime("%I%M%p").lower().lstrip("0")
 
     # Create backup schedule name
-    backup_name = f"pxb-{vm}-sched-backup-{time_str}"
+    backup_name = f"pxb-{namespace}-{vm}-sched-backup-{time_str}"
 
     schedule_policy_ref = {
         "name": policy_name,
@@ -764,7 +739,6 @@ def create_vm_backup_schedule(vm, namespace, policy_name, policy_uid, backup_loc
 
     result = subprocess.run(ansible_cmd, capture_output=True, text=True)
     stdout_text = result.stdout
-    print("Ansible output - ", stdout_text)
     if result.returncode != 0:
         print(f"[ERROR] Failed to create backup schedule for VM: {vm}")
         return False, backup_name
@@ -959,6 +933,282 @@ def print_namespace_vm_schedules(ns_vm_map):
             print(f"  {vm} => {schedule_name}")
 
 
+# def generate_report(
+#         inventory_map,
+#         active_vm_schedules,
+#         suspended_vm_schedules,
+#         new_vms,
+#         suspended_info,
+#         resumed_info,
+#         newly_created_schedules,
+#         report_file_path="vm_protection_report.txt"
+# ):
+#     """
+#     Generates a text-based report of the VM protection operations and writes it to the console
+#     and to a file (report_file_path). The report includes:
+#       1) Cluster inventory (namespace -> list of VM names)
+#       2) Active schedules (namespace -> vm -> schedule_name)
+#       3) Suspended schedules (namespace -> vm -> schedule_name)
+#       4) Newly created VMs in the cluster (namespace -> list of VM names)
+#       5) Summary of actions performed:
+#          - Schedules suspended (namespace -> vm -> schedule_name)
+#          - Schedules resumed (namespace -> vm -> schedule_name)
+#          - Schedules created for new VMs (namespace -> vm -> schedule_name)
+#
+#     Args:
+#         inventory_map (dict):
+#             The cluster inventory, namespace -> list of VM names
+#         active_vm_schedules (dict):
+#             Dictionary of active schedules: { namespace -> { vm_name -> schedule_name } }
+#         suspended_vm_schedules (dict):
+#             Dictionary of suspended schedules: { namespace -> { vm_name -> schedule_name } }
+#         new_vms (dict):
+#             Newly created VMs not previously scheduled: { namespace -> list of VM names }
+#         suspended_info (dict):
+#             Schedules that were suspended: { namespace -> { vm_name -> schedule_name } }
+#         resumed_info (dict):
+#             Schedules that were resumed: { namespace -> { vm_name -> schedule_name } }
+#         newly_created_schedules (dict):
+#             Schedules created for new VMs: { namespace -> { vm_name -> schedule_name } }
+#         report_file_path (str):
+#             File path where the report will be written (default 'vm_protection_report.txt').
+#
+#     Returns:
+#         None
+#     """
+#     lines = []
+#     lines.append("====== VM Protection Management Report ======\n")
+#
+#     # 1) Print cluster inventory
+#     lines.append("Cluster Inventory (namespace -> VMs):\n")
+#     for ns, vm_list in inventory_map.items():
+#         lines.append(f"{ns}:\n")
+#         for vm in vm_list:
+#             lines.append(f"  - {vm}\n")
+#     lines.append("\n")
+#
+#     # 2) Print active schedules
+#     lines.append("Active Schedules (namespace -> VM -> Schedule name):\n")
+#     if active_vm_schedules:
+#         for ns, vm_dict in active_vm_schedules.items():
+#             lines.append(f"{ns}:\n")
+#             for vm, schedule in vm_dict.items():
+#                 schedule_metadata = schedule.get("metadata", {})
+#                 sched_name = schedule_metadata.get("name", "")
+#                 lines.append(f"  {vm} -> {sched_name}\n")
+#     else:
+#         lines.append("  (None)\n")
+#     lines.append("\n")
+#
+#     # 3) Print suspended schedules
+#     lines.append("Suspended Schedules (namespace -> VM -> Schedule name):\n")
+#     if suspended_vm_schedules:
+#         for ns, vm_dict in suspended_vm_schedules.items():
+#             lines.append(f"{ns}:\n")
+#             for vm, schedule in vm_dict.items():
+#                 schedule_metadata = schedule.get("metadata", {})
+#                 sched_name = schedule_metadata.get("name", "")
+#                 lines.append(f"  {vm} -> {sched_name}\n")
+#     else:
+#         lines.append("  (None)\n")
+#     lines.append("\n")
+#
+#     # 4) Print newly created VMs
+#     lines.append("Newly Created VMs (namespace -> VMs):\n")
+#     if new_vms:
+#         for ns, vm_list in new_vms.items():
+#             lines.append(f"{ns}:\n")
+#             for vm in vm_list:
+#                 lines.append(f"  - {vm}\n")
+#     else:
+#         lines.append("  (None)\n")
+#     lines.append("\n")
+#
+#     # 5) Summary of actions performed
+#     lines.append("Summary of Actions Performed:\n")
+#
+#     # a) Schedules suspended
+#     lines.append("  - Schedules Suspended:\n")
+#     if suspended_info:
+#         for ns, vm_dict in suspended_info.items():
+#             lines.append(f"    {ns}:\n")
+#             for vm, schedule in vm_dict.items():
+#                 schedule_metadata = schedule.get("metadata", {})
+#                 sched_name = schedule_metadata.get("name", "")
+#                 lines.append(f"      {vm} -> {sched_name}\n")
+#     else:
+#         lines.append("    (None)\n")
+#
+#     # b) Schedules resumed
+#     lines.append("  - Schedules Resumed:\n")
+#     if resumed_info:
+#         for ns, vm_dict in resumed_info.items():
+#             lines.append(f"    {ns}:\n")
+#             for vm, schedule in vm_dict.items():
+#                 schedule_metadata = schedule.get("metadata", {})
+#                 sched_name = schedule_metadata.get("name", "")
+#                 lines.append(f"      {vm} -> {sched_name}\n")
+#     else:
+#         lines.append("    (None)\n")
+#
+#     # c) New schedules created
+#     lines.append("  - New Schedules Created:\n")
+#     if newly_created_schedules:
+#         for ns, vm_dict in newly_created_schedules.items():
+#             lines.append(f"    {ns}:\n")
+#             for vm, schedule in vm_dict.items():
+#                 schedule_metadata = schedule.get("metadata", {})
+#                 sched_name = schedule_metadata.get("name", "")
+#                 lines.append(f"      {vm} -> {sched_name}\n")
+#     else:
+#         lines.append("    (None)\n")
+#
+#     # Join lines into a single report string
+#     report_str = "".join(lines)
+#
+#     # Print to console
+#     print(report_str)
+#
+#     # Write to file
+#     with open(report_file_path, "w") as f:
+#         f.write(report_str)
+
+def generate_report(
+        inventory_map,
+        active_vm_schedules,
+        suspended_vm_schedules,
+        new_vms,
+        suspended_info,
+        resumed_info,
+        newly_created_schedules,
+        report_file_path="vm_protection_report.txt"
+):
+    """
+    Generates a text-based report of the VM protection operations and writes it to the console
+    and to a file (report_file_path). The report includes:
+      1) Cluster inventory (namespace -> list of VM names)
+      2) Active schedules (namespace -> vm -> schedule_name)
+      3) Suspended schedules (namespace -> vm -> schedule_name)
+      4) Newly created VMs in the cluster (namespace -> list of VM names)
+      5) Summary of actions performed:
+         - Schedules suspended (namespace -> vm -> schedule_name)
+         - Schedules resumed (namespace -> vm -> schedule_name)
+         - Schedules created for new VMs (namespace -> vm -> schedule_name)
+
+    Args:
+        inventory_map (dict):
+            The cluster inventory, namespace -> list of VM names
+        active_vm_schedules (dict):
+            Dictionary of active schedules: { namespace -> { vm_name -> schedule_name } }
+        suspended_vm_schedules (dict):
+            Dictionary of suspended schedules: { namespace -> { vm_name -> schedule_name } }
+        new_vms (dict):
+            Newly created VMs not previously scheduled: { namespace -> list of VM names }
+        suspended_info (dict):
+            Schedules that were suspended: { namespace -> { vm_name -> schedule_name } }
+        resumed_info (dict):
+            Schedules that were resumed: { namespace -> { vm_name -> schedule_name } }
+        newly_created_schedules (dict):
+            Schedules created for new VMs: { namespace -> { vm_name -> schedule_name } }
+        report_file_path (str):
+            File path where the report will be written (default 'vm_protection_report.txt').
+
+    Returns:
+        None
+    """
+    lines = []
+    lines.append("====== VM Protection Management Report ======\n")
+    lines.append("------------------------------------------------------\n")
+
+    # 1) Print cluster inventory
+    lines.append("Cluster Inventory (namespace -> list of VM names):\n")
+    lines.append("--------------------------------------------------\n")
+    for ns, vm_list in inventory_map.items():
+        lines.append(f"{ns}:\n")
+        for vm in vm_list:
+            lines.append(f"  - {vm}\n")
+    lines.append("\n")
+
+    # 2) Print active schedules
+    lines.append("Active Schedules (namespace -> VM -> Schedule name):\n")
+    lines.append("--------------------------------------------------\n")
+    if active_vm_schedules:
+        for ns, vm_dict in active_vm_schedules.items():
+            lines.append(f"{ns}:\n")
+            for vm, schedule in vm_dict.items():
+                lines.append(f"  {vm} -> {schedule}\n")
+    else:
+        lines.append("  (None)\n")
+    lines.append("\n")
+
+    # 3) Print suspended schedules
+    lines.append("Suspended Schedules (namespace -> VM -> Schedule name):\n")
+    lines.append("--------------------------------------------------\n")
+    if suspended_vm_schedules:
+        for ns, vm_dict in suspended_vm_schedules.items():
+            lines.append(f"{ns}:\n")
+            for vm, schedule in vm_dict.items():
+                lines.append(f"  {vm} -> {schedule}\n")
+    else:
+        lines.append("  (None)\n")
+    lines.append("\n")
+
+    # 4) Print newly created VMs
+    lines.append("Newly Created VMs (namespace -> VMs):\n")
+    lines.append("--------------------------------------------------\n")
+    if new_vms:
+        for ns, vm_list in new_vms.items():
+            lines.append(f"{ns}:\n")
+            for vm in vm_list:
+                lines.append(f"  - {vm}\n")
+    else:
+        lines.append("  (None)\n")
+    lines.append("\n")
+
+    # 5) Summary of actions performed
+    lines.append("Summary of Actions Performed:\n")
+    lines.append("--------------------------------------------------\n")
+
+    # a) Schedules suspended
+    lines.append("  - Schedules Suspended:\n")
+    if suspended_info:
+        for ns, vm_dict in suspended_info.items():
+            lines.append(f"    {ns}:\n")
+            for vm, schedule in vm_dict.items():
+                lines.append(f"      {vm} -> {schedule}\n")
+    else:
+        lines.append("    (None)\n")
+
+    # b) Schedules resumed
+    lines.append("  - Schedules Resumed:\n")
+    if resumed_info:
+        for ns, vm_dict in resumed_info.items():
+            lines.append(f"    {ns}:\n")
+            for vm, schedule in vm_dict.items():
+                lines.append(f"      {vm} -> {schedule}\n")
+    else:
+        lines.append("    (None)\n")
+
+    # c) New schedules created
+    lines.append("  - New Schedules Created:\n")
+    if newly_created_schedules:
+        for ns, vm_dict in newly_created_schedules.items():
+            lines.append(f"    {ns}:\n")
+            for vm, schedule in vm_dict.items():
+                lines.append(f"      {vm} -> {schedule}\n")
+    else:
+        lines.append("    (None)\n")
+
+    # Join lines into a single report string
+    report_str = "".join(lines)
+
+    # Print to console
+    print(report_str)
+
+    # Write to file
+    with open(report_file_path, "w") as f:
+        f.write(report_str)
+
 def main():
     parser = argparse.ArgumentParser(description="Synchronize VM backup schedules with current VM inventory")
     parser.add_argument("--cluster", required=True, help="Name of the cluster to use")
@@ -990,10 +1240,12 @@ def main():
             raise ValueError("Failed to create kubeconfig")
         
         # Get VM inventory
-        ns_list = ["vikas1", "vikas2", "win", "win", "win2", "win3", "win4"]
+        ns_list = ["vikas1", "vikas2", "win", "win2", "win3", "win4"]
+        ns_list = list(set(ns_list))
 
         ns_vm_map = get_vm_inventory(kubeconfig_file, ns_list)
-        logger.info(f"Found {len(ns_vm_map)} VMs in current inventory")
+        total_count = sum(len(v) for v in ns_vm_map.values())
+        logger.info(f"Found {total_count} VMs in current inventory")
         
         # Get backup schedules
         schedules = enumerate_backup_schedules(cluster_name, cluster_uid)
@@ -1017,48 +1269,17 @@ def main():
         new_vm_map = get_new_vms(ns_vm_map, all_ns_vm_schedules)
         schedules_created = create_schedules(new_vm_map, bl_name, bl_uid, cluster_name, cluster_uid)
         print(schedules_created)
-        exit(1)
 
-
-        # Print results
-        # Give the current time in time.Kitchen format
-        now = time.strftime("%H:%M:%S", time.localtime())
-        logger.info("\n===== VM Protection Management Report - now =====")
-        logger.info(f"Current VM inventory:")
-        # Print the list of VMs in the inventory
-        for vm_id in sorted(current_vm_ids):
-            logger.info(f"  {vm_id}")
-        # Print total VMs
-        logger.info("\n=================================================")
-        logger.info(f"Total VMs in inventory: {len(current_vm_ids)}")
-        logger.info("\n=================================================")
-
-        logger.info(f"VMs deleted and their corresponding suspended schedules:")
-        # Print the list of VMs that were deleted and their corresponding suspended schedules
-        for vm_id, schedule_name in schedules_suspended.items():
-            logger.info(f"  {vm_id} - {schedule_name}")
-        # Print total
-        logger.info("\n=================================================")
-        logger.info(f"Total VMs deleted: {len(schedules_suspended)}")
-        logger.info("\n=================================================")
-
-        logger.info(f"VMs added and their newly created schedules:")
-        # Print the list of VMs that were added and their newly created schedules
-        for vm_id, schedule_name in schedules_created.items():
-            logger.info(f"  {vm_id} - {schedule_name}")
-        # Print total
-        logger.info("\n=================================================")
-        logger.info(f"Total VMs added: {len(schedules_created)}")
-        logger.info("\n=================================================")
-
-        logger.info(f"VMs resumed and their corresponding active schedules:")
-        # Print the list of VMs that were resumed and their corresponding active schedules
-        for vm_id, schedule_name in schedules_resumed.items():
-            logger.info(f"  {vm_id} - {schedule_name}")
-        # Print total
-        logger.info("\n=================================================")
-        logger.info(f"Total VMs resumed: {len(schedules_resumed)}")
-        logger.info("\n=================================================")
+        generate_report(
+            ns_vm_map,
+            active_ns_vm_schedules,
+            suspended_ns_vm_schedules,
+            new_vm_map,
+            suspended_info,
+            resumed_info,
+            schedules_created,
+            report_file_path="vm_protection_report.txt"
+        )
 
     except Exception as e:
         logger.error(f"Error: {e}")
@@ -1068,17 +1289,3 @@ def main():
 
 if __name__ == "__main__":
     exit(main())
-
-
-        # Enumerate backup schedules for active states - active schedule list
-        # Enumerate backup schedules for suspended states - suspended schedule list
-        # Create remove list
-        # Create added list
-
-        # Suspend the schedules for the VMs in remove list
-        # Compare added list with suspended list
-        # If match, make it active
-        # Remove from added list to resumed list
-        # Make it active
-        # At this point we will have an added list of new VMs with no history
-        # Create new schedules for this
