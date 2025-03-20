@@ -264,12 +264,17 @@ def update_backup_schedule(module, client):
 def enumerate_backup_schedules(module, client):
     """List all backup schedule"""
     backup_location_ref = module.params.get('backup_location_ref', {})
+    cluster_ref = module.params.get('cluster_ref', {}) 
     enumerate_options = module.params.get('enumerate_options', {})
     params ={}
 
     if backup_location_ref:
         params['backup_location_ref.name'] = backup_location_ref.get('name')
         params['backup_location_ref.uid'] = backup_location_ref.get('uid')
+
+    if cluster_ref:
+        params['cluster_ref.name'] = cluster_ref.get('name')
+        params['cluster_ref.uid'] = cluster_ref.get('uid')
 
     if enumerate_options:
         time_range = enumerate_options.get("time_range", {})

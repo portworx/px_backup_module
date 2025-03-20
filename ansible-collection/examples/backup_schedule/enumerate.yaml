@@ -9,17 +9,14 @@
   tasks:
     - name: Login and fetch Px-Backup token
       include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+      
     - name: List All Backup Schedule
       backup_schedule:
         operation: INSPECT_ALL
         api_url: "{{ px_backup_api_url }}"
         token: "{{ px_backup_token }}"
         org_id: "{{ org_id }}"
-        backup_location_ref:
-          name: "s3-backup-1"
-          uid: "0af0ae2b-6259-4d1a-a3fc-8e40fe229cb6"
-        # enumerate_options:
-        #   backup_object_type: "VirtualMachine"
-        #   time_range:
-        #     start_time:
-        #     end_time:
+        enumerate_options:
+          cluster_name_filter: "{{ enumerate_options.cluster_name_filter }}"
+          cluster_uid_filter: "{{ enumerate_options.cluster_uid_filter }}"
+          backup_object_type: "{{ enumerate_options.backup_object_type }}"
