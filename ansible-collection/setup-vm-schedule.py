@@ -33,6 +33,7 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[
         logging.FileHandler(LOG_FILE),
+        logging.StreamHandler(),
     ]
 )
 
@@ -240,18 +241,8 @@ def print_summary(args, results=None, policy_result=None, vm_map=None):
                     print(f"  - {policy}")
             
             print("\nTo proceed with the script:")
-            print("1. Delete the existing policies (see detailed report for commands)")
+            print("1. Delete the existing policies")
             print("2. Run the script again with the same parameters")
-            
-            if 'cleanup_help' in policy_result:
-                print("\nExample cleanup command for the first policy:")
-                # Get just the first command line
-                cleanup_lines = policy_result['cleanup_help'].split('\n')
-                for line in cleanup_lines:
-                    if line.startswith('ansible-playbook'):
-                        print(f"  {line}")
-                        break
-                print("See the detailed report for all cleanup commands.")
         else:
             print(f"Status: \033[92mSuccess\033[0m")
             print(f"Created {len(policy_result.get('policies', []))} schedule policies:")
@@ -1388,10 +1379,9 @@ def main():
     parser = argparse.ArgumentParser(description="Create backup schedules for virtual machines")
     parser.add_argument("--cluster", required=True, help="Name of the cluster to use (required)")
     parser.add_argument("--backup-location", required=True, help="Name of the backup location to use (required)")
-    parser.add_argument("--namespaces", nargs="+", help="List of namespaces to check (required)")
+    parser.add_argument("--namespaces", nargs="+", help="List of namespaces to check (e.g., 'ns1' 'ns2')")
     parser.add_argument("--time-series", required=True, help="Comma-separated list of times in 24-hour format (e.g., '0100,0245,0350')")
     parser.add_argument("--output", type=str, default="vm_schedule_result.json", help="Output file for backup results")
-    parser.add_argument("--dry-run", action="store_true", help="Show what would be done without making changes")
     parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose logging")
     parser.add_argument('--csiDriver_map',"-d", type=str, help='Map input in the form csiDriver1:VSC1,csiDriver2:VSC2')
 
@@ -1399,7 +1389,9 @@ def main():
 
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
-        
+    
+    # removing dry run option
+    args.dry_run = False
     if args.dry_run:
         logging.info("Running in DRY RUN mode. No changes will be made.")
     
@@ -1431,38 +1423,6 @@ def main():
             "name": cluster_name,
             "uid": cluster_uid
         }
-        
-        # Create policies for time series
-        policy_result = create_policies_for_time_series(time_series, dry_run=args.dry_run)
-        
-        # Handle the case where duplicate policies are found
-        if policy_result['status'] == 'error':
-            logging.error("Found duplicate schedule policies. Cannot proceed.")
-            
-            # Generate a report about the duplicate policies
-            report = generate_report(args, error=policy_result['message'], policy_result=policy_result)
-            
-            # Save the report to a file with timestamp to avoid overwriting
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            report_filename = f"duplicate_policies_report_{timestamp}.txt"
-            
-            try:
-                with open(report_filename, "w") as f:
-                    f.write(report)
-                logging.info(f"Report saved to {report_filename}")
-            except Exception as e:
-                logging.error(f"Failed to write report: {e}")
-            
-            # Print a summary of the error
-            print_summary(args, policy_result=policy_result)
-            log_summary(args, policy_result=policy_result)
-            
-            # Exit with error since we can't proceed
-            return 1
-            
-        # Proceed with successful policy creation
-        policies = policy_result['policies']
-        logging.info(f"Created/Found {len(policies)} schedule policies")
         
         # Inspect cluster and create kubeconfig
         cluster_file = inspect_cluster(cluster_name, cluster_uid, dry_run=args.dry_run)
@@ -1500,10 +1460,42 @@ def main():
         
         # Count total VMs
         total_vm_count = sum(len(vms) for vms in vm_map.values())
-        logging.info(f"Found {total_vm_count} VMs across {len(vm_map)} namespaces")
+        logging.info(f"Found {total_vm_count} VMs across namespaces")
         
         if total_vm_count == 0:
-            raise ValueError("No VMs found in the specified namespaces. Please verify the cluster has virtual machines.")
+            raise ValueError(f"No VMs found in the specified namespaces. [{','.join(ns_list)}] Please verify the cluster has virtual machines.")
+        
+        # Create policies for time series
+        policy_result = create_policies_for_time_series(time_series, dry_run=args.dry_run)
+        
+        # Handle the case where duplicate policies are found
+        if policy_result['status'] == 'error':
+            logging.error("Found duplicate schedule policies. Cannot proceed.")
+            
+            # Generate a report about the duplicate policies
+            report = generate_report(args, error=policy_result['message'], policy_result=policy_result)
+            
+            # Save the report to a file with timestamp to avoid overwriting
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            report_filename = f"duplicate_policies_report_{timestamp}.txt"
+            
+            try:
+                with open(report_filename, "w") as f:
+                    f.write(report)
+                logging.info(f"Report saved to {report_filename}")
+            except Exception as e:
+                logging.error(f"Failed to write report: {e}")
+            
+            # Print a summary of the error
+            print_summary(args, policy_result=policy_result)
+            log_summary(args, policy_result=policy_result)
+            
+            # Exit with error since we can't proceed
+            return 1
+            
+        # Proceed with successful policy creation
+        policies = policy_result['policies']
+        logging.info(f"Created/Found {len(policies)} schedule policies")
         
         # Distribute VMs across policies
         vm_assignments = distribute_vms_to_policies(vm_map, policies)
