@@ -1334,7 +1334,7 @@ def main():
         if ns_list is None:
             logging.info("No namespace list provided. Will act on all namespaces in the cluster")
         else:
-            logging.info("Namespaces to check:", ns_list)
+            logging.info(f"Namespaces to check: {ns_list}")
 
         ns_vm_map = get_vm_inventory(kubeconfig_file, ns_list)
         total_count = sum(len(v) for v in ns_vm_map.values())
