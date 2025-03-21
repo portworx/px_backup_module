@@ -1,15 +1,15 @@
 import argparse
 import base64
 import json
+import logging
 import re
 import subprocess
 import time
-from typing import Dict, List, Set, Tuple, Optional, Any
-import logging
 from datetime import datetime
-from kubernetes import client, config
+from typing import Dict, List, Tuple, Optional, Any
 
 import yaml
+from kubernetes import client, config
 
 # Configure logging
 logging.basicConfig(
@@ -18,6 +18,125 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S"
 )
 logger = logging.getLogger("vm-schedule-sync")
+
+
+def create_vm_backup_schedule(vm, namespace, policy_name, policy_uid, backup_location_ref, cluster_ref, csi_driver_map,
+                              dry_run=False):
+    """
+    Create a backup schedule for a single VM
+
+    Args:
+        vm (str): VM name
+        namespace (str): VM namespace
+        policy_name (str): Policy name
+        policy_uid (str): Policy UID
+        backup_location_ref (dict): Backup location reference
+        cluster_ref (dict): Cluster reference
+        dry_run (bool, optional): If True, don't actually run the command
+
+    Returns:
+        tuple: (success, backup_name) where success is a boolean indicating if the operation succeeded
+    """
+
+    # Create backup schedule name
+    backup_name = f"pxb-{namespace}-{vm}-{policy_name}"
+
+    if dry_run:
+        logger.debug(
+            f"[DRY RUN] Would create backup schedule: {backup_name} for VM {vm} in namespace {namespace} using policy {policy_name}")
+        return True, backup_name
+
+    schedule_policy_ref = {
+        "name": policy_name,
+        "uid": policy_uid
+    }
+
+    vm_namespaces = [namespace]
+    include_resources = [{
+        "group": "kubevirt.io",
+        "kind": "VirtualMachine",
+        "version": "v1",
+        "name": vm,
+        "namespace": namespace
+    }]
+
+    # Define backup config
+    backup_object_type = {
+        "type": "VirtualMachine"
+    }
+
+    playbook_data = [{
+        "name": "Configure VM Backup Schedule",
+        "hosts": "localhost",
+        "gather_facts": False,
+        "vars": {
+            "backup_schedules": [{
+                "name": backup_name,
+                "volume_snapshot_class_mapping": csi_driver_map,
+                "backup_location_ref": backup_location_ref,
+                "schedule_policy_ref": schedule_policy_ref,
+                "cluster_ref": cluster_ref,
+                "backup_type": "Normal",
+                "backup_object_type": backup_object_type,
+                "skip_vm_auto_exec_rules": True,
+                "validate_certs": True,
+                "labels": {
+                    "vm-name": vm,
+                    "vm-namespace": namespace,
+                    "policy-name": policy_name,
+                    "created-at": datetime.now().strftime("%Y-%m-%d")
+                }
+            }],
+            "vm_namespaces": vm_namespaces,
+            "include_resources": include_resources
+        },
+        "tasks": [
+            {
+                "name": "Create Backup Schedule",
+                "include_tasks": "examples/backup_schedule/create_vm_schedule.yaml"
+            }
+        ]
+    }]
+
+    # Save generated playbook
+    timestamp = int(time.time())
+    playbook_file = f"create_backup_{namespace}_{vm}_{timestamp}.yaml"
+    with open(playbook_file, "w") as f:
+        yaml.safe_dump(playbook_data, f, default_flow_style=False)
+
+    logger.info(f"Creating backup schedule for VM: {vm} in namespace: {namespace} using policy: {policy_name}")
+
+    # Invoke the Ansible playbook
+    combined_vars = json.dumps({
+        "vm_namespaces": vm_namespaces,
+        "include_resources": include_resources
+    })
+
+    ansible_cmd = [
+        "ansible-playbook", playbook_file, "-vvvv",
+        "--extra-vars", combined_vars
+    ]
+
+    logger.debug(f"Executing command: {' '.join(ansible_cmd)}")
+    result = subprocess.run(ansible_cmd, capture_output=True, text=True)
+    logger.debug(f"Command completed with return code: {result.returncode}")
+
+    if result.returncode != 0:
+        logger.error(f"Failed to create backup schedule for VM: {vm} in namespace: {namespace}")
+        return False, backup_name
+
+    # Check for success in output
+    stdout_text = result.stdout
+
+    # Locate the "Create Backup Schedule" task output
+    task_match = re.search(r"TASK \[Create Backup Schedule].*?\n(.*?)\nTASK ", stdout_text, re.DOTALL)
+    if not task_match:
+        logger.error(f"Could not find 'Create Backup Schedule' task output for VM {vm} in namespace {namespace}.")
+        return False, backup_name
+
+    # Success
+    logger.info(f"Created backup schedule for VM: {vm} in namespace: {namespace} - {backup_name}")
+    return True, backup_name
 
 def get_cluster_info(cluster_name: str) -> Tuple[str, str]:
     """
@@ -394,10 +513,6 @@ def extract_vm_schedules(schedules):
     all_ns_vm_schedules = {}  # Maps VM IDs to their schedule info
     
     for schedule in schedules:
-        metadata = schedule.get("metadata", {})
-        schedule_name = metadata.get("name", "")
-        schedule_uid = metadata.get("uid", "")
-        
         # Check if schedule is suspended
         backup_info = schedule.get("backup_schedule_info", {})
         is_suspended = backup_info.get("suspend", False)
@@ -443,10 +558,6 @@ def update_schedules(matching_schedules, suspend=False):
     for schedule in matching_schedules:
         backup_name = schedule["metadata"].get("name", "")
         # Create backup schedule name
-        schedule_policy_ref = {
-            "name": schedule["backup_schedule_info"].get("schedule_policy_ref", {}).get("name", ""),
-            "uid": schedule["backup_schedule_info"].get("schedule_policy_ref", {}).get("uid", "")
-        }
 
         vm_namespaces = schedule["backup_schedule_info"].get("namespaces", [])
         include_resources = schedule["backup_schedule_info"].get("include_resources", [])
@@ -645,138 +756,138 @@ def resume_schedules(ns_vm_map, suspended_ns_vm_schedules):
     return resumed_info
 
 
-def create_vm_backup_schedule(vm, namespace, policy_name, policy_uid, backup_location_ref, cluster_ref):
-    """
-    Create a backup schedule for a single VM
+# def create_vm_backup_schedule(vm, namespace, policy_name, policy_uid, backup_location_ref, cluster_ref):
+#     """
+#     Create a backup schedule for a single VM
+#
+#     Args:
+#         vm (str): VM name
+#         namespace (str): VM namespace
+#         policy_name (str): Policy name
+#         policy_uid (str): Policy UID
+#         backup_location_ref (dict): Backup location reference
+#         cluster_ref (dict): Cluster reference
+#
+#     Returns:
+#         tuple: (success, backup_name) where success is a boolean indicating if the operation succeeded
+#     """
+#     # Extract time from policy name
+#     print(f"[INFO] Creating backup schedule for {vm} in namespace {namespace}")
+#     time_match = re.search(r'-([0-9]{2,4}[ap]m)$', policy_name)
+#     time_str = time_match.group(1) if time_match else datetime.now().strftime("%I%M%p").lower().lstrip("0")
+#
+#     # Create backup schedule name
+#     backup_name = f"pxb-{namespace}-{vm}-sched-backup-{time_str}"
+#
+#     schedule_policy_ref = {
+#         "name": policy_name,
+#         "uid": policy_uid
+#     }
+#
+#     vm_namespaces = [namespace]
+#     include_resources = [{
+#         "group": "kubevirt.io",
+#         "kind": "VirtualMachine",
+#         "version": "v1",
+#         "name": vm,
+#         "namespace": namespace
+#     }]
+#
+#     # Define backup config
+#     backup_object_type = {
+#         "type": "VirtualMachine"
+#     }
+#
+#     playbook_data = [{
+#         "name": "Configure VM Backup Schedule",
+#         "hosts": "localhost",
+#         "gather_facts": False,
+#         "vars": {
+#             "backup_schedules": [{
+#                 "name": backup_name,
+#                 "backup_location_ref": backup_location_ref,
+#                 "schedule_policy_ref": schedule_policy_ref,
+#                 "cluster_ref": cluster_ref,
+#                 "backup_type": "Normal",
+#                 "backup_object_type": backup_object_type,
+#                 "skip_vm_auto_exec_rules": True,
+#                 "validate_certs": True,
+#                 "labels": {
+#                     "vm-name": vm,
+#                     "vm-namespace": namespace,
+#                     "created-at": datetime.now().strftime("%Y-%m-%d")
+#                 }
+#             }],
+#             "vm_namespaces": vm_namespaces,
+#             "include_resources": include_resources
+#         },
+#         "tasks": [
+#             {
+#                 "name": "Create Backup Schedule",
+#                 "include_tasks": "examples/backup_schedule/create_vm_schedule.yaml"
+#             }
+#         ]
+#     }]
+#
+#     # Save generated playbook
+#     timestamp = int(time.time())
+#     playbook_file = f"create_backup_{namespace}_{vm}_{timestamp}.yaml"
+#     with open(playbook_file, "w") as f:
+#         yaml.safe_dump(playbook_data, f, default_flow_style=False)
+#
+#     print(f"[INFO] Creating backup schedule for VM: {vm} in namespace: {namespace} using policy: {policy_name}")
+#
+#     # Invoke the Ansible playbook
+#     combined_vars = json.dumps({
+#         "vm_namespaces": vm_namespaces,
+#         "include_resources": include_resources
+#     })
+#
+#     ansible_cmd = [
+#         "ansible-playbook", playbook_file, "-vvvv",
+#         "--extra-vars", combined_vars
+#     ]
+#
+#     result = subprocess.run(ansible_cmd, capture_output=True, text=True)
+#     stdout_text = result.stdout
+#     if result.returncode != 0:
+#         print(f"[ERROR] Failed to create backup schedule for VM: {vm}")
+#         return False, backup_name
+#
+#     # Check for success in output
+#
+#
+#     # Locate the "Create Backup Schedule" task output
+#     task_match = re.search(r"TASK \[Create Backup Schedule].*?\n(.*?)\nTASK ", stdout_text, re.DOTALL)
+#     if not task_match:
+#         print(f"[ERROR] Could not find 'Create Backup Schedule' task output for VM {vm}.")
+#         return False, backup_name
+#
+#     # Success
+#     print(f"[SUCCESS] Created backup schedule for VM: {vm} - {backup_name}")
+#     return True, backup_name
 
-    Args:
-        vm (str): VM name
-        namespace (str): VM namespace
-        policy_name (str): Policy name
-        policy_uid (str): Policy UID
-        backup_location_ref (dict): Backup location reference
-        cluster_ref (dict): Cluster reference
 
-    Returns:
-        tuple: (success, backup_name) where success is a boolean indicating if the operation succeeded
-    """
-    # Extract time from policy name
-    print(f"[INFO] Creating backup schedule for {vm} in namespace {namespace}")
-    time_match = re.search(r'-([0-9]{2,4}[ap]m)$', policy_name)
-    time_str = time_match.group(1) if time_match else datetime.now().strftime("%I%M%p").lower().lstrip("0")
-
-    # Create backup schedule name
-    backup_name = f"pxb-{namespace}-{vm}-sched-backup-{time_str}"
-
-    schedule_policy_ref = {
-        "name": policy_name,
-        "uid": policy_uid
-    }
-
-    vm_namespaces = [namespace]
-    include_resources = [{
-        "group": "kubevirt.io",
-        "kind": "VirtualMachine",
-        "version": "v1",
-        "name": vm,
-        "namespace": namespace
-    }]
-
-    # Define backup config
-    backup_object_type = {
-        "type": "VirtualMachine"
-    }
-
-    playbook_data = [{
-        "name": "Configure VM Backup Schedule",
-        "hosts": "localhost",
-        "gather_facts": False,
-        "vars": {
-            "backup_schedules": [{
-                "name": backup_name,
-                "backup_location_ref": backup_location_ref,
-                "schedule_policy_ref": schedule_policy_ref,
-                "cluster_ref": cluster_ref,
-                "backup_type": "Normal",
-                "backup_object_type": backup_object_type,
-                "skip_vm_auto_exec_rules": True,
-                "validate_certs": True,
-                "labels": {
-                    "vm-name": vm,
-                    "vm-namespace": namespace,
-                    "created-at": datetime.now().strftime("%Y-%m-%d")
-                }
-            }],
-            "vm_namespaces": vm_namespaces,
-            "include_resources": include_resources
-        },
-        "tasks": [
-            {
-                "name": "Create Backup Schedule",
-                "include_tasks": "examples/backup_schedule/create_vm_schedule.yaml"
-            }
-        ]
-    }]
-
-    # Save generated playbook
-    timestamp = int(time.time())
-    playbook_file = f"create_backup_{namespace}_{vm}_{timestamp}.yaml"
-    with open(playbook_file, "w") as f:
-        yaml.safe_dump(playbook_data, f, default_flow_style=False)
-
-    print(f"[INFO] Creating backup schedule for VM: {vm} in namespace: {namespace} using policy: {policy_name}")
-
-    # Invoke the Ansible playbook
-    combined_vars = json.dumps({
-        "vm_namespaces": vm_namespaces,
-        "include_resources": include_resources
-    })
-
-    ansible_cmd = [
-        "ansible-playbook", playbook_file, "-vvvv",
-        "--extra-vars", combined_vars
-    ]
-
-    result = subprocess.run(ansible_cmd, capture_output=True, text=True)
-    stdout_text = result.stdout
-    if result.returncode != 0:
-        print(f"[ERROR] Failed to create backup schedule for VM: {vm}")
-        return False, backup_name
-
-    # Check for success in output
-
-
-    # Locate the "Create Backup Schedule" task output
-    task_match = re.search(r"TASK \[Create Backup Schedule].*?\n(.*?)\nTASK ", stdout_text, re.DOTALL)
-    if not task_match:
-        print(f"[ERROR] Could not find 'Create Backup Schedule' task output for VM {vm}.")
-        return False, backup_name
-
-    # Success
-    print(f"[SUCCESS] Created backup schedule for VM: {vm} - {backup_name}")
-    return True, backup_name
-
-
-def create_schedules(new_vm_map, bl_name, bl_uid, cluster_name, cluster_uid):
-    if len(new_vm_map) == 0:
-        print("[INFO] No schedules to create")
-        return {}  # Return empty dict instead of None
-    
-    schedules_created = {}
-    print("[INFO] Creating schedules for ", new_vm_map)
-    for ns, vms in new_vm_map.items():
-        for vm in vms:
-            print(f"[INFO] Creating schedule for VM: {vm} in namespace: {ns}")
-            # Fix the tuple unpacking here:
-            success, backup_name = create_vm_backup_schedule(vm, ns, "12hr", "3f81933e-4b5b-4c9c-b42a-fae31eb82d58", 
-                                                            {"name": bl_name, "uid": bl_uid}, 
-                                                            {"name": cluster_name, "uid": cluster_uid})
-            if success:
-                if ns not in schedules_created:
-                    schedules_created[ns] = {}
-                schedules_created[ns][vm] = backup_name
-            
-    return schedules_created
+# def create_schedules(new_vm_map, bl_name, bl_uid, cluster_name, cluster_uid):
+#     if len(new_vm_map) == 0:
+#         print("[INFO] No schedules to create")
+#         return {}  # Return empty dict instead of None
+#
+#     schedules_created = {}
+#     print("[INFO] Creating schedules for ", new_vm_map)
+#     for ns, vms in new_vm_map.items():
+#         for vm in vms:
+#             print(f"[INFO] Creating schedule for VM: {vm} in namespace: {ns}")
+#             # Fix the tuple unpacking here:
+#             success, backup_name = create_vm_backup_schedule(vm, ns, "mithun-schedule", "1c40afc8-42f6-443f-9169-04f255dda8b1",
+#                                                             {"name": bl_name, "uid": bl_uid},
+#                                                             {"name": cluster_name, "uid": cluster_uid})
+#             if success:
+#                 if ns not in schedules_created:
+#                     schedules_created[ns] = {}
+#                 schedules_created[ns][vm] = backup_name
+#
+#     return schedules_created
 
 def get_backup_location_by_name(location_name):
     """
@@ -940,7 +1051,207 @@ def print_namespace_vm_schedules(ns_vm_map):
             print(f"  {vm} => {schedule_name}")
 
 
+def enumerate_schedule_policies(name_filter=None):
+    """
+    Enumerate schedule policies in PX-Backup using Ansible with improved error handling
 
+    Args:
+        name_filter (str, optional): Filter schedule policies by name
+
+    Returns:
+        list: List of matching schedule policies
+    """
+    print(f"[INFO] Enumerating schedule policies with filter: {name_filter}")
+
+    # Prepare extra vars for the Ansible command
+    extra_vars = {}
+    if name_filter:
+        extra_vars["name_filter"] = name_filter
+
+    # Convert to JSON string
+    extra_vars_json = json.dumps(extra_vars)
+
+    # Run the Ansible command
+    cmd = [
+        "ansible-playbook", "examples/schedule_policy/enumerate.yaml", "-vvvv",
+        "--extra-vars", extra_vars_json
+    ]
+
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    print(f"[DEBUG] Ansible command completed with return code: {result.returncode}")
+
+    if result.returncode != 0:
+        print(f"[ERROR] Failed to enumerate schedule policies")
+        return []
+
+    # Extract schedule policies from output
+    stdout_text = result.stdout
+
+    # Look for the schedule policies task output - match various possible task names
+    task_match = re.search(r"TASK \[(Enumerate schedule policies|Schedule Policy Enumerate call)].*?\n(.*?)\nTASK ",
+                           stdout_text, re.DOTALL)
+    if not task_match:
+        # Try looking for it at the end of the output (last task)
+        task_match = re.search(r"TASK \[(Enumerate schedule policies|Schedule Policy Enumerate call)].*?\n(.*?)$",
+                               stdout_text, re.DOTALL)
+        if not task_match:
+            print("[WARNING] Could not find schedule policies task output, trying alternative pattern")
+            # Try another pattern - look for schedule_policies in the output anywhere
+            json_match = re.search(r'"schedule_policies"\s*:\s*(\[.*?\])', stdout_text, re.DOTALL)
+            if json_match:
+                try:
+                    policies_json = json_match.group(1)
+                    policies = json.loads(policies_json)
+                    return policies
+                except json.JSONDecodeError as e:
+                    print(f"[ERROR] Failed to parse schedule policies JSON: {e}")
+                    return []
+            print("[ERROR] Could not extract schedule policies from output")
+            return []
+
+    task_output = task_match.group(2)
+
+    # Try to extract JSON
+    json_match = re.search(r'"schedule_policies"\s*:\s*(\[.*?\])', task_output, re.DOTALL)
+    if not json_match:
+        # Try to find the schedule_policies JSON in the entire output as a fallback
+        json_match = re.search(r'"schedule_policies"\s*:\s*(\[.*?\])', stdout_text, re.DOTALL)
+        if not json_match:
+            print("[ERROR] Could not extract schedule policies list from task output")
+            return []
+
+    try:
+        policies_json = json_match.group(1)
+        policies = json.loads(policies_json)
+        return policies
+    except json.JSONDecodeError as e:
+        print(f"[ERROR] Failed to parse schedule policies JSON: {e}")
+        return []
+
+
+def get_filtered_schedule_policies():
+    import re
+    matched_policies = {}
+    pattern = re.compile(r"^pxb-(\d{4})$")
+    existing_policies = enumerate_schedule_policies()
+
+    for policy in existing_policies:
+        policy_name = policy.get("metadata", {}).get("name", "")
+        policy_uid = policy.get("metadata", {}).get("uid", "")
+        match = pattern.match(policy_name)
+        if match:
+            number_str = match.group(1)  # This group(1) is the 4-digit part
+            number_val = int(number_str)
+            if 0 <= number_val <= 2359:
+                print(f"[INFO] Policy {policy_name} was created by the setup script."
+                      f" Will not be used for VM schedule distribution")
+                matched_policies[policy_name] = policy_uid
+        else:
+            print(f"[INFO] Policy {policy_name} was not created by the setup script. Will not be used")
+    return matched_policies
+
+
+def distribute_vms_schedules(new_vms_map, policy_dict, backup_location_ref, cluster_ref, csi_driver_map):
+    """
+    Distributes newly created VMs among the given policies, where each policy first gets
+    floor(total_vms / num_policies) VMs, then the leftover VMs are assigned one-by-one
+    to each policy in order until no leftovers remain.
+
+    In this version, `policy_dict` is a dictionary mapping policy_name -> policy_uid.
+    The returned distribution maps each policy_name to:
+      {
+        "policy_uid": <uid>,
+        "vms": [ (namespace, vm_name), ... ]
+      }
+
+    For example, if total VMs = 14 and policy_dict has 4 entries, each policy gets 3 VMs
+    (base_count = 3). Leftover = 2 => the first two policies get 1 additional VM each.
+
+    Args:
+        new_vms_map (dict):
+            e.g. {
+              "ns1": ["vm1", "vm2"],
+              "ns2": ["vm3", "vm4"]
+            }
+        policy_dict (dict):
+            Dictionary mapping policy_name -> policy_uid.
+            e.g. {
+              "policyA": "uidA",
+              "policyB": "uidB",
+              ...
+            }
+
+    Returns:
+        dict:
+            { policy_name:
+                {
+                  "policy_uid": <uid>,
+                  "vms": [ (namespace, vm_name), ... ]
+                }
+            }
+    """
+    # 1) Flatten all VMs into a list of (namespace, vm_name) tuples
+    all_vms = []
+    if len(new_vms_map) == 0:
+        print("[INFO] No schedules to create")
+        return {}, {}
+
+    for ns, vm_list in new_vms_map.items():
+        for vm_name in vm_list:
+            all_vms.append((ns, vm_name))
+
+    # Prepare result distribution: each policy_name => { "policy_uid": ..., "vms": ... }
+    distribution = {}
+    for p_name, p_uid in policy_dict.items():
+        distribution[p_name] = {
+            "policy_uid": p_uid,
+            "vms": []
+        }
+
+    if not all_vms or not policy_dict:
+        return distribution
+
+    total_vms = len(all_vms)
+    policy_names = list(policy_dict.keys())  # preserve dict order
+    num_policies = len(policy_names)
+
+    # 2) Determine base_count and leftover
+    base_count = total_vms // num_policies
+    leftover = total_vms % num_policies
+
+    # 3) Assign base_count to each policy in order
+    start_idx = 0
+    for p_name in policy_names:
+        end_idx = start_idx + base_count
+        distribution[p_name]["vms"].extend(all_vms[start_idx:end_idx])
+        start_idx = end_idx
+
+    # 4) Distribute leftover VMs one by one to each policy in order
+    for i in range(leftover):
+        policy_name = policy_names[i]
+        distribution[policy_name]["vms"].append(all_vms[start_idx])
+        start_idx += 1
+    schedules_created = {}
+    for p_name, data in distribution.items():
+        for namespace, vm_name in data["vms"]:
+            success, backup_schedule_name = create_vm_backup_schedule(vm_name, namespace, p_name, data["policy_uid"], backup_location_ref, cluster_ref,
+                                      csi_driver_map)
+            if success:
+                if namespace not in schedules_created:
+                    schedules_created[namespace] = {}
+                schedules_created[namespace][vm_name] = backup_schedule_name
+
+    return distribution, schedules_created
+
+def parse_input_map(map_str):
+    result = {}
+    if map_str:
+        for pair in map_str.split(','):
+            if ':' not in pair:
+                raise ValueError(f"Invalid pair format: {pair}")
+            key, value = pair.split(':', 1)
+            result[key.strip()] = value.strip()
+    return result
 
 def generate_report(
         inventory_map,
@@ -990,7 +1301,7 @@ def generate_report(
     lines.append("------------------------------------------------------\n")
 
     # 1) Print cluster inventory
-    lines.append("Cluster Inventory (namespace -> list of VM names):\n")
+    lines.append("\nCluster Inventory (namespace -> list of VM names):\n")
     lines.append("--------------------------------------------------\n")
     for ns, vm_list in inventory_map.items():
         lines.append(f"{ns}:\n")
@@ -999,7 +1310,7 @@ def generate_report(
     lines.append("\n")
 
     # 2) Print active schedules
-    lines.append("Active Schedules (namespace -> VM -> Schedule name):\n")
+    lines.append("\nActive Schedules (namespace -> VM -> Schedule name):\n")
     lines.append("--------------------------------------------------\n")
     if active_vm_schedules:
         for ns, vm_dict in active_vm_schedules.items():
@@ -1013,7 +1324,7 @@ def generate_report(
     lines.append("\n")
 
     # 3) Print suspended schedules
-    lines.append("Suspended Schedules (namespace -> VM -> Schedule name):\n")
+    lines.append("\nSuspended Schedules (namespace -> VM -> Schedule name):\n")
     lines.append("--------------------------------------------------\n")
     if suspended_vm_schedules:
         for ns, vm_dict in suspended_vm_schedules.items():
@@ -1027,7 +1338,7 @@ def generate_report(
 
 
     # 4) Print newly created VMs
-    lines.append("Newly Created VMs (namespace -> VMs):\n")
+    lines.append("\nNewly Created VMs (namespace -> VMs):\n")
     lines.append("--------------------------------------------------\n")
     if new_vms:
         for ns, vm_list in new_vms.items():
@@ -1038,8 +1349,17 @@ def generate_report(
         lines.append("  (None)\n")
     lines.append("\n")
 
+    # Print Deleted VMs from suspended schedules
+    lines.append("\nDeleted VMs (namespace -> VMs):\n")
+    lines.append("--------------------------------------------------\n")
+    if suspended_info:
+        for ns, vm_dict in suspended_info.items():
+            lines.append(f"{ns}:\n")
+            for vm, schedule in vm_dict.items():
+                lines.append(f"  {vm}\n")
+
     # 5) Summary of actions performed
-    lines.append("Summary of Actions Performed:\n")
+    lines.append("\n\nSummary of Actions Performed:\n")
     lines.append("--------------------------------------------------\n")
 
     # a) Schedules suspended
@@ -1087,9 +1407,8 @@ def main():
     parser.add_argument("--cluster", required=True, help="Name of the cluster to use")
     parser.add_argument("--namespaces", nargs="+", help="List of namespaces to check (if not specified, checks all namespaces)")
     parser.add_argument("--backup-location", required=True, help="Name of the backup location to use (required)")
-    parser.add_argument("--dry-run", action="store_true", help="Show what would be done without making changes")
     parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose logging")
-    parser.add_argument("--output-file", help="Write results to file")
+    parser.add_argument('--csiDriver_map', "-d", type=str, help='Map input in the form csiDriver1:VSC1,csiDriver2:VSC2')
     
     args = parser.parse_args()
     
@@ -1111,9 +1430,14 @@ def main():
         kubeconfig_file = create_kubeconfig(cluster_file)
         if not kubeconfig_file:
             raise ValueError("Failed to create kubeconfig")
-        
+
+        # Get schedule policies created
+        matched_policies = get_filtered_schedule_policies()
+        print(f"Found {len(matched_policies)} policies to use")
+        print(f"Policies to use: {matched_policies}")
+
         # Get VM inventory
-        ns_list = ["vikas1", "vikas2", "win", "win2", "win3", "win4","win5", "simple-vm","simple-vm2", "simple-vm4"]
+        ns_list = ["vikas1", "vikas2", "win", "win2", "win3", "win4","win5", "simple-vm","simple-vm2", "simple-vm4", "lin-vm-fio-1", "lin-vm-fio-3"]
         ns_list = list(set(ns_list))
 
         ns_vm_map = get_vm_inventory(kubeconfig_file, ns_list)
@@ -1138,10 +1462,17 @@ def main():
         resumed_info = resume_schedules(ns_vm_map, suspended_ns_vm_schedules)
         print(resumed_info)
 
-
+        backup_location_ref = {
+            "name": bl_name,
+            "uid": bl_uid
+        }
+        cluster_ref = {
+            "name": cluster_name,
+            "uid": cluster_uid
+        }
         new_vm_map = get_new_vms(ns_vm_map, all_ns_vm_schedules)
-        schedules_created = create_schedules(new_vm_map, bl_name, bl_uid, cluster_name, cluster_uid)
-        print(schedules_created)
+        distribution_result, schedules_created = distribute_vms_schedules(new_vm_map, matched_policies, backup_location_ref, cluster_ref, parse_input_map(args.csiDriver_map))
+
 
         generate_report(
             ns_vm_map,
@@ -1150,9 +1481,30 @@ def main():
             new_vm_map,
             suspended_info,
             resumed_info,
-            schedules_created,
+            distribution_result,
             report_file_path="vm_protection_report.txt"
         )
+        if distribution_result:
+            for p_name, data in distribution_result.items():
+                print(f"{p_name} (UID={data['policy_uid']}):")
+                for namespace, vm_name in data["vms"]:
+                    print(f"  namespace={namespace}, vm={vm_name}")
+
+        # Append all the distribution related lines
+        lines = []
+        lines.append("====== New VM Schedule Distribution Report ======\n")
+        lines.append("------------------------------------------------------\n")
+        for p_name, data in distribution_result.items():
+            lines.append(f"{p_name} (UID={data['policy_uid']}):\n")
+            for namespace, vm_name in data["vms"]:
+                lines.append(f"  namespace={namespace}, vm={vm_name}\n")
+        lines.append("------------------------------------------------------\n")
+
+        # Join lines into a single report string
+        report_str = "".join(lines)
+        # Append report_str in vm_protection_report.txt file
+        with open("vm_protection_report.txt", "a") as f:
+            f.write(report_str)
 
     except Exception as e:
         logger.error(f"Error: {e}")
