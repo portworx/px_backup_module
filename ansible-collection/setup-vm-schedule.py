@@ -27,12 +27,15 @@ import yaml
 from kubernetes import client, config
 
 # Set up logging
-logger = logging.getLogger("vm-schedule-sync")
-handler = logging.StreamHandler()
-formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-handler.setFormatter(formatter)
-logger.addHandler(handler)
-logger.setLevel(logging.INFO)
+LOG_FILE = "setup-vm-schedule.log"
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.FileHandler(LOG_FILE),
+    ]
+)
+
 
 def generate_report(args, results=None, error=None, policy_result=None, vm_map=None):
     """
@@ -194,9 +197,9 @@ def save_report(report_content, filename="vm_backup_schedule_report.log"):
     try:
         with open(filename, "a") as f:
             f.write(report_content)
-        logger.info(f"Report appended to {filename}")
+        logging.info(f"Report appended to {filename}")
     except Exception as e:
-        logger.error(f"Failed to write report: {e}")
+        logging.error(f"Failed to write report: {e}")
 
 
 def print_summary(args, results=None, policy_result=None, vm_map=None):
@@ -334,6 +337,117 @@ def print_summary(args, results=None, policy_result=None, vm_map=None):
         print(f"{'EXECUTION STATUS: ' + status:^80}")
     print("=" * 80 + "\n")
 
+
+def log_summary(args, results=None, policy_result=None, vm_map=None):
+    """
+    Log a professional summary of the script execution
+    """
+
+    logging.info("\n" + "=" * 80)
+    logging.info(f"{'VM BACKUP SCHEDULE SUMMARY':^80}")
+    logging.info("=" * 80)
+
+    logging.info(f"\n{'INPUT PARAMETERS':^80}")
+    logging.info(f"{'=' * 16:^80}")
+    logging.info(f"Cluster:         {args.cluster}")
+    logging.info(f"Backup Location: {args.backup_location}")
+    logging.info(f"Time Series:     {args.time_series}")
+    logging.info(f"Dry Run:         {'Yes' if args.dry_run else 'No'}")
+
+    if policy_result:
+        logging.info(f"\n{'SCHEDULE POLICY INFORMATION':^80}")
+        logging.info(f"{'=' * 27:^80}")
+
+        if policy_result['status'] == 'error':
+            logging.info("Status: ERROR - DUPLICATE POLICIES DETECTED")
+            logging.info(f"Found {len(policy_result.get('existing_policies', []))} existing policies with the same names.")
+
+            if policy_result.get('existing_policies'):
+                logging.info("\nExisting Policies:")
+                for policy in policy_result['existing_policies']:
+                    logging.info(f"  - {policy}")
+
+            logging.info("\nTo proceed with the script:")
+            logging.info("1. Delete the existing policies (see detailed report for commands)")
+            logging.info("2. Run the script again with the same parameters")
+
+            if 'cleanup_help' in policy_result:
+                logging.info("\nExample cleanup command for the first policy:")
+                for line in policy_result['cleanup_help'].split('\n'):
+                    if line.startswith('ansible-playbook'):
+                        logging.info(f"  {line}")
+                        break
+                logging.info("See the detailed report for all cleanup commands.")
+        else:
+            logging.info("Status: Success")
+            logging.info(f"Created {len(policy_result.get('policies', []))} schedule policies:")
+            for i, (policy_name, policy_uid) in enumerate(policy_result.get('policies', []), 1):
+                if i <= 5:
+                    logging.info(f"  - {policy_name}")
+                elif i == 6:
+                    logging.info(f"  - ... and {len(policy_result['policies']) - 5} more")
+                    break
+
+    if vm_map:
+        logging.info(f"\n{'VM INVENTORY':^80}")
+        logging.info(f"{'=' * 12:^80}")
+        total_vms = sum(len(vms) for vms in vm_map.values())
+        logging.info(f"Found {total_vms} VMs across {len(vm_map)} namespaces")
+
+        if len(vm_map) <= 10:
+            for namespace, vms in sorted(vm_map.items()):
+                vm_list = ", ".join(sorted(vms))
+                if len(vm_list) > 60:
+                    vm_list = vm_list[:57] + "..."
+                logging.info(f"  - Namespace: {namespace} - VMs: {vm_list}")
+        else:
+            logging.info("  Top 5 namespaces by VM count:")
+            sorted_namespaces = sorted(vm_map.items(), key=lambda x: len(x[1]), reverse=True)
+            for i, (namespace, vms) in enumerate(sorted_namespaces[:5], 1):
+                vm_sample = ", ".join(sorted(vms)[:3])
+                if len(vms) > 3:
+                    vm_sample += f", ... ({len(vms) - 3} more)"
+                logging.info(f"  {i}. {namespace}: {vm_sample}")
+
+    if results:
+        logging.info(f"\n{'BACKUP SCHEDULE RESULTS':^80}")
+        logging.info(f"{'=' * 23:^80}")
+        logging.info(f"Total VMs:            {results['total_vms']}")
+        logging.info(f"Total Policies:       {results['total_policies']}")
+        logging.info(f"Successful Schedules: {results['success_count']}")
+        logging.info(f"Failed Schedules:     {results['failed_count']}")
+
+        if results['success_count'] > 0 and results['failed_count'] == 0:
+            logging.info("All backup schedules created successfully!")
+        elif results['success_count'] > 0 and results['failed_count'] > 0:
+            logging.info(f"Partially successful: {results['success_count']}/{results['total_vms']} schedules created")
+            logging.info("See the detailed report for information about failed schedules.")
+        elif results['success_count'] == 0 and results['failed_count'] > 0:
+            logging.info("Failed: No schedules created successfully.")
+
+        if results['success_count'] > 0:
+            logging.info(f"\n{'BACKUP SCHEDULES CREATED':^80}")
+            logging.info(f"{'=' * 24:^80}")
+            logging.info("Backup Schedule Name (Schedule Policy Name)")
+            logging.info("-" * 50)
+            for schedule in sorted(results['successful_schedules'], key=lambda x: (x['namespace'], x['vm'])):
+                logging.info(f"{schedule['backup_name']} ({schedule['policy_name']})")
+
+    logging.info("\n" + "=" * 80)
+    if policy_result and policy_result['status'] == 'error':
+        status = "FAILED - DUPLICATE POLICIES"
+    elif results:
+        if results['failed_count'] > 0 and results['success_count'] == 0:
+            status = "FAILED"
+        elif results['failed_count'] > 0:
+            status = "PARTIALLY SUCCESSFUL"
+        else:
+            status = "SUCCESSFUL"
+    else:
+        status = "FAILED"
+    logging.info(f"{'EXECUTION STATUS: ' + status:^80}")
+    logging.info("=" * 80 + "\n")
+
 def enumerate_clusters(name_filter=None, dry_run=False):
     """
     Enumerate clusters in PX-Backup using Ansible
@@ -345,10 +459,10 @@ def enumerate_clusters(name_filter=None, dry_run=False):
     Returns:
         list: List of matching clusters
     """
-    logger.info(f"Enumerating clusters with filter: {name_filter}")
+    logging.info(f"Enumerating clusters with filter: {name_filter}")
     
     if dry_run:
-        logger.debug("[DRY RUN] Would enumerate clusters")
+        logging.debug("[DRY RUN] Would enumerate clusters")
         return []
     
     # Prepare extra vars for the Ansible command
@@ -365,14 +479,14 @@ def enumerate_clusters(name_filter=None, dry_run=False):
         "--extra-vars", extra_vars_json
     ]
     
-    logger.debug(f"Executing command: {' '.join(cmd)}")
+    logging.debug(f"Executing command: {' '.join(cmd)}")
     
     try:
         result = subprocess.run(cmd, capture_output=True, text=True)
-        logger.debug(f"Command completed with return code: {result.returncode}")
+        logging.debug(f"Command completed with return code: {result.returncode}")
         
         if result.returncode != 0:
-            logger.error(f"Failed to enumerate clusters")
+            logging.error(f"Failed to enumerate clusters")
             return []
         
         # Extract clusters from output
@@ -384,9 +498,9 @@ def enumerate_clusters(name_filter=None, dry_run=False):
             # Try looking for it at the end of the output (last task)
             task_match = re.search(r"TASK \[(Enumerate clusters|Cluster Enumerate call)].*?\n(.*?)$", stdout_text, re.DOTALL)
             if not task_match:
-                logger.error("Could not find cluster enumeration task output")
+                logging.error("Could not find cluster enumeration task output")
                 # Print the first 200 chars of stdout for debugging
-                logger.debug(f"First 200 chars of stdout: {stdout_text[:200]}")
+                logging.debug(f"First 200 chars of stdout: {stdout_text[:200]}")
                 return []
         
         task_output = task_match.group(2)
@@ -397,9 +511,9 @@ def enumerate_clusters(name_filter=None, dry_run=False):
             # Try to find the clusters JSON in the entire output as a fallback
             json_match = re.search(r'"clusters"\s*:\s*(\[.*?\])', stdout_text, re.DOTALL)
             if not json_match:
-                logger.error("Could not extract clusters list from task output")
+                logging.error("Could not extract clusters list from task output")
                 # Print part of the task output for debugging
-                logger.debug(f"Task output snippet: {task_output[:200]}")
+                logging.debug(f"Task output snippet: {task_output[:200]}")
                 return []
         
         try:
@@ -407,10 +521,10 @@ def enumerate_clusters(name_filter=None, dry_run=False):
             clusters = json.loads(clusters_json)
             return clusters
         except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse clusters JSON: {e}")
+            logging.error(f"Failed to parse clusters JSON: {e}")
             return []
     except Exception as e:
-        logger.error(f"Error executing enumerate clusters command: {e}")
+        logging.error(f"Error executing enumerate clusters command: {e}")
         return []
 
 
@@ -426,14 +540,14 @@ def get_cluster_by_name(cluster_name, dry_run=False):
         tuple: (cluster_name, cluster_uid) if found, otherwise (None, None)
     """
     if dry_run:
-        logger.debug(f"[DRY RUN] Would get cluster info for: {cluster_name}")
+        logging.debug(f"[DRY RUN] Would get cluster info for: {cluster_name}")
         return cluster_name, "dry-run-cluster-uid"
     
     # First enumerate clusters with the name filter
     clusters = enumerate_clusters(name_filter=cluster_name)
     
     if not clusters:
-        logger.error(f"No clusters found with name: {cluster_name}")
+        logging.error(f"No clusters found with name: {cluster_name}")
         return None, None
     
     # Find exact match
@@ -447,7 +561,7 @@ def get_cluster_by_name(cluster_name, dry_run=False):
         cluster = clusters[0]
         cluster_name = cluster.get("metadata", {}).get("name")
         cluster_uid = cluster.get("metadata", {}).get("uid")
-        logger.info(f"Using cluster: {cluster_name} with UID: {cluster_uid}")
+        logging.info(f"Using cluster: {cluster_name} with UID: {cluster_uid}")
         return cluster_name, cluster_uid
     
     return None, None
@@ -464,10 +578,10 @@ def enumerate_backup_locations(name_filter=None, dry_run=False):
     Returns:
         list: List of matching backup locations
     """
-    logger.info(f"Enumerating backup locations with filter: {name_filter}")
+    logging.info(f"Enumerating backup locations with filter: {name_filter}")
     
     if dry_run:
-        logger.debug(f"[DRY RUN] Would enumerate backup locations")
+        logging.debug(f"[DRY RUN] Would enumerate backup locations")
         return []
     
     # Prepare extra vars for the Ansible command
@@ -484,12 +598,12 @@ def enumerate_backup_locations(name_filter=None, dry_run=False):
         "--extra-vars", extra_vars_json
     ]
     
-    logger.debug(f"Executing command: {' '.join(cmd)}")
+    logging.debug(f"Executing command: {' '.join(cmd)}")
     result = subprocess.run(cmd, capture_output=True, text=True)
-    logger.debug(f"Command completed with return code: {result.returncode}")
+    logging.debug(f"Command completed with return code: {result.returncode}")
     
     if result.returncode != 0:
-        logger.error(f"Failed to enumerate backup locations")
+        logging.error(f"Failed to enumerate backup locations")
         return []
     
     # Extract backup locations from output
@@ -501,7 +615,7 @@ def enumerate_backup_locations(name_filter=None, dry_run=False):
         # Try looking for it at the end of the output (last task)
         task_match = re.search(r"TASK \[(Enumerate backup locations|Backup Location Enumerate call)].*?\n(.*?)$", stdout_text, re.DOTALL)
         if not task_match:
-            logger.error("Could not find backup locations task output")
+            logging.error("Could not find backup locations task output")
             return []
     
     task_output = task_match.group(2)
@@ -512,7 +626,7 @@ def enumerate_backup_locations(name_filter=None, dry_run=False):
         # Try to find the backup_locations JSON in the entire output as a fallback
         json_match = re.search(r'"backup_locations"\s*:\s*(\[.*?\])', stdout_text, re.DOTALL)
         if not json_match:
-            logger.error("Could not extract backup locations list from task output")
+            logging.error("Could not extract backup locations list from task output")
             return []
     
     try:
@@ -520,7 +634,7 @@ def enumerate_backup_locations(name_filter=None, dry_run=False):
         locations = json.loads(locations_json)
         return locations
     except json.JSONDecodeError as e:
-        logger.error(f"Failed to parse backup locations JSON: {e}")
+        logging.error(f"Failed to parse backup locations JSON: {e}")
         return []
 
 
@@ -536,14 +650,14 @@ def get_backup_location_by_name(location_name, dry_run=False):
         tuple: (location_name, location_uid) if found, otherwise (None, None)
     """
     if dry_run:
-        logger.debug(f"[DRY RUN] Would get backup location info for: {location_name}")
+        logging.debug(f"[DRY RUN] Would get backup location info for: {location_name}")
         return location_name, "dry-run-location-uid"
     
     # First enumerate backup locations with the name filter
     locations = enumerate_backup_locations(name_filter=location_name)
     
     if not locations:
-        logger.error(f"No backup locations found with name: {location_name}")
+        logging.error(f"No backup locations found with name: {location_name}")
         return None, None
     
     # Find exact match
@@ -557,7 +671,7 @@ def get_backup_location_by_name(location_name, dry_run=False):
         location = locations[0]
         location_name = location.get("metadata", {}).get("name")
         location_uid = location.get("metadata", {}).get("uid")
-        logger.info(f"Using backup location: {location_name} with UID: {location_uid}")
+        logging.info(f"Using backup location: {location_name} with UID: {location_uid}")
         return location_name, location_uid
     
     return None, None
@@ -574,10 +688,10 @@ def enumerate_schedule_policies(name_filter=None, dry_run=False):
     Returns:
         list: List of matching schedule policies
     """
-    logger.info(f"Enumerating schedule policies with filter: {name_filter}")
+    logging.info(f"Enumerating schedule policies with filter: {name_filter}")
     
     if dry_run:
-        logger.debug(f"[DRY RUN] Would enumerate schedule policies")
+        logging.debug(f"[DRY RUN] Would enumerate schedule policies")
         return []
     
     # Prepare extra vars for the Ansible command
@@ -594,12 +708,12 @@ def enumerate_schedule_policies(name_filter=None, dry_run=False):
         "--extra-vars", extra_vars_json
     ]
     
-    logger.debug(f"Executing command: {' '.join(cmd)}")
+    logging.debug(f"Executing command: {' '.join(cmd)}")
     result = subprocess.run(cmd, capture_output=True, text=True)
-    logger.debug(f"Command completed with return code: {result.returncode}")
+    logging.debug(f"Command completed with return code: {result.returncode}")
     
     if result.returncode != 0:
-        logger.error(f"Failed to enumerate schedule policies")
+        logging.error(f"Failed to enumerate schedule policies")
         return []
     
     # Extract schedule policies from output
@@ -611,7 +725,7 @@ def enumerate_schedule_policies(name_filter=None, dry_run=False):
         # Try looking for it at the end of the output (last task)
         task_match = re.search(r"TASK \[(Enumerate schedule policies|Schedule Policy Enumerate call)].*?\n(.*?)$", stdout_text, re.DOTALL)
         if not task_match:
-            logger.warning("Could not find schedule policies task output, trying alternative pattern")
+            logging.warning("Could not find schedule policies task output, trying alternative pattern")
             # Try another pattern - look for schedule_policies in the output anywhere
             json_match = re.search(r'"schedule_policies"\s*:\s*(\[.*?\])', stdout_text, re.DOTALL)
             if json_match:
@@ -620,9 +734,9 @@ def enumerate_schedule_policies(name_filter=None, dry_run=False):
                     policies = json.loads(policies_json)
                     return policies
                 except json.JSONDecodeError as e:
-                    logger.error(f"Failed to parse schedule policies JSON: {e}")
+                    logging.error(f"Failed to parse schedule policies JSON: {e}")
                     return []
-            logger.error("Could not extract schedule policies from output")
+            logging.error("Could not extract schedule policies from output")
             return []
     
     task_output = task_match.group(2)
@@ -633,7 +747,7 @@ def enumerate_schedule_policies(name_filter=None, dry_run=False):
         # Try to find the schedule_policies JSON in the entire output as a fallback
         json_match = re.search(r'"schedule_policies"\s*:\s*(\[.*?\])', stdout_text, re.DOTALL)
         if not json_match:
-            logger.error("Could not extract schedule policies list from task output")
+            logging.error("Could not extract schedule policies list from task output")
             return []
     
     try:
@@ -641,7 +755,7 @@ def enumerate_schedule_policies(name_filter=None, dry_run=False):
         policies = json.loads(policies_json)
         return policies
     except json.JSONDecodeError as e:
-        logger.error(f"Failed to parse schedule policies JSON: {e}")
+        logging.error(f"Failed to parse schedule policies JSON: {e}")
         return []
 
 
@@ -658,20 +772,20 @@ def check_policy_exists(policy_name, dry_run=False):
                and uid is the policy UID (or None if it doesn't exist or dry_run is True)
     """
     if dry_run:
-        logger.debug(f"[DRY RUN] Would check if policy exists: {policy_name}")
+        logging.debug(f"[DRY RUN] Would check if policy exists: {policy_name}")
         return False, None
         
-    logger.info(f"Checking if policy exists: {policy_name}")
+    logging.info(f"Checking if policy exists: {policy_name}")
     policies = enumerate_schedule_policies(name_filter=policy_name)
     
     for policy in policies:
         metadata = policy.get("metadata", {})
         if metadata.get("name") == policy_name:
             policy_uid = metadata.get("uid")
-            logger.info(f"Policy found: {policy_name} with UID: {policy_uid}")
+            logging.info(f"Policy found: {policy_name} with UID: {policy_uid}")
             return True, policy_uid
     
-    logger.info(f"Policy not found: {policy_name}")
+    logging.info(f"Policy not found: {policy_name}")
     return False, None
 
 
@@ -688,7 +802,7 @@ def create_schedule_policy(policy_name, policy_time, dry_run=False):
         tuple: (policy_name, policy_uid) if created/found successfully, otherwise (None, None)
     """
     if dry_run:
-        logger.debug(f"[DRY RUN] Would create schedule policy: {policy_name} at time {policy_time.strftime('%H:%M')}")
+        logging.debug(f"[DRY RUN] Would create schedule policy: {policy_name} at time {policy_time.strftime('%H:%M')}")
         return policy_name, "dry-run-policy-uid"
     
     # Format the time for the policy (e.g., "06:00PM")
@@ -717,56 +831,56 @@ def create_schedule_policy(policy_name, policy_time, dry_run=False):
         ]
     })
 
-    logger.info(f"Creating schedule policy: {policy_name} with time {formatted_time}")
+    logging.info(f"Creating schedule policy: {policy_name} with time {formatted_time}")
     cmd = [
         "ansible-playbook", "examples/schedule_policy/create.yaml", "-vvvv",
         "--extra-vars", extra_vars
     ]
     
-    logger.debug(f"Executing command: {' '.join(cmd)}")
+    logging.debug(f"Executing command: {' '.join(cmd)}")
     result = subprocess.run(cmd, capture_output=True, text=True)
-    logger.debug(f"Command completed with return code: {result.returncode}")
+    logging.debug(f"Command completed with return code: {result.returncode}")
     
     if result.returncode != 0:
         # Check if the error is due to policy already existing
         if "already exists" in result.stderr or "already exists" in result.stdout:
-            logger.info(f"Policy {policy_name} appears to already exist. Trying to fetch it directly.")
+            logging.info(f"Policy {policy_name} appears to already exist. Trying to fetch it directly.")
             # Try to get the policy details again
             exists, policy_uid = check_policy_exists(policy_name)
             if exists and policy_uid:
-                logger.info(f"Successfully retrieved existing policy: {policy_name}")
+                logging.info(f"Successfully retrieved existing policy: {policy_name}")
                 return policy_name, policy_uid
         
-        logger.error(f"Failed to create schedule policy: {policy_name}")
+        logging.error(f"Failed to create schedule policy: {policy_name}")
         return None, None
         
     stdout_text = result.stdout
     if not stdout_text:
-        logger.error(f"No output from Ansible playbook for policy {policy_name}.")
+        logging.error(f"No output from Ansible playbook for policy {policy_name}.")
         return None, None
 
     # Locate the "Create schedule policy" task output
     task_match = re.search(r"TASK \[Create schedule policy].*?\n(.*?)\nTASK ", stdout_text, re.DOTALL)
     if not task_match:
-        logger.error(f"Could not find 'Create schedule policy' task output for policy {policy_name}.")
+        logging.error(f"Could not find 'Create schedule policy' task output for policy {policy_name}.")
         return None, None
     task_output = task_match.group(1)
 
     # Extract JSON from the task output
     json_match = re.search(r'(\{.*\})', task_output, re.DOTALL)
     if not json_match:
-        logger.error(f"Could not extract JSON from 'Create schedule policy' task output for policy {policy_name}.")
+        logging.error(f"Could not extract JSON from 'Create schedule policy' task output for policy {policy_name}.")
         return None, None
     raw_json = json_match.group(1).strip()
 
     try:
         decoder = json.JSONDecoder()
         parsed_json, idx = decoder.raw_decode(raw_json)
-        logger.info(f"Created schedule policy successfully - {policy_name}")
+        logging.info(f"Created schedule policy successfully - {policy_name}")
         policy_uid = parsed_json.get("schedule_policy", {}).get("metadata", {}).get("uid")
         return policy_name, policy_uid
     except json.JSONDecodeError as e:
-        logger.error(f"JSON parsing failed for policy {policy_name}: {str(e)}")
+        logging.error(f"JSON parsing failed for policy {policy_name}: {str(e)}")
         return None, None
 
 
@@ -793,7 +907,7 @@ def create_vm_backup_schedule(vm, namespace, policy_name, policy_uid, backup_loc
     backup_name = f"pxb-{namespace}-{vm}-{policy_name}"
     
     if dry_run:
-        logger.debug(f"[DRY RUN] Would create backup schedule: {backup_name} for VM {vm} in namespace {namespace} using policy {policy_name}")
+        logging.debug(f"[DRY RUN] Would create backup schedule: {backup_name} for VM {vm} in namespace {namespace} using policy {policy_name}")
         return True, backup_name
     
     schedule_policy_ref = {
@@ -854,7 +968,7 @@ def create_vm_backup_schedule(vm, namespace, policy_name, policy_uid, backup_loc
     with open(playbook_file, "w") as f:
         yaml.safe_dump(playbook_data, f, default_flow_style=False)
 
-    logger.info(f"Creating backup schedule for VM: {vm} in namespace: {namespace} using policy: {policy_name}")
+    logging.info(f"Creating backup schedule for VM: {vm} in namespace: {namespace} using policy: {policy_name}")
 
     # Invoke the Ansible playbook
     combined_vars = json.dumps({
@@ -867,12 +981,12 @@ def create_vm_backup_schedule(vm, namespace, policy_name, policy_uid, backup_loc
         "--extra-vars", combined_vars
     ]
 
-    logger.debug(f"Executing command: {' '.join(ansible_cmd)}")
+    logging.debug(f"Executing command: {' '.join(ansible_cmd)}")
     result = subprocess.run(ansible_cmd, capture_output=True, text=True)
-    logger.debug(f"Command completed with return code: {result.returncode}")
+    logging.debug(f"Command completed with return code: {result.returncode}")
     
     if result.returncode != 0:
-        logger.error(f"Failed to create backup schedule for VM: {vm} in namespace: {namespace}")
+        logging.error(f"Failed to create backup schedule for VM: {vm} in namespace: {namespace}")
         return False, backup_name
 
     # Check for success in output
@@ -881,11 +995,11 @@ def create_vm_backup_schedule(vm, namespace, policy_name, policy_uid, backup_loc
     # Locate the "Create Backup Schedule" task output
     task_match = re.search(r"TASK \[Create Backup Schedule].*?\n(.*?)\nTASK ", stdout_text, re.DOTALL)
     if not task_match:
-        logger.error(f"Could not find 'Create Backup Schedule' task output for VM {vm} in namespace {namespace}.")
+        logging.error(f"Could not find 'Create Backup Schedule' task output for VM {vm} in namespace {namespace}.")
         return False, backup_name
     
     # Success
-    logger.info(f"Created backup schedule for VM: {vm} in namespace: {namespace} - {backup_name}")
+    logging.info(f"Created backup schedule for VM: {vm} in namespace: {namespace} - {backup_name}")
     return True, backup_name
 
 
@@ -929,10 +1043,10 @@ def inspect_cluster(cluster_name, cluster_uid, dry_run=False):
     Raises:
         ValueError: If inspection fails
     """
-    logger.info(f"Running Ansible playbook for cluster: {cluster_name}, UID: {cluster_uid}")
+    logging.info(f"Running Ansible playbook for cluster: {cluster_name}, UID: {cluster_uid}")
 
     if dry_run:
-        logger.debug(f"[DRY RUN] Would inspect cluster: {cluster_name}")
+        logging.debug(f"[DRY RUN] Would inspect cluster: {cluster_name}")
         output_file = f"cluster_data_{cluster_name}.json"
         # Create a dummy file for dry run
         with open(output_file, "w") as json_file:
@@ -953,9 +1067,9 @@ def inspect_cluster(cluster_name, cluster_uid, dry_run=False):
         "--extra-vars", extra_vars
     ]
 
-    logger.debug(f"Executing command: {' '.join(cmd)}")
+    logging.debug(f"Executing command: {' '.join(cmd)}")
     result = subprocess.run(cmd, capture_output=True, text=True)
-    logger.debug(f"Command completed with return code: {result.returncode}")
+    logging.debug(f"Command completed with return code: {result.returncode}")
 
     if result.returncode != 0:
         raise ValueError(f"Cluster inspection failed with return code {result.returncode}")
@@ -984,7 +1098,7 @@ def inspect_cluster(cluster_name, cluster_uid, dry_run=False):
         output_file = f"cluster_data_{cluster_name}.json"
         with open(output_file, "w") as json_file:
             json.dump(parsed_json, json_file, indent=4)
-        logger.info(f"Extracted cluster data successfully.")
+        logging.info(f"Extracted cluster data successfully.")
         return output_file
 
     except json.JSONDecodeError as e:
@@ -1009,7 +1123,7 @@ def create_kubeconfig(cluster_file, dry_run=False):
         raise ValueError("No cluster file provided")
     
     if dry_run:
-        logger.debug(f"[DRY RUN] Would create kubeconfig from cluster file: {cluster_file}")
+        logging.debug(f"[DRY RUN] Would create kubeconfig from cluster file: {cluster_file}")
         # Just return a filename that would be created
         cluster_name = "dryrun"
         try:
@@ -1047,7 +1161,7 @@ def create_kubeconfig(cluster_file, dry_run=False):
         with open(filename, "w") as f:
             f.write(kubeconfig_text)
 
-        logger.info(f"Created kubeconfig file: {filename}")
+        logging.info(f"Created kubeconfig file: {filename}")
         return filename
         
     except (IOError, json.JSONDecodeError) as e:
@@ -1069,7 +1183,7 @@ def get_inventory(ns_list, kubeconfig_file, dry_run=False):
     Raises:
         ValueError: If there's an error accessing the cluster
     """
-    logger.info(f"Getting VM inventory from {len(ns_list)} namespaces")
+    logging.info(f"Getting VM inventory from {len(ns_list)} namespaces")
     
     vm_map = {}
     try:
@@ -1100,13 +1214,13 @@ def get_inventory(ns_list, kubeconfig_file, dry_run=False):
                 
                 if vm_list:  # Only add namespace if it has VMs
                     vm_map[ns] = vm_list
-                    logger.info(f"Found {len(vm_list)} VMs in namespace {ns}")
+                    logging.info(f"Found {len(vm_list)} VMs in namespace {ns}")
                 
             except Exception as e:
-                logger.error(f"Error listing VirtualMachines in namespace {ns}: {e}")
+                logging.error(f"Error listing VirtualMachines in namespace {ns}: {e}")
                 raise ValueError(f"Failed to access namespace {ns}: {e}")
     except Exception as e:
-        logger.error(f"Error loading kubeconfig or accessing cluster: {e}")
+        logging.error(f"Error loading kubeconfig or accessing cluster: {e}")
         raise ValueError(f"Failed to access cluster: {e}")
     
     return vm_map
@@ -1134,7 +1248,7 @@ def parse_time_series(time_series):
         
         # Check if the time is in the expected format (24-hour format like "0100" or "2345")
         if not re.match(r'^([01][0-9]|2[0-3])([0-5][0-9])$', time_str):
-            logger.error(f"Invalid time format: {time_str}. Expected format is HHMM in 24-hour format (e.g., 0100, 2345)")
+            logging.error(f"Invalid time format: {time_str}. Expected format is HHMM in 24-hour format (e.g., 0100, 2345)")
             continue
         
         # Extract hours and minutes
@@ -1180,8 +1294,8 @@ def create_policies_for_time_series(time_series, dry_run=False):
     
     if existing_policies:
         error_msg = f"The following schedule policies already exist: {', '.join(existing_policies)}"
-        logger.error(error_msg)
-        logger.error("Please delete these policies before proceeding.")
+        logging.error(error_msg)
+        logging.error("Please delete these policies before proceeding.")
         
         # Construct a command example for deleting these policies
         cleanup_commands = []
@@ -1194,7 +1308,7 @@ def create_policies_for_time_series(time_series, dry_run=False):
             cleanup_commands.append(delete_cmd)
         
         cleanup_cmd = "\n".join(cleanup_commands)
-        logger.error(f"\n{cleanup_cmd}")
+        logging.error(f"\n{cleanup_cmd}")
         
         return {
             'status': 'error',
@@ -1216,7 +1330,7 @@ def create_policies_for_time_series(time_series, dry_run=False):
         if policy_name and policy_uid:
             created_policies.append((policy_name, policy_uid))
         else:
-            logger.error(f"Failed to create policy: {policy_name}")
+            logging.error(f"Failed to create policy: {policy_name}")
     
     return {
         'status': 'success',
@@ -1262,11 +1376,12 @@ def distribute_vms_to_policies(vm_map, policies):
 
 def parse_input_map(map_str):
     result = {}
-    for pair in map_str.split(','):
-        if ':' not in pair:
-            raise ValueError(f"Invalid pair format: {pair}")
-        key, value = pair.split(':', 1)
-        result[key.strip()] = value.strip()
+    if map_str:
+        for pair in map_str.split(','):
+            if ':' not in pair:
+                raise ValueError(f"Invalid pair format: {pair}")
+            key, value = pair.split(':', 1)
+            result[key.strip()] = value.strip()
     return result
 
 def main():
@@ -1283,10 +1398,10 @@ def main():
     args = parser.parse_args()
 
     if args.verbose:
-        logger.setLevel(logging.DEBUG)
+        logging.getLogger().setLevel(logging.DEBUG)
         
     if args.dry_run:
-        logger.info("Running in DRY RUN mode. No changes will be made.")
+        logging.info("Running in DRY RUN mode. No changes will be made.")
     
     try:
         # Parse time series
@@ -1296,11 +1411,11 @@ def main():
         if not time_series:
             raise ValueError("No valid times provided in time-series. Expected format is HHMM in 24-hour format (e.g., 0100,2345)")
             
-        logger.info(f"Using time series: {', '.join(t.strftime('%H:%M') for t in time_series)}")
+        logging.info(f"Using time series: {', '.join(t.strftime('%H:%M') for t in time_series)}")
         
         # Get cluster info
         cluster_name, cluster_uid = get_cluster_info(args.cluster, dry_run=args.dry_run)
-        logger.info(f"Using cluster: {cluster_name} (UID: {cluster_uid})")
+        logging.info(f"Using cluster: {cluster_name} (UID: {cluster_uid})")
         
         # Get backup location info
         bl_name, bl_uid = get_backup_location_by_name(args.backup_location, dry_run=args.dry_run)
@@ -1322,7 +1437,7 @@ def main():
         
         # Handle the case where duplicate policies are found
         if policy_result['status'] == 'error':
-            logger.error("Found duplicate schedule policies. Cannot proceed.")
+            logging.error("Found duplicate schedule policies. Cannot proceed.")
             
             # Generate a report about the duplicate policies
             report = generate_report(args, error=policy_result['message'], policy_result=policy_result)
@@ -1334,19 +1449,20 @@ def main():
             try:
                 with open(report_filename, "w") as f:
                     f.write(report)
-                logger.info(f"Report saved to {report_filename}")
+                logging.info(f"Report saved to {report_filename}")
             except Exception as e:
-                logger.error(f"Failed to write report: {e}")
+                logging.error(f"Failed to write report: {e}")
             
             # Print a summary of the error
             print_summary(args, policy_result=policy_result)
+            log_summary(args, policy_result=policy_result)
             
             # Exit with error since we can't proceed
             return 1
             
         # Proceed with successful policy creation
         policies = policy_result['policies']
-        logger.info(f"Created/Found {len(policies)} schedule policies")
+        logging.info(f"Created/Found {len(policies)} schedule policies")
         
         # Inspect cluster and create kubeconfig
         cluster_file = inspect_cluster(cluster_name, cluster_uid, dry_run=args.dry_run)
@@ -1360,7 +1476,7 @@ def main():
         # Get VM inventory
         ns_list = args.namespaces
         if not ns_list:
-            logger.info("No namespaces specified, will check all namespaces with VirtualMachines")
+            logging.info("No namespaces specified, will check all namespaces with VirtualMachines")
             # Get all namespaces if none specified
             if not args.dry_run:
                 try:
@@ -1371,9 +1487,9 @@ def main():
                     # List all namespaces
                     namespaces = v1.list_namespace()
                     ns_list = [ns.metadata.name for ns in namespaces.items]
-                    logger.info(f"Found {len(ns_list)} namespaces in the cluster")
+                    logging.info(f"Found {len(ns_list)} namespaces in the cluster")
                 except Exception as e:
-                    logger.error(f"Error listing namespaces: {e}")
+                    logging.error(f"Error listing namespaces: {e}")
                     # Provide a default namespace as fallback
                     ns_list = ["default"]
             else:
@@ -1384,7 +1500,7 @@ def main():
         
         # Count total VMs
         total_vm_count = sum(len(vms) for vms in vm_map.values())
-        logger.info(f"Found {total_vm_count} VMs across {len(vm_map)} namespaces")
+        logging.info(f"Found {total_vm_count} VMs across {len(vm_map)} namespaces")
         
         if total_vm_count == 0:
             raise ValueError("No VMs found in the specified namespaces. Please verify the cluster has virtual machines.")
@@ -1431,7 +1547,7 @@ def main():
         with open(args.output, "w") as f:
             json.dump(results, f, indent=2)
             
-        logger.info(f"Results saved to {args.output}")
+        logging.info(f"Results saved to {args.output}")
         
         # Generate a full report
         report = generate_report(args, results=results, policy_result=policy_result, vm_map=vm_map)
@@ -1440,22 +1556,23 @@ def main():
         try:
             with open(report_filename, "w") as f:
                 f.write(report)
-            logger.info(f"Detailed report saved to {report_filename}")
+            logging.info(f"Detailed report saved to {report_filename}")
         except Exception as e:
-            logger.error(f"Failed to write detailed report: {e}")
+            logging.error(f"Failed to write detailed report: {e}")
         
         # Print summary
         print_summary(args, results=results, policy_result=policy_result, vm_map=vm_map)
+        log_summary(args, results=results, policy_result=policy_result, vm_map=vm_map)
         
         if results["failed_count"] > 0:
-            logger.warning("\nSome backup schedules failed to be created. See result file for details.")
+            logging.warning("\nSome backup schedules failed to be created. See result file for details.")
             return 1
         
-        logger.info("\nAll backup schedules created successfully!")
+        logging.info("\nAll backup schedules created successfully!")
         return 0
             
     except ValueError as e:
-        logger.error(f"{str(e)}")
+        logging.error(f"{str(e)}")
         
         # Generate a report for the error
         report = generate_report(args, error=str(e))
@@ -1464,16 +1581,16 @@ def main():
         try:
             with open(error_report_filename, "w") as f:
                 f.write(report)
-            logger.info(f"Error report saved to {error_report_filename}")
+            logging.info(f"Error report saved to {error_report_filename}")
         except Exception as report_error:
-            logger.error(f"Failed to write error report: {report_error}")
+            logging.error(f"Failed to write error report: {report_error}")
             
         return 1
     except Exception as e:
-        logger.error(f"An unexpected error occurred: {str(e)}")
+        logging.error(f"An unexpected error occurred: {str(e)}")
         if args.verbose:
             import traceback
-            logger.debug(traceback.format_exc())
+            logging.debug(traceback.format_exc())
             
         # Generate a report for the unexpected error
         error_details = traceback.format_exc() if args.verbose else str(e)
@@ -1483,9 +1600,9 @@ def main():
         try:
             with open(error_report_filename, "w") as f:
                 f.write(report)
-            logger.info(f"Error report saved to {error_report_filename}")
+            logging.info(f"Error report saved to {error_report_filename}")
         except Exception as report_error:
-            logger.error(f"Failed to write error report: {report_error}")
+            logging.error(f"Failed to write error report: {report_error}")
             
         return 1
 

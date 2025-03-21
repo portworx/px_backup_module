@@ -8,10 +8,22 @@ import time
 from zoneinfo import ZoneInfo
 
 import yaml
+import logging
+
+
+timestamp = datetime.now().strftime("%d%m%Y_%H%M%S")
+LOG_FILE = f"retry-failed-logs_{timestamp}.log"
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.FileHandler(LOG_FILE),
+    ]
+)
 
 
 def enumerate_cluster(cluster_name):
-    print("[INFO] Running Ansible playbook for enumerate clusters")
+    logging.info("Running Ansible playbook for enumerate clusters")
 
     # Define the Ansible command
     cmd = ["ansible-playbook", "examples/cluster/enumerate.yaml", "-vvvv"]
@@ -19,31 +31,31 @@ def enumerate_cluster(cluster_name):
     # Run the command
     result = subprocess.run(cmd, capture_output=True, text=True)
 
-    print(f"[DEBUG] Ansible command completed with return code: {result.returncode}")
+    logging.debug(f"Ansible command completed with return code: {result.returncode}")
 
     # Extract stdout
     stdout_text = result.stdout
 
     if not stdout_text:
-        print("[ERROR] No output from Ansible playbook.")
+        logging.error("No output from Ansible playbook.")
         exit(1)
 
     # **Step 1: Locate the "Get list of clusters" task output**
     task_match = re.search(r"TASK \[Cluster Enumerate call].*?\n(.*?)\nRead vars_file ", stdout_text, re.DOTALL)
 
     if not task_match:
-        print("[ERROR] Could not find 'Get list of clusters' task output.")
+        logging.error("Could not find 'Get list of clusters' task output.")
         exit(1)
 
     task_output = task_match.group(1)
-    print(f"[DEBUG] Ansible task output: {task_output}")
+    logging.debug(f"Ansible task output: {task_output}")
 
     # **Step 2: Extract everything between "cluster" and "clusters"**
     pattern = r"ok:\s*\[localhost\]\s*=>\s*(\{.*\})"
     json_match = re.search(pattern, task_output, re.DOTALL)
 
     if not json_match:
-        print("[ERROR] Could not extract JSON between 'cluster' and 'clusters'.")
+        logging.error("Could not extract JSON between 'cluster' and 'clusters'.")
         exit(1)
 
     raw_json = json_match.group(1)
@@ -62,10 +74,10 @@ def enumerate_cluster(cluster_name):
         # return cluster_uid
 
     except json.JSONDecodeError as e:
-        print(f"[ERROR] JSON parsing failed: {str(e)}")
+        logging.error(f"JSON parsing failed: {str(e)}")
 
 def get_all_backups(cluster_name_filter, cluster_uid):
-    print(f"[INFO] Running Ansible playbook for enumerate backups")
+    logging.debug(f"[INFO] Running Ansible playbook for enumerate backups")
 
 
     # Define the Ansible command with extra-vars
@@ -77,20 +89,20 @@ def get_all_backups(cluster_name_filter, cluster_uid):
     # Run the command
     result = subprocess.run(cmd, capture_output=True, text=True)
 
-    print(f"[DEBUG] Ansible command completed with return code: {result.returncode}")
+    logging.debug(f"[DEBUG] Ansible command completed with return code: {result.returncode}")
 
     # Extract stdout
     stdout_text = result.stdout
 
     if not stdout_text:
-        print("[ERROR] No output from Ansible playbook.")
+        logging.debug("[ERROR] No output from Ansible playbook.")
         exit(1)
 
     # **Step 1: Locate the "Get list of backups" task output**
     task_match = re.search(r"TASK \[Get list of backups].*?\n(.*?)\nTASK", stdout_text, re.DOTALL)
 
     if not task_match:
-        print("[ERROR] Could not find 'Get backup details' task output.")
+        logging.debug("[ERROR] Could not find 'Get backup details' task output.")
         exit(1)
 
     task_output = task_match.group(1)
@@ -100,7 +112,7 @@ def get_all_backups(cluster_name_filter, cluster_uid):
     json_match = re.search(r'(\{.*\})', task_output, re.DOTALL)
 
     if not json_match:
-        print("[ERROR] Could not extract JSON between 'backup' and 'backups'.")
+        logging.debug("[ERROR] Could not extract JSON between 'backup' and 'backups'.")
         exit(1)
 
     raw_json = json_match.group(1)
@@ -112,11 +124,11 @@ def get_all_backups(cluster_name_filter, cluster_uid):
         output_file = f"backup_data_enumerate.json"
         with open(output_file, "w") as json_file:
             json.dump(parsed_json, json_file, indent=4)
-        print(f"[SUCCESS] Extracted backup data successfully. File saved as {output_file}")
+        logging.debug(f"[SUCCESS] Extracted backup data successfully. File saved as {output_file}")
         return output_file
 
     except json.JSONDecodeError as e:
-        print(f"[ERROR] JSON parsing failed: {str(e)}")
+        logging.debug(f"[ERROR] JSON parsing failed: {str(e)}")
 
 
 def get_failed_backups(file_path, min_last_update, tz_str=None):
@@ -171,7 +183,7 @@ def get_failed_backups(file_path, min_last_update, tz_str=None):
                 # If there's no tzinfo, assume the timestamp is already in UTC
                 last_update_dt = last_update_dt.replace(tzinfo=ZoneInfo("UTC"))
         except Exception as e:
-            print(f"[WARNING] Error parsing last_update_time '{last_update_str}': {e}")
+            logging.debug(f"[WARNING] Error parsing last_update_time '{last_update_str}': {e}")
             continue
 
         # Check filters
@@ -186,7 +198,7 @@ def get_failed_backups(file_path, min_last_update, tz_str=None):
     return failed_backups
 
 def inspect_backup(backup_name, backup_uid):
-    print(f"[INFO] Running Ansible playbook for backup: {backup_name}, UID: {backup_uid}")
+    logging.info(f"Running Ansible playbook for backup: {backup_name}, UID: {backup_uid}")
 
     # Define the Ansible command with extra-vars
     cmd = [
@@ -197,20 +209,20 @@ def inspect_backup(backup_name, backup_uid):
     # Run the command
     result = subprocess.run(cmd, capture_output=True, text=True)
 
-    print(f"[DEBUG] Ansible command completed with return code: {result.returncode}")
+    logging.debug(f"Ansible command completed with return code: {result.returncode}")
 
     # Extract stdout
     stdout_text = result.stdout
 
     if not stdout_text:
-        print("[ERROR] No output from Ansible playbook.")
+        logging.error("No output from Ansible playbook.")
         exit(1)
 
     # **Step 1: Locate the "Get backup details" task output**
     task_match = re.search(r"TASK \[Get backup details].*?\n(.*?)\nTASK ", stdout_text, re.DOTALL)
 
     if not task_match:
-        print("[ERROR] Could not find 'Get backup details' task output.")
+        logging.error("Could not find 'Get backup details' task output.")
         exit(1)
 
     task_output = task_match.group(1)
@@ -219,7 +231,7 @@ def inspect_backup(backup_name, backup_uid):
     json_match = re.search(r'"backup"\s*:\s*({.*?})\s*,\s*"backups"', task_output, re.DOTALL)
 
     if not json_match:
-        print("[ERROR] Could not extract JSON between 'backup' and 'backups'.")
+        logging.error("Could not extract JSON between 'backup' and 'backups'.")
         exit(1)
 
     raw_json = json_match.group(1)
@@ -230,11 +242,11 @@ def inspect_backup(backup_name, backup_uid):
         output_file = f"backup_data_{backup_name}.json"
         with open(output_file, "w") as json_file:
             json.dump(parsed_json, json_file, indent=4)
-        print(f"[SUCCESS] Extracted backup data successfully. File saved as {output_file}")
+        logging.debug(f"Extracted backup data successfully. File saved as {output_file}")
         return output_file
 
     except json.JSONDecodeError as e:
-        print(f"[ERROR] JSON parsing failed: {str(e)}")
+        logging.error(f"JSON parsing failed: {str(e)}")
 
 def get_resources_from_backup(file_path):
     with open(file_path, 'r') as f:
@@ -261,7 +273,7 @@ def create_yaml_file(vm_map, output_filename):
     yaml_filename = f"{output_filename}.yaml"
     with open(yaml_filename, "w") as f:
         yaml.safe_dump(output_list, f, default_flow_style=False)
-    print(f"YAML output written to {yaml_filename}")
+    logging.debug(f"YAML output written to {yaml_filename}")
     return yaml_filename
 
 def load_yaml(file_path):
@@ -340,7 +352,7 @@ def invoke_backup(resources, backup_info):
     with open(playbook_file, "w") as f:
         yaml.safe_dump(playbook_data, f, default_flow_style=False)
 
-    print(f"[INFO] Ansible playbook written to {playbook_file}")
+    logging.info(f"Ansible playbook written to {playbook_file}")
 
     json_output_file = f"{new_backup_name}.json"
 
@@ -353,12 +365,12 @@ def invoke_backup(resources, backup_info):
 
     result = subprocess.run(ansible_cmd, capture_output=True, text=True)
 
-    print(f"[DEBUG] Ansible stdout: {result.stdout}")
+    logging.debug(f"Ansible stdout: {result.stdout}")
 
-    print(f"[DEBUG] Ansible command completed with return code: {result.returncode}")
+    logging.debug(f"Ansible command completed with return code: {result.returncode}")
 
     if result.returncode != 0:
-        print(f"[ERROR] Backup playbook execution failed.")
+        logging.error("Backup playbook execution failed.")
 
         # Save failure response as JSON
         response = {
@@ -372,7 +384,7 @@ def invoke_backup(resources, backup_info):
             json.dump(response, json_file, indent=4)
 
     else:
-        print(f"[SUCCESS] Backup successfully triggered. Playbook: {playbook_file}")
+        logging.debug(f"Backup successfully triggered. Playbook: {playbook_file}")
 
         # Save success response as JSON
         response = {
@@ -414,7 +426,7 @@ def inspect_cluster(cluster_name):
     Returns:
         str: Cluster UID.
     """
-    print(f"[INFO] Running Ansible playbook for cluster: {cluster_name}")
+    logging.info(f"Running Ansible playbook for cluster: {cluster_name}")
 
     # Construct extra-vars as a JSON object
     extra_vars = json.dumps({
@@ -430,17 +442,17 @@ def inspect_cluster(cluster_name):
     ]
 
     result = subprocess.run(cmd, capture_output=True, text=True)
-    print(f"[DEBUG] Ansible command completed with return code: {result.returncode}")
+    logging.debug(f"Ansible command completed with return code: {result.returncode}")
 
     stdout_text = result.stdout
     if not stdout_text:
-        print("[ERROR] No output from Ansible playbook.")
+        logging.error("No output from Ansible playbook.")
         exit(1)
 
     # Step 1: Locate the "Get cluster details" task output
     task_match = re.search(r"TASK \[Get cluster details].*?\n(.*?)\nTASK ", stdout_text, re.DOTALL)
     if not task_match:
-        print("[ERROR] Could not find 'Get cluster details' task output.")
+        logging.error("Could not find 'Get cluster details' task output.")
         exit(1)
 
     task_output = task_match.group(1)
@@ -448,7 +460,7 @@ def inspect_cluster(cluster_name):
     # Step 2: Extract JSON between "cluster" and "clusters"
     json_match = re.search(r'"cluster"\s*:\s*({.*?})\s*,\s*"clusters"', task_output, re.DOTALL)
     if not json_match:
-        print("[ERROR] Could not extract JSON between 'cluster' and 'clusters'.")
+        logging.error("Could not extract JSON between 'cluster' and 'clusters'.")
         exit(1)
 
     raw_json = json_match.group(1)
@@ -457,42 +469,47 @@ def inspect_cluster(cluster_name):
     try:
         parsed_json = json.loads(raw_json)
         cluster_uid = parsed_json.get("cluster_info", {}).get("cluster_uid", {})
-        print(f"[SUCCESS] Extracted cluster data successfully.")
+        logging.debug("Extracted cluster data successfully.")
         return cluster_uid
 
     except json.JSONDecodeError as e:
-        print(f"[ERROR] JSON parsing failed: {str(e)}")
+        logging.error(f"JSON parsing failed: {str(e)}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Backup Processing Script")
     parser.add_argument("--cluster-name", required=True, help="Name of the application cluster")
     parser.add_argument("--timestamp", required=True,
                         help="Timestamp for filtering failed backups in MM/DD/YYYY HH:MMAM/PM format e.g., 03/18/2025 07:25AM")
+    parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose logging")
 
     args = parser.parse_args()
+
+    if args.verbose:
+        logging.setLevel(logging.DEBUG)
+
     cluster_uid = enumerate_cluster(args.cluster_name)
-    print(f"[INFO] Backing up cluster: {args.cluster_name} with uid {cluster_uid}")
+    logging.info(f"Backing up cluster: {args.cluster_name} with uid {cluster_uid}")
     enumerate_response = get_all_backups(args.cluster_name, cluster_uid)
     failed_backups = get_failed_backups(enumerate_response, args.timestamp)
-    # Print only the backup name from the failed backups
+    # print only the backup name from the failed backups
     failed_backup_names = [backup.get("metadata", {}).get("name") for backup in failed_backups]
-    print(f"[SUCCESS] Enumerated backup list: {failed_backup_names}")
+    logging.debug(f"Enumerated backup list: {failed_backup_names}")
     for backup in failed_backups:
         backup_name = backup.get("metadata", {}).get("name")
         backup_uid = backup.get("metadata", {}).get("uid")
         # Inspect Backup
         file_path = inspect_backup(backup_name, backup_uid)
         vms_in_backup = get_all_vms_from_backup(file_path)
-        # Print the failed VM names and namespaces
-        print(f"VMs in failed backup {backup_name}:")
-        print(json.dumps(vms_in_backup, indent=2))
+        # logging.debug the failed VM names and namespaces
+        logging.debug(f"VMs in failed backup {backup_name}:")
+        logging.debug(json.dumps(vms_in_backup, indent=2))
         resources = get_resources_from_backup(file_path)
-        # print("\nMapping of namespace to KubeVirt VM names referencing a failed PVC:")
-        # print(json.dumps(resources, indent=2))
+        # logging.debug("\nMapping of namespace to KubeVirt VM names referencing a failed PVC:")
+        # logging.debug(json.dumps(resources, indent=2))
 
         # Create the YAML file as an array of objects with each object having the keys "namespace" and "vmlist"
         # yaml_filename = create_yaml_file(resources, backup_name)
-        # print(f"VM list saved to {yaml_filename}")
+        # logging.debug(f"VM list saved to {yaml_filename}")
         #
         # # Load VM mapping (YAML)
         # vm_map = load_yaml(yaml_filename)
@@ -501,6 +518,6 @@ if __name__ == "__main__":
         backup_info = load_json(file_path)
 
         new_backup_name = invoke_backup(resources, backup_info)
-        print("Created retry backup for failed VMs: ", new_backup_name)
+        logging.debug("Created retry backup for failed VMs: ", new_backup_name)
         # sleep for 2 minutes
         time.sleep(120)
