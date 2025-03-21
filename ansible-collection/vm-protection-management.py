@@ -1303,7 +1303,8 @@ def main():
     
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
-    
+    print(f"Logs are getting captured at {LOG_FILE}")
+
     try:
         report_file_name = f"vm-protection-report-{timestamp}.txt"
         backup_location_name = args.backup_location

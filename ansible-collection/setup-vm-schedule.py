@@ -1180,7 +1180,11 @@ def get_inventory(ns_list, kubeconfig_file, dry_run=False):
     try:
         # Always load the actual inventory
         config.load_kube_config(kubeconfig_file)
-        custom_api = client.CustomObjectsApi()
+        # Setup the cert
+        configuration = client.Configuration.get_default_copy()
+        configuration.ssl_ca_cert = "ca.crt"
+        api_client = client.ApiClient(configuration)
+        custom_api = client.CustomObjectsApi(api_client)
 
         group = "kubevirt.io"
         version = "v1"
@@ -1394,7 +1398,8 @@ def main():
     args.dry_run = False
     if args.dry_run:
         logging.info("Running in DRY RUN mode. No changes will be made.")
-    
+    print(f"Logs are getting captured at {LOG_FILE}")
+
     try:
         # Parse time series
         time_series_str = args.time_series

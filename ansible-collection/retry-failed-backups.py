@@ -486,6 +486,7 @@ if __name__ == "__main__":
     parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose logging")
 
     args = parser.parse_args()
+    print(f"Logs are getting captured at {LOG_FILE}")
 
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
