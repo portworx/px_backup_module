@@ -1,26 +1,355 @@
-import base64
-from datetime import datetime, timedelta
-import json, subprocess, re, time, os
-import argparse
-import math
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
+"""
+VM Backup Schedule Management Tool
+
+This script automates the creation of backup schedules for KubeVirt VMs in PX-Backup.
+It allows users to specify time series for schedule policies and distributes VMs across them.
+"""
+
+# Standard library imports
+import argparse
+import base64
+import json
+import logging
+import math
+import os
+import re
+import subprocess
+import sys
+import time
+import traceback
+from datetime import datetime, timedelta
+
+# Third-party imports
 import yaml
 from kubernetes import client, config
 
-DEFAULT_START_TIME = '1800'
-GAP_MINUTES = 2
+# Set up logging
+logger = logging.getLogger("vm-schedule-sync")
+handler = logging.StreamHandler()
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+logger.setLevel(logging.INFO)
 
-def enumerate_clusters(name_filter=None):
+def generate_report(args, results=None, error=None, policy_result=None, vm_map=None):
+    """
+    Generate a report of the script execution
+    
+    Args:
+        args: Command line arguments
+        results: Results of backup schedule creation
+        error: Error message if any
+        policy_result: Results of policy creation
+        vm_map: Dictionary mapping namespaces to lists of VM names
+    
+    Returns:
+        str: Report content
+    """
+    report = []
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    # Title with timestamp
+    report.append("=" * 80)
+    report.append(f"VM BACKUP SCHEDULE EXECUTION REPORT - {timestamp}")
+    report.append("=" * 80)
+    
+    # Command line arguments
+    report.append("COMMAND LINE ARGUMENTS:")
+    report.append(f"  Cluster: {args.cluster}")
+    report.append(f"  Backup Location: {args.backup_location}")
+    report.append(f"  Time Series: {args.time_series}")
+    report.append(f"  Namespaces: {args.namespaces if args.namespaces else 'All namespaces'}")
+    report.append(f"  Dry Run: {args.dry_run}")
+    report.append("")
+    
+    # Policy information
+    if policy_result:
+        report.append("SCHEDULE POLICY INFORMATION:")
+        if policy_result['status'] == 'error':
+            report.append(f"  Status: ERROR - {policy_result['message']}")
+            report.append("")
+            report.append("  Existing Policies:")
+            for policy_name in policy_result.get('existing_policies', []):
+                report.append(f"    - {policy_name}")
+            
+            report.append("")
+            report.append("  Requested Policies:")
+            for policy_name in policy_result.get('all_policy_names', []):
+                report.append(f"    - {policy_name}")
+                
+            # Add cleanup instructions
+            if 'cleanup_help' in policy_result:
+                report.append("")
+                report.append("  CLEANUP INSTRUCTIONS:")
+                report.append("  " + policy_result['cleanup_help'].replace("\n", "\n  "))
+        else:
+            report.append(f"  Status: Success")
+            report.append("")
+            report.append("  Created Policies:")
+            for policy_name, policy_uid in policy_result.get('policies', []):
+                report.append(f"    - {policy_name} (UID: {policy_uid})")
+        report.append("")
+    
+    # VM inventory information
+    if vm_map:
+        report.append("VM INVENTORY:")
+        total_vms = sum(len(vms) for vms in vm_map.values())
+        report.append(f"  Total VMs Found: {total_vms}")
+        report.append(f"  Total Namespaces with VMs: {len(vm_map)}")
+        report.append("")
+        
+        # Detailed VM list by namespace with comma-separated VM names
+        for namespace, vms in sorted(vm_map.items()):
+            report.append(f"  Namespace: {namespace}")
+            report.append(f"    VM Count: {len(vms)}")
+            vm_list = ", ".join(sorted(vms))
+            report.append(f"    VMs: {vm_list}")
+            report.append("")
+    
+    # Results of backup schedule creation
+    if results:
+        report.append("BACKUP SCHEDULE RESULTS:")
+        report.append(f"  Total VMs Processed: {results['total_vms']}")
+        report.append(f"  Total Policies Used: {results['total_policies']}")
+        report.append(f"  Successful Schedules: {results['success_count']}")
+        report.append(f"  Failed Schedules: {results['failed_count']}")
+        report.append("")
+        
+        # Add a section listing successful backup schedules with their policies
+        if results['success_count'] > 0:
+            report.append("  SUCCESSFUL BACKUP SCHEDULES:")
+            report.append("  " + "=" * 26)
+            report.append("  Backup Schedule Name (Schedule Policy Name)")
+            report.append("  " + "-" * 50)
+            
+            for schedule in sorted(results['successful_schedules'], key=lambda x: (x['namespace'], x['vm'])):
+                report.append(f"  {schedule['backup_name']} ({schedule['policy_name']})")
+            report.append("")
+        
+        # Add a section listing failed backup schedules with their policies
+        if results['failed_count'] > 0:
+            report.append("  FAILED BACKUP SCHEDULES:")
+            report.append("  " + "=" * 23)
+            report.append("  Backup Schedule Name (Schedule Policy Name)")
+            report.append("  " + "-" * 50)
+            
+            for schedule in sorted(results['failed_schedules'], key=lambda x: (x['namespace'], x['vm'])):
+                report.append(f"  {schedule['backup_name']} ({schedule['policy_name']})")
+            report.append("")
+        
+        # More detailed information about successful schedules
+        if results['success_count'] > 0:
+            report.append("  SUCCESSFUL SCHEDULES DETAILS:")
+            for schedule in sorted(results['successful_schedules'], key=lambda x: (x['namespace'], x['vm'])):
+                report.append(f"    - {schedule['backup_name']}")
+                report.append(f"      VM: {schedule['vm']}")
+                report.append(f"      Namespace: {schedule['namespace']}")
+                report.append(f"      Policy: {schedule['policy_name']}")
+                report.append("")
+        
+        # More detailed information about failed schedules
+        if results['failed_count'] > 0:
+            report.append("  FAILED SCHEDULES DETAILS:")
+            for schedule in sorted(results['failed_schedules'], key=lambda x: (x['namespace'], x['vm'])):
+                report.append(f"    - {schedule['backup_name']}")
+                report.append(f"      VM: {schedule['vm']}")
+                report.append(f"      Namespace: {schedule['namespace']}")
+                report.append(f"      Policy: {schedule['policy_name']}")
+                report.append("")
+    
+    # Error information
+    if error:
+        report.append("ERROR INFORMATION:")
+        report.append(f"  {error}")
+        report.append("")
+    
+    # Execution status
+    if error:
+        report.append("EXECUTION STATUS: FAILED")
+    elif policy_result and policy_result['status'] == 'error':
+        report.append("EXECUTION STATUS: FAILED - DUPLICATE POLICIES DETECTED")
+    elif results:
+        if results['failed_count'] > 0:
+            report.append("EXECUTION STATUS: PARTIALLY SUCCESSFUL")
+        else:
+            report.append("EXECUTION STATUS: SUCCESSFUL")
+    else:
+        report.append("EXECUTION STATUS: UNKNOWN")
+    
+    report.append("=" * 80)
+    report.append("")
+    return "\n".join(report)
+
+def save_report(report_content, filename="vm_backup_schedule_report.log"):
+    """
+    Append report content to a report file
+    
+    Args:
+        report_content: Content to append
+        filename: Name of the report file
+    """
+    try:
+        with open(filename, "a") as f:
+            f.write(report_content)
+        logger.info(f"Report appended to {filename}")
+    except Exception as e:
+        logger.error(f"Failed to write report: {e}")
+
+
+def print_summary(args, results=None, policy_result=None, vm_map=None):
+    """
+    Print a professional summary of the script execution
+    
+    Args:
+        args: Command line arguments
+        results: Results of backup schedule creation
+        policy_result: Results of policy creation
+        vm_map: Dictionary mapping namespaces to lists of VM names
+    """
+    # Clear formatting for better presentation
+    print("\n" + "=" * 80)
+    print(f"{'VM BACKUP SCHEDULE SUMMARY':^80}")
+    print("=" * 80)
+    
+    # Input parameters
+    print(f"\n{'INPUT PARAMETERS':^80}")
+    print(f"{'=' * 16:^80}")
+    print(f"Cluster:         {args.cluster}")
+    print(f"Backup Location: {args.backup_location}")
+    print(f"Time Series:     {args.time_series}")
+    print(f"Dry Run:         {'Yes' if args.dry_run else 'No'}")
+    
+    # Policy information
+    if policy_result:
+        print(f"\n{'SCHEDULE POLICY INFORMATION':^80}")
+        print(f"{'=' * 27:^80}")
+        
+        if policy_result['status'] == 'error':
+            print(f"Status: \033[91mERROR - DUPLICATE POLICIES DETECTED\033[0m")
+            print(f"Found {len(policy_result.get('existing_policies', []))} existing policies with the same names.")
+            
+            if len(policy_result.get('existing_policies', [])) > 0:
+                print("\nExisting Policies:")
+                for policy in policy_result.get('existing_policies', []):
+                    print(f"  - {policy}")
+            
+            print("\nTo proceed with the script:")
+            print("1. Delete the existing policies (see detailed report for commands)")
+            print("2. Run the script again with the same parameters")
+            
+            if 'cleanup_help' in policy_result:
+                print("\nExample cleanup command for the first policy:")
+                # Get just the first command line
+                cleanup_lines = policy_result['cleanup_help'].split('\n')
+                for line in cleanup_lines:
+                    if line.startswith('ansible-playbook'):
+                        print(f"  {line}")
+                        break
+                print("See the detailed report for all cleanup commands.")
+        else:
+            print(f"Status: \033[92mSuccess\033[0m")
+            print(f"Created {len(policy_result.get('policies', []))} schedule policies:")
+            for i, (policy_name, policy_uid) in enumerate(policy_result.get('policies', []), 1):
+                if i <= 5:  # Limit to showing first 5 policies if there are many
+                    print(f"  - {policy_name}")
+                elif i == 6:
+                    print(f"  - ... and {len(policy_result.get('policies', [])) - 5} more")
+                    break
+    
+    # VM information
+    if vm_map:
+        print(f"\n{'VM INVENTORY':^80}")
+        print(f"{'=' * 12:^80}")
+        
+        total_vms = sum(len(vms) for vms in vm_map.values())
+        print(f"Found {total_vms} VMs across {len(vm_map)} namespaces")
+        
+        # Show namespace breakdown with VM names
+        if len(vm_map) <= 10:  # Show details for up to 10 namespaces
+            for namespace, vms in sorted(vm_map.items()):
+                vm_list = ", ".join(sorted(vms))
+                # Truncate the list if it's too long for display
+                if len(vm_list) > 60:
+                    vm_list = vm_list[:57] + "..."
+                print(f"  - Namespace: {namespace} - VMs: {vm_list}")
+        else:
+            # Just show a summary for larger clusters
+            print(f"  Top 5 namespaces by VM count:")
+            sorted_namespaces = sorted(vm_map.items(), key=lambda x: len(x[1]), reverse=True)
+            for i, (namespace, vms) in enumerate(sorted_namespaces[:5], 1):
+                vm_sample = ", ".join(sorted(vms)[:3])
+                if len(vms) > 3:
+                    vm_sample += f", ... ({len(vms)-3} more)"
+                print(f"  {i}. {namespace}: {vm_sample}")
+    
+    # Backup schedule results
+    if results:
+        print(f"\n{'BACKUP SCHEDULE RESULTS':^80}")
+        print(f"{'=' * 23:^80}")
+        
+        print(f"Total VMs:            {results['total_vms']}")
+        print(f"Total Policies:       {results['total_policies']}")
+        print(f"Successful Schedules: {results['success_count']}")
+        print(f"Failed Schedules:     {results['failed_count']}")
+        
+        if results['success_count'] > 0 and results['failed_count'] == 0:
+            print(f"\n\033[92mAll backup schedules created successfully!\033[0m")
+        elif results['success_count'] > 0 and results['failed_count'] > 0:
+            print(f"\n\033[93mPartially successful: {results['success_count']}/{results['total_vms']} schedules created\033[0m")
+            print("See the detailed report for information about failed schedules.")
+        elif results['success_count'] == 0 and results['failed_count'] > 0:
+            print(f"\n\033[91mFailed: No schedules created successfully.\033[0m")
+            
+        # Add section listing backup schedules with their policies
+        if results['success_count'] > 0:
+            print(f"\n{'BACKUP SCHEDULES CREATED':^80}")
+            print(f"{'=' * 24:^80}")
+            print("Backup Schedule Name (Schedule Policy Name)")
+            print("-" * 50)
+            
+            # Sort schedules by namespace and VM name for better readability
+            for schedule in sorted(results['successful_schedules'], key=lambda x: (x['namespace'], x['vm'])):
+                schedule_name = schedule['backup_name']
+                policy_name = schedule['policy_name']
+                print(f"{schedule_name} ({policy_name})")
+    
+    # Summary footer
+    print("\n" + "=" * 80)
+    if policy_result and policy_result['status'] == 'error':
+        status = "\033[91mFAILED - DUPLICATE POLICIES\033[0m"
+        print(f"{'EXECUTION STATUS: ' + status:^80}")
+    elif results:
+        if results['failed_count'] > 0 and results['success_count'] == 0:
+            status = "\033[91mFAILED\033[0m"
+        elif results['failed_count'] > 0:
+            status = "\033[93mPARTIALLY SUCCESSFUL\033[0m"
+        else:
+            status = "\033[92mSUCCESSFUL\033[0m"
+        print(f"{'EXECUTION STATUS: ' + status:^80}")
+    else:
+        status = "\033[91mFAILED\033[0m"
+        print(f"{'EXECUTION STATUS: ' + status:^80}")
+    print("=" * 80 + "\n")
+
+def enumerate_clusters(name_filter=None, dry_run=False):
     """
     Enumerate clusters in PX-Backup using Ansible
     
     Args:
         name_filter (str, optional): Filter clusters by name
+        dry_run (bool, optional): If True, don't actually run the command
     
     Returns:
         list: List of matching clusters
     """
-    print(f"[INFO] Enumerating clusters with filter: {name_filter}")
+    logger.info(f"Enumerating clusters with filter: {name_filter}")
+    
+    if dry_run:
+        logger.debug("[DRY RUN] Would enumerate clusters")
+        return []
     
     # Prepare extra vars for the Ansible command
     extra_vars = {}
@@ -36,64 +365,75 @@ def enumerate_clusters(name_filter=None):
         "--extra-vars", extra_vars_json
     ]
     
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    print(f"[DEBUG] Ansible command completed with return code: {result.returncode}")
-    
-    if result.returncode != 0:
-        print(f"[ERROR] Failed to enumerate clusters")
-        return []
-    
-    # Extract clusters from output
-    stdout_text = result.stdout
-    
-    # Look for the cluster enumeration task output - match various possible task names
-    task_match = re.search(r"TASK \[(Enumerate clusters|Cluster Enumerate call)].*?\n(.*?)\nTASK ", stdout_text, re.DOTALL)
-    if not task_match:
-        # Try looking for it at the end of the output (last task)
-        task_match = re.search(r"TASK \[(Enumerate clusters|Cluster Enumerate call)].*?\n(.*?)$", stdout_text, re.DOTALL)
-        if not task_match:
-            print("[ERROR] Could not find cluster enumeration task output")
-            # Print the first 200 chars of stdout for debugging
-            print(f"[DEBUG] First 200 chars of stdout: {stdout_text[:200]}")
-            return []
-    
-    task_output = task_match.group(2)
-    
-    # Try to extract JSON
-    json_match = re.search(r'"clusters"\s*:\s*(\[.*?\])', task_output, re.DOTALL)
-    if not json_match:
-        # Try to find the clusters JSON in the entire output as a fallback
-        json_match = re.search(r'"clusters"\s*:\s*(\[.*?\])', stdout_text, re.DOTALL)
-        if not json_match:
-            print("[ERROR] Could not extract clusters list from task output")
-            # Print part of the task output for debugging
-            print(f"[DEBUG] Task output snippet: {task_output[:200]}")
-            return []
+    logger.debug(f"Executing command: {' '.join(cmd)}")
     
     try:
-        clusters_json = json_match.group(1)
-        clusters = json.loads(clusters_json)
-        return clusters
-    except json.JSONDecodeError as e:
-        print(f"[ERROR] Failed to parse clusters JSON: {e}")
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        logger.debug(f"Command completed with return code: {result.returncode}")
+        
+        if result.returncode != 0:
+            logger.error(f"Failed to enumerate clusters")
+            return []
+        
+        # Extract clusters from output
+        stdout_text = result.stdout
+        
+        # Look for the cluster enumeration task output - match various possible task names
+        task_match = re.search(r"TASK \[(Enumerate clusters|Cluster Enumerate call)].*?\n(.*?)\nTASK ", stdout_text, re.DOTALL)
+        if not task_match:
+            # Try looking for it at the end of the output (last task)
+            task_match = re.search(r"TASK \[(Enumerate clusters|Cluster Enumerate call)].*?\n(.*?)$", stdout_text, re.DOTALL)
+            if not task_match:
+                logger.error("Could not find cluster enumeration task output")
+                # Print the first 200 chars of stdout for debugging
+                logger.debug(f"First 200 chars of stdout: {stdout_text[:200]}")
+                return []
+        
+        task_output = task_match.group(2)
+        
+        # Try to extract JSON
+        json_match = re.search(r'"clusters"\s*:\s*(\[.*?\])', task_output, re.DOTALL)
+        if not json_match:
+            # Try to find the clusters JSON in the entire output as a fallback
+            json_match = re.search(r'"clusters"\s*:\s*(\[.*?\])', stdout_text, re.DOTALL)
+            if not json_match:
+                logger.error("Could not extract clusters list from task output")
+                # Print part of the task output for debugging
+                logger.debug(f"Task output snippet: {task_output[:200]}")
+                return []
+        
+        try:
+            clusters_json = json_match.group(1)
+            clusters = json.loads(clusters_json)
+            return clusters
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse clusters JSON: {e}")
+            return []
+    except Exception as e:
+        logger.error(f"Error executing enumerate clusters command: {e}")
         return []
 
 
-def get_cluster_by_name(cluster_name):
+def get_cluster_by_name(cluster_name, dry_run=False):
     """
     Get cluster information by name
     
     Args:
         cluster_name (str): Name of the cluster to find
+        dry_run (bool, optional): If True, don't actually run the command
     
     Returns:
         tuple: (cluster_name, cluster_uid) if found, otherwise (None, None)
     """
+    if dry_run:
+        logger.debug(f"[DRY RUN] Would get cluster info for: {cluster_name}")
+        return cluster_name, "dry-run-cluster-uid"
+    
     # First enumerate clusters with the name filter
     clusters = enumerate_clusters(name_filter=cluster_name)
     
     if not clusters:
-        print(f"[ERROR] No clusters found with name: {cluster_name}")
+        logger.error(f"No clusters found with name: {cluster_name}")
         return None, None
     
     # Find exact match
@@ -107,23 +447,28 @@ def get_cluster_by_name(cluster_name):
         cluster = clusters[0]
         cluster_name = cluster.get("metadata", {}).get("name")
         cluster_uid = cluster.get("metadata", {}).get("uid")
-        print(f"[INFO] Using cluster: {cluster_name} with UID: {cluster_uid}")
+        logger.info(f"Using cluster: {cluster_name} with UID: {cluster_uid}")
         return cluster_name, cluster_uid
     
     return None, None
 
 
-def enumerate_backup_locations(name_filter=None):
+def enumerate_backup_locations(name_filter=None, dry_run=False):
     """
     Enumerate backup locations in PX-Backup using Ansible
     
     Args:
         name_filter (str, optional): Filter backup locations by name
+        dry_run (bool, optional): If True, don't actually run the command
     
     Returns:
         list: List of matching backup locations
     """
-    print(f"[INFO] Enumerating backup locations with filter: {name_filter}")
+    logger.info(f"Enumerating backup locations with filter: {name_filter}")
+    
+    if dry_run:
+        logger.debug(f"[DRY RUN] Would enumerate backup locations")
+        return []
     
     # Prepare extra vars for the Ansible command
     extra_vars = {}
@@ -139,11 +484,12 @@ def enumerate_backup_locations(name_filter=None):
         "--extra-vars", extra_vars_json
     ]
     
+    logger.debug(f"Executing command: {' '.join(cmd)}")
     result = subprocess.run(cmd, capture_output=True, text=True)
-    print(f"[DEBUG] Ansible command completed with return code: {result.returncode}")
+    logger.debug(f"Command completed with return code: {result.returncode}")
     
     if result.returncode != 0:
-        print(f"[ERROR] Failed to enumerate backup locations")
+        logger.error(f"Failed to enumerate backup locations")
         return []
     
     # Extract backup locations from output
@@ -155,7 +501,7 @@ def enumerate_backup_locations(name_filter=None):
         # Try looking for it at the end of the output (last task)
         task_match = re.search(r"TASK \[(Enumerate backup locations|Backup Location Enumerate call)].*?\n(.*?)$", stdout_text, re.DOTALL)
         if not task_match:
-            print("[ERROR] Could not find backup locations task output")
+            logger.error("Could not find backup locations task output")
             return []
     
     task_output = task_match.group(2)
@@ -166,7 +512,7 @@ def enumerate_backup_locations(name_filter=None):
         # Try to find the backup_locations JSON in the entire output as a fallback
         json_match = re.search(r'"backup_locations"\s*:\s*(\[.*?\])', stdout_text, re.DOTALL)
         if not json_match:
-            print("[ERROR] Could not extract backup locations list from task output")
+            logger.error("Could not extract backup locations list from task output")
             return []
     
     try:
@@ -174,25 +520,30 @@ def enumerate_backup_locations(name_filter=None):
         locations = json.loads(locations_json)
         return locations
     except json.JSONDecodeError as e:
-        print(f"[ERROR] Failed to parse backup locations JSON: {e}")
+        logger.error(f"Failed to parse backup locations JSON: {e}")
         return []
 
 
-def get_backup_location_by_name(location_name):
+def get_backup_location_by_name(location_name, dry_run=False):
     """
     Get backup location information by name
     
     Args:
         location_name (str): Name of the backup location to find
+        dry_run (bool, optional): If True, don't actually run the command
     
     Returns:
         tuple: (location_name, location_uid) if found, otherwise (None, None)
     """
+    if dry_run:
+        logger.debug(f"[DRY RUN] Would get backup location info for: {location_name}")
+        return location_name, "dry-run-location-uid"
+    
     # First enumerate backup locations with the name filter
     locations = enumerate_backup_locations(name_filter=location_name)
     
     if not locations:
-        print(f"[ERROR] No backup locations found with name: {location_name}")
+        logger.error(f"No backup locations found with name: {location_name}")
         return None, None
     
     # Find exact match
@@ -206,23 +557,28 @@ def get_backup_location_by_name(location_name):
         location = locations[0]
         location_name = location.get("metadata", {}).get("name")
         location_uid = location.get("metadata", {}).get("uid")
-        print(f"[INFO] Using backup location: {location_name} with UID: {location_uid}")
+        logger.info(f"Using backup location: {location_name} with UID: {location_uid}")
         return location_name, location_uid
     
     return None, None
 
 
-def enumerate_schedule_policies(name_filter=None):
+def enumerate_schedule_policies(name_filter=None, dry_run=False):
     """
     Enumerate schedule policies in PX-Backup using Ansible with improved error handling
     
     Args:
         name_filter (str, optional): Filter schedule policies by name
+        dry_run (bool, optional): If True, don't actually run the command
     
     Returns:
         list: List of matching schedule policies
     """
-    print(f"[INFO] Enumerating schedule policies with filter: {name_filter}")
+    logger.info(f"Enumerating schedule policies with filter: {name_filter}")
+    
+    if dry_run:
+        logger.debug(f"[DRY RUN] Would enumerate schedule policies")
+        return []
     
     # Prepare extra vars for the Ansible command
     extra_vars = {}
@@ -238,11 +594,12 @@ def enumerate_schedule_policies(name_filter=None):
         "--extra-vars", extra_vars_json
     ]
     
+    logger.debug(f"Executing command: {' '.join(cmd)}")
     result = subprocess.run(cmd, capture_output=True, text=True)
-    print(f"[DEBUG] Ansible command completed with return code: {result.returncode}")
+    logger.debug(f"Command completed with return code: {result.returncode}")
     
     if result.returncode != 0:
-        print(f"[ERROR] Failed to enumerate schedule policies")
+        logger.error(f"Failed to enumerate schedule policies")
         return []
     
     # Extract schedule policies from output
@@ -254,7 +611,7 @@ def enumerate_schedule_policies(name_filter=None):
         # Try looking for it at the end of the output (last task)
         task_match = re.search(r"TASK \[(Enumerate schedule policies|Schedule Policy Enumerate call)].*?\n(.*?)$", stdout_text, re.DOTALL)
         if not task_match:
-            print("[WARNING] Could not find schedule policies task output, trying alternative pattern")
+            logger.warning("Could not find schedule policies task output, trying alternative pattern")
             # Try another pattern - look for schedule_policies in the output anywhere
             json_match = re.search(r'"schedule_policies"\s*:\s*(\[.*?\])', stdout_text, re.DOTALL)
             if json_match:
@@ -263,9 +620,9 @@ def enumerate_schedule_policies(name_filter=None):
                     policies = json.loads(policies_json)
                     return policies
                 except json.JSONDecodeError as e:
-                    print(f"[ERROR] Failed to parse schedule policies JSON: {e}")
+                    logger.error(f"Failed to parse schedule policies JSON: {e}")
                     return []
-            print("[ERROR] Could not extract schedule policies from output")
+            logger.error("Could not extract schedule policies from output")
             return []
     
     task_output = task_match.group(2)
@@ -276,7 +633,7 @@ def enumerate_schedule_policies(name_filter=None):
         # Try to find the schedule_policies JSON in the entire output as a fallback
         json_match = re.search(r'"schedule_policies"\s*:\s*(\[.*?\])', stdout_text, re.DOTALL)
         if not json_match:
-            print("[ERROR] Could not extract schedule policies list from task output")
+            logger.error("Could not extract schedule policies list from task output")
             return []
     
     try:
@@ -284,134 +641,59 @@ def enumerate_schedule_policies(name_filter=None):
         policies = json.loads(policies_json)
         return policies
     except json.JSONDecodeError as e:
-        print(f"[ERROR] Failed to parse schedule policies JSON: {e}")
+        logger.error(f"Failed to parse schedule policies JSON: {e}")
         return []
 
-def extract_time_from_policy_name(policy_name):
+
+def check_policy_exists(policy_name, dry_run=False):
     """
-    Extract time from a policy name with format pxb-<vm-name>-sched-policy-HHMMAM/PM
+    Check if a policy with the given name already exists
     
     Args:
-        policy_name (str): The policy name
-    
+        policy_name (str): The policy name to check
+        dry_run (bool, optional): If True, don't actually run the command
+        
     Returns:
-        datetime or None: The extracted time as a datetime object, or None if extraction fails
+        tuple: (exists, uid) where exists is a boolean indicating if the policy exists,
+               and uid is the policy UID (or None if it doesn't exist or dry_run is True)
     """
-    # Extract the time portion (last part after last hyphen)
-    parts = policy_name.split('-')
-    if len(parts) < 4:
-        return None
-    
-    time_str = parts[-1]
-    
-    # Try to parse the time string in format like 0602pm
-    try:
-        # Check if it ends with am or pm (case insensitive)
-        if time_str.lower().endswith('am') or time_str.lower().endswith('pm'):
-            # Extract hours and minutes
-            hours_minutes = time_str[:-2]  # Remove am/pm
-            if len(hours_minutes) == 3:  # For formats like 602pm
-                hours = int(hours_minutes[0])
-                minutes = int(hours_minutes[1:])
-            elif len(hours_minutes) == 4:  # For formats like 0602pm or 1045am
-                hours = int(hours_minutes[:2])
-                minutes = int(hours_minutes[2:])
-            else:
-                return None
-                
-            # Adjust hours for PM
-            if time_str.lower().endswith('pm') and hours < 12:
-                hours += 12
-            elif time_str.lower().endswith('am') and hours == 12:
-                hours = 0
-            
-            # Create time object
-            return datetime.now().replace(hour=hours, minute=minutes, second=0, microsecond=0)
-    except (ValueError, IndexError):
-        pass
-    
-    return None
-
-
-def find_latest_policy_time(policies):
-    """
-    Find the latest policy time from a list of policy objects
-    
-    Args:
-        policies (list): List of policy objects
-    
-    Returns:
-        datetime or None: The latest policy time as a datetime object, or None if no valid times found
-    """
-    latest_time = None
+    if dry_run:
+        logger.debug(f"[DRY RUN] Would check if policy exists: {policy_name}")
+        return False, None
+        
+    logger.info(f"Checking if policy exists: {policy_name}")
+    policies = enumerate_schedule_policies(name_filter=policy_name)
     
     for policy in policies:
-        policy_name = policy.get("metadata", {}).get("name", "")
-        if "pxb-" in policy_name and "sched-policy" in policy_name:
-            time = extract_time_from_policy_name(policy_name)
-            if time and (latest_time is None or time > latest_time):
-                latest_time = time
+        metadata = policy.get("metadata", {})
+        if metadata.get("name") == policy_name:
+            policy_uid = metadata.get("uid")
+            logger.info(f"Policy found: {policy_name} with UID: {policy_uid}")
+            return True, policy_uid
     
-    return latest_time
+    logger.info(f"Policy not found: {policy_name}")
+    return False, None
 
 
-def get_vms_with_existing_policies(policies):
+def create_schedule_policy(policy_name, policy_time, dry_run=False):
     """
-    Get VMs that already have policies
+    Creates a schedule policy with the given name and time
     
     Args:
-        policies (list): List of policy objects
-    
-    Returns:
-        set: Set of VM names that already have policies
-    """
-    vms_with_policies = set()
-    
-    for policy in policies:
-        policy_name = policy.get("metadata", {}).get("name", "")
-        if "pxb-" in policy_name and "sched-policy" in policy_name:
-            # Extract VM name from policy name (format: pxb-<vm-name>-sched-policy-time)
-            parts = policy_name.split('-')
-            if len(parts) >= 4 and parts[0] == "pxb" and "sched-policy" in policy_name:
-                # VM name is everything between "pxb-" and "-sched-policy"
-                vm_name_parts = []
-                for i in range(1, len(parts)):
-                    if parts[i] == "sched-policy":
-                        break
-                    vm_name_parts.append(parts[i])
-                
-                vm_name = "-".join(vm_name_parts)
-                if vm_name:
-                    vms_with_policies.add(vm_name)
-    
-    return vms_with_policies
-
-
-def create_schedule_policy(vm_name, policy_time,namespace):
-    """
-    Creates a schedule policy for a specific VM or returns existing one
-    
-    Args:
-        vm_name (str): VM name
+        policy_name (str): The policy name to create
         policy_time (datetime): Time for the policy
+        dry_run (bool, optional): If True, don't actually run the command
         
     Returns:
         tuple: (policy_name, policy_uid) if created/found successfully, otherwise (None, None)
     """
-    # Format the time in the required format (e.g., "0602pm")
-    formatted_time = policy_time.strftime("%I%M%p").lower().lstrip("0")
+    if dry_run:
+        logger.debug(f"[DRY RUN] Would create schedule policy: {policy_name} at time {policy_time.strftime('%H:%M')}")
+        return policy_name, "dry-run-policy-uid"
     
-    # Create a policy name using the new convention
-    policy_name = f"pxb-{vm_name}-{namespace}-sched-policy-{formatted_time}"
-
-    # Check if policy already exists before attempting to create it
-    existing_policies = enumerate_schedule_policies(name_filter=policy_name)
-    for policy in existing_policies:
-        if policy.get("metadata", {}).get("name") == policy_name:
-            policy_uid = policy.get("metadata", {}).get("uid")
-            print(f"[INFO] Policy {policy_name} already exists. Using existing policy.")
-            return policy_name, policy_uid
-
+    # Format the time for the policy (e.g., "06:00PM")
+    formatted_time = policy_time.strftime("%I:%M%p").lstrip("0")
+    
     # Construct extra-vars JSON object
     extra_vars = json.dumps({
         "schedule_policies": [
@@ -419,11 +701,12 @@ def create_schedule_policy(vm_name, policy_time,namespace):
                 "name": policy_name,
                 "validate_certs": True,
                 "labels": {
-                    "policy-label": "test-label"
+                    "policy-type": "vm-backup",
+                    "created": datetime.now().strftime("%Y-%m-%d")
                 },
                 "schedule_policy": {
                     "daily": {
-                        "time": policy_time.strftime("%I:%M%p").lstrip("0"),
+                        "time": formatted_time,
                         "retain": 5,
                         "incremental_count": {
                             "count": 6
@@ -434,59 +717,60 @@ def create_schedule_policy(vm_name, policy_time,namespace):
         ]
     })
 
-    print(f"[INFO] Creating schedule policy: {policy_name} with time {policy_time.strftime('%I:%M%p').lstrip('0')}")
+    logger.info(f"Creating schedule policy: {policy_name} with time {formatted_time}")
     cmd = [
         "ansible-playbook", "examples/schedule_policy/create.yaml", "-vvvv",
         "--extra-vars", extra_vars
     ]
+    
+    logger.debug(f"Executing command: {' '.join(cmd)}")
     result = subprocess.run(cmd, capture_output=True, text=True)
-    print(f"[DEBUG] Ansible command for policy {policy_name} completed with return code: {result.returncode}")
+    logger.debug(f"Command completed with return code: {result.returncode}")
     
     if result.returncode != 0:
         # Check if the error is due to policy already existing
         if "already exists" in result.stderr or "already exists" in result.stdout:
-            print(f"[INFO] Policy {policy_name} appears to already exist. Trying to fetch it directly.")
+            logger.info(f"Policy {policy_name} appears to already exist. Trying to fetch it directly.")
             # Try to get the policy details again
-            retry_policies = enumerate_schedule_policies(name_filter=policy_name)
-            for policy in retry_policies:
-                if policy.get("metadata", {}).get("name") == policy_name:
-                    policy_uid = policy.get("metadata", {}).get("uid")
-                    print(f"[INFO] Successfully retrieved existing policy: {policy_name}")
-                    return policy_name, policy_uid
+            exists, policy_uid = check_policy_exists(policy_name)
+            if exists and policy_uid:
+                logger.info(f"Successfully retrieved existing policy: {policy_name}")
+                return policy_name, policy_uid
         
-        print(f"[ERROR] Failed to create schedule policy: {policy_name}")
+        logger.error(f"Failed to create schedule policy: {policy_name}")
         return None, None
         
     stdout_text = result.stdout
     if not stdout_text:
-        print(f"[ERROR] No output from Ansible playbook for policy {policy_name}.")
+        logger.error(f"No output from Ansible playbook for policy {policy_name}.")
         return None, None
 
     # Locate the "Create schedule policy" task output
     task_match = re.search(r"TASK \[Create schedule policy].*?\n(.*?)\nTASK ", stdout_text, re.DOTALL)
     if not task_match:
-        print(f"[ERROR] Could not find 'Create schedule policy' task output for policy {policy_name}.")
+        logger.error(f"Could not find 'Create schedule policy' task output for policy {policy_name}.")
         return None, None
     task_output = task_match.group(1)
 
     # Extract JSON from the task output
     json_match = re.search(r'(\{.*\})', task_output, re.DOTALL)
     if not json_match:
-        print(f"[ERROR] Could not extract JSON from 'Create schedule policy' task output for policy {policy_name}.")
+        logger.error(f"Could not extract JSON from 'Create schedule policy' task output for policy {policy_name}.")
         return None, None
     raw_json = json_match.group(1).strip()
 
     try:
         decoder = json.JSONDecoder()
         parsed_json, idx = decoder.raw_decode(raw_json)
-        print(f"[SUCCESS] Created schedule policy successfully - {policy_name}")
+        logger.info(f"Created schedule policy successfully - {policy_name}")
         policy_uid = parsed_json.get("schedule_policy", {}).get("metadata", {}).get("uid")
         return policy_name, policy_uid
     except json.JSONDecodeError as e:
-        print(f"[ERROR] JSON parsing failed for policy {policy_name}: {str(e)}")
+        logger.error(f"JSON parsing failed for policy {policy_name}: {str(e)}")
         return None, None
 
-def create_vm_backup_schedule(vm, namespace, policy_name, policy_uid, backup_location_ref, cluster_ref):
+
+def create_vm_backup_schedule(vm, namespace, policy_name, policy_uid, backup_location_ref, cluster_ref, csi_driver_map,  dry_run=False):
     """
     Create a backup schedule for a single VM
     
@@ -497,16 +781,20 @@ def create_vm_backup_schedule(vm, namespace, policy_name, policy_uid, backup_loc
         policy_uid (str): Policy UID
         backup_location_ref (dict): Backup location reference
         cluster_ref (dict): Cluster reference
+        dry_run (bool, optional): If True, don't actually run the command
         
     Returns:
         tuple: (success, backup_name) where success is a boolean indicating if the operation succeeded
     """
     # Extract time from policy name
-    time_match = re.search(r'-([0-9]{2,4}[ap]m)$', policy_name)
-    time_str = time_match.group(1) if time_match else datetime.now().strftime("%I%M%p").lower().lstrip("0")
+    time_str = policy_name.replace("pxb-", "")
     
     # Create backup schedule name
-    backup_name = f"pxb-{vm}-sched-backup-{time_str}"
+    backup_name = f"pxb-{namespace}-{vm}-{policy_name}"
+    
+    if dry_run:
+        logger.debug(f"[DRY RUN] Would create backup schedule: {backup_name} for VM {vm} in namespace {namespace} using policy {policy_name}")
+        return True, backup_name
     
     schedule_policy_ref = {
         "name": policy_name,
@@ -527,7 +815,6 @@ def create_vm_backup_schedule(vm, namespace, policy_name, policy_uid, backup_loc
         "type": "VirtualMachine"
     }
     
-
     playbook_data = [{
         "name": "Configure VM Backup Schedule",
         "hosts": "localhost",
@@ -535,6 +822,7 @@ def create_vm_backup_schedule(vm, namespace, policy_name, policy_uid, backup_loc
         "vars": {
             "backup_schedules": [{
                 "name": backup_name,
+                "volume_snapshot_class_mapping": csi_driver_map,
                 "backup_location_ref": backup_location_ref,
                 "schedule_policy_ref": schedule_policy_ref,
                 "cluster_ref": cluster_ref,
@@ -545,7 +833,8 @@ def create_vm_backup_schedule(vm, namespace, policy_name, policy_uid, backup_loc
                 "labels": {
                     "vm-name": vm,
                     "vm-namespace": namespace,
-                    "created-at": datetime.now().strftime("%Y-%m-%d")
+                    "policy-name": policy_name,
+                    "created": datetime.now().strftime("%Y-%m-%d")
                 }
             }],
             "vm_namespaces": vm_namespaces,
@@ -561,11 +850,11 @@ def create_vm_backup_schedule(vm, namespace, policy_name, policy_uid, backup_loc
 
     # Save generated playbook
     timestamp = int(time.time())
-    playbook_file = f"create_backup_{vm}_{timestamp}.yaml"
+    playbook_file = f"create_backup_{namespace}_{vm}_{timestamp}.yaml"
     with open(playbook_file, "w") as f:
         yaml.safe_dump(playbook_data, f, default_flow_style=False)
 
-    print(f"[INFO] Creating backup schedule for VM: {vm} in namespace: {namespace} using policy: {policy_name}")
+    logger.info(f"Creating backup schedule for VM: {vm} in namespace: {namespace} using policy: {policy_name}")
 
     # Invoke the Ansible playbook
     combined_vars = json.dumps({
@@ -578,10 +867,12 @@ def create_vm_backup_schedule(vm, namespace, policy_name, policy_uid, backup_loc
         "--extra-vars", combined_vars
     ]
 
+    logger.debug(f"Executing command: {' '.join(ansible_cmd)}")
     result = subprocess.run(ansible_cmd, capture_output=True, text=True)
+    logger.debug(f"Command completed with return code: {result.returncode}")
     
     if result.returncode != 0:
-        print(f"[ERROR] Failed to create backup schedule for VM: {vm}")
+        logger.error(f"Failed to create backup schedule for VM: {vm} in namespace: {namespace}")
         return False, backup_name
 
     # Check for success in output
@@ -590,164 +881,21 @@ def create_vm_backup_schedule(vm, namespace, policy_name, policy_uid, backup_loc
     # Locate the "Create Backup Schedule" task output
     task_match = re.search(r"TASK \[Create Backup Schedule].*?\n(.*?)\nTASK ", stdout_text, re.DOTALL)
     if not task_match:
-        print(f"[ERROR] Could not find 'Create Backup Schedule' task output for VM {vm}.")
+        logger.error(f"Could not find 'Create Backup Schedule' task output for VM {vm} in namespace {namespace}.")
         return False, backup_name
     
     # Success
-    print(f"[SUCCESS] Created backup schedule for VM: {vm} - {backup_name}")
+    logger.info(f"Created backup schedule for VM: {vm} in namespace: {namespace} - {backup_name}")
     return True, backup_name
 
 
-def create_policies_and_schedules(vm_map, backup_location_name, cluster_name):
-    """
-    Create policies and backup schedules for VMs
-    
-    Args:
-        vm_map (dict): Dictionary mapping namespaces to lists of VM names
-        backup_location_name (str): Name of backup location to use
-        cluster_name (str): Name of cluster to use
-        
-    Returns:
-        dict: Results of backup schedule creation with focus on failed schedules
-    """
-    # Get backup location info
-    bl_name, bl_uid = get_backup_location_by_name(backup_location_name)
-    if not bl_name or not bl_uid:
-        raise ValueError(f"Backup location '{backup_location_name}' not found")
-        
-    backup_location_ref = {
-        "name": bl_name,
-        "uid": bl_uid
-    }
-    
-    # Get cluster info
-    cl_name, cl_uid = get_cluster_by_name(cluster_name)
-    if not cl_name or not cl_uid:
-        raise ValueError(f"Cluster '{cluster_name}' not found")
-        
-    cluster_ref = {
-        "name": cl_name,
-        "uid": cl_uid
-    }
-    
-    # Enumerate existing policies
-    existing_policies = enumerate_schedule_policies(name_filter="pxb")
-    
-    # Get all VMs that need policies
-    all_vms = []
-    for namespace, vm_list in vm_map.items():
-        for vm in vm_list:
-            all_vms.append((vm, namespace))
-    
-    if not existing_policies:
-        # No existing policies, start at 6:00 PM
-        print("[INFO] No existing policies found with 'pxb' prefix. Creating new policies starting at 6:00 PM")
-        start_time = datetime.now().replace(hour=int(DEFAULT_START_TIME[:2]), minute=int(DEFAULT_START_TIME[2:]), second=0, microsecond=0)
-        gap_minutes = GAP_MINUTES
-        vms_needing_policies = all_vms
-    else:
-        # Find VMs that already have policies
-        vms_with_policies = get_vms_with_existing_policies(existing_policies)
-        
-        # Filter VMs that need new policies
-        # print(f"[INFO] vm needing policies {vms_needing_policies}")
-        vms_needing_policies = [(vm, ns) for vm, ns in all_vms if vm+"-"+ns not in vms_with_policies]
-        
-        if not vms_needing_policies:
-            print("[INFO] All VMs already have policies. No new policies needed.")
-            return {
-                "total_vms": len(all_vms), 
-                "success_count": len(all_vms), 
-                "failed_count": 0, 
-                "failed_schedules": []
-            }
-        
-        # Find the latest policy time
-        latest_time = find_latest_policy_time(existing_policies)
-        if latest_time:
-            # Start 2 minutes after the latest policy
-            start_time = latest_time + timedelta(minutes=2)
-            print(f"[INFO] Found latest policy time: {latest_time.strftime('%I:%M%p')}. Starting at: {start_time.strftime('%I:%M%p')}")
-        else:
-            # Fallback to 6:00 PM if no valid time found
-            start_time = datetime.now().replace(hour=int(DEFAULT_START_TIME[:2]), minute=int(DEFAULT_START_TIME[2:]), second=0, microsecond=0)
-            print(f"[INFO] Could not determine latest policy time. Starting at default time: {start_time.strftime('%I:%M%p')}")
-        
-        gap_minutes = GAP_MINUTES
-    
-    # Prepare results dictionary with focus on failed schedules
-    results = {
-        "total_vms": len(all_vms),
-        "processed_vms": len(vms_needing_policies),
-        "success_count": 0,
-        "failed_count": 0,
-        "failed_schedules": []
-    }
-    
-    print(f"[INFO] Processing {len(vms_needing_policies)} VMs that need policies")
-    
-    # Create policies and schedules for each VM
-    for i, (vm, namespace) in enumerate(vms_needing_policies):
-        # Calculate policy time
-        policy_time = start_time + timedelta(minutes=i * gap_minutes)
-        policy_time_str = policy_time.strftime('%I:%M%p')
-        
-        # Create policy
-        # policy_name, policy_uid = create_schedule_policy(vm, policy_time, namespace)
-
-        # if not policy_name or not policy_uid:
-        #     print(f"[ERROR] Failed to create policy for VM: {vm}")
-        #     results["failed_count"] += 1
-        #     results["failed_schedules"].append({
-        #         "vm": vm,
-        #         "namespace": namespace,
-        #         "policy_time": policy_time_str,
-        #         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        #     })
-        #     continue
-        
-        # Create backup schedule
-        success, backup_name = create_vm_backup_schedule(
-            vm, namespace, "hardcoded-policy", "hardcoded-uid", backup_location_ref, cluster_ref
-        )
-        
-        # Update results
-        if success:
-            results["success_count"] += 1
-        else:
-            results["failed_count"] += 1
-            results["failed_schedules"].append({
-                "vm": vm,
-                "namespace": namespace,
-                "backup_name": backup_name,
-                "policy_name": "hardcoded-policy",
-                "policy_time": policy_time_str,
-                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            })
-    
-    # Print summary
-    print(f"\n[SUMMARY] Total VMs: {results['total_vms']}")
-    print(f"[SUMMARY] VMs processed: {results['processed_vms']}")
-    print(f"[SUMMARY] Successful schedules: {results['success_count']}")
-    print(f"[SUMMARY] Failed schedules: {results['failed_count']}")
-    
-    # Print details of failed schedules
-    if results["failed_count"] > 0:
-        print("\n[FAILED SCHEDULES]")
-        for failed in results["failed_schedules"]:
-            print(f"  VM: {failed['vm']} (Namespace: {failed['namespace']})")
-            print(f"  Policy Time: {failed['policy_time']}")
-            print(f"  Error: {failed['error']} at {failed['timestamp']}")
-            print()
-    
-    return results
-
-def get_cluster_info(cluster_name):
+def get_cluster_info(cluster_name, dry_run=False):
     """
     Get cluster information for the specified cluster name
     
     Args:
         cluster_name (str): Name of the cluster to find
+        dry_run (bool, optional): If True, don't actually run the command
     
     Returns:
         tuple: (cluster_name, cluster_uid)
@@ -759,20 +907,21 @@ def get_cluster_info(cluster_name):
         raise ValueError("Cluster name must be provided")
         
     # Dynamically get cluster info by name
-    cluster_name, cluster_uid = get_cluster_by_name(cluster_name)
+    cluster_name, cluster_uid = get_cluster_by_name(cluster_name, dry_run=dry_run)
     if not cluster_name or not cluster_uid:
         raise ValueError(f"Cluster '{cluster_name}' not found")
         
     return cluster_name, cluster_uid
 
 
-def inspect_cluster(cluster_name, cluster_uid):
+def inspect_cluster(cluster_name, cluster_uid, dry_run=False):
     """
     Inspect a cluster and extract its configuration
     
     Args:
         cluster_name (str): The name of the cluster
         cluster_uid (str): The UID of the cluster
+        dry_run (bool, optional): If True, don't actually run the command
         
     Returns:
         str or None: Path to the output file containing cluster data, or None if inspection failed
@@ -780,7 +929,15 @@ def inspect_cluster(cluster_name, cluster_uid):
     Raises:
         ValueError: If inspection fails
     """
-    print(f"[INFO] Running Ansible playbook for cluster: {cluster_name}, UID: {cluster_uid}")
+    logger.info(f"Running Ansible playbook for cluster: {cluster_name}, UID: {cluster_uid}")
+
+    if dry_run:
+        logger.debug(f"[DRY RUN] Would inspect cluster: {cluster_name}")
+        output_file = f"cluster_data_{cluster_name}.json"
+        # Create a dummy file for dry run
+        with open(output_file, "w") as json_file:
+            json.dump({"cluster": {"metadata": {"name": cluster_name}}}, json_file, indent=4)
+        return output_file
 
     # Construct extra-vars as a JSON object
     extra_vars = json.dumps({
@@ -796,8 +953,9 @@ def inspect_cluster(cluster_name, cluster_uid):
         "--extra-vars", extra_vars
     ]
 
+    logger.debug(f"Executing command: {' '.join(cmd)}")
     result = subprocess.run(cmd, capture_output=True, text=True)
-    print(f"[DEBUG] Ansible command completed with return code: {result.returncode}")
+    logger.debug(f"Command completed with return code: {result.returncode}")
 
     if result.returncode != 0:
         raise ValueError(f"Cluster inspection failed with return code {result.returncode}")
@@ -826,21 +984,20 @@ def inspect_cluster(cluster_name, cluster_uid):
         output_file = f"cluster_data_{cluster_name}.json"
         with open(output_file, "w") as json_file:
             json.dump(parsed_json, json_file, indent=4)
-        print(f"[SUCCESS] Extracted cluster data successfully.")
+        logger.info(f"Extracted cluster data successfully.")
         return output_file
 
     except json.JSONDecodeError as e:
         raise ValueError(f"JSON parsing failed: {str(e)}")
-        
-    return None
 
 
-def create_kubeconfig(cluster_file):
+def create_kubeconfig(cluster_file, dry_run=False):
     """
     Create a kubeconfig file from cluster data
     
     Args:
         cluster_file (str): Path to the cluster data file
+        dry_run (bool, optional): If True, don't actually create the file
         
     Returns:
         str: Path to the created kubeconfig file
@@ -850,6 +1007,18 @@ def create_kubeconfig(cluster_file):
     """
     if not cluster_file:
         raise ValueError("No cluster file provided")
+    
+    if dry_run:
+        logger.debug(f"[DRY RUN] Would create kubeconfig from cluster file: {cluster_file}")
+        # Just return a filename that would be created
+        cluster_name = "dryrun"
+        try:
+            with open(cluster_file, 'r') as f:
+                data = json.load(f)
+                cluster_name = data.get("cluster", {}).get("metadata", {}).get("name", "dryrun")
+        except:
+            pass
+        return f"{cluster_name}_kubeconfig"
         
     try:
         # Load the JSON data from the file
@@ -878,166 +1047,447 @@ def create_kubeconfig(cluster_file):
         with open(filename, "w") as f:
             f.write(kubeconfig_text)
 
-        print(f"[SUCCESS] Created kubeconfig file: {filename}")
+        logger.info(f"Created kubeconfig file: {filename}")
         return filename
         
     except (IOError, json.JSONDecodeError) as e:
         raise ValueError(f"Failed to process cluster file: {e}")
-        
-    return None
 
 
-def get_inventory(ns_list, kubeconfig_file):
+def get_inventory(ns_list, kubeconfig_file, dry_run=False):
     """
     Get inventory of all VirtualMachine resources in the cluster
     
     Args:
+        ns_list (list): List of namespaces to check
         kubeconfig_file (str): Path to the kubeconfig file
+        dry_run (bool, optional): If True, don't make any changes but still get real data
         
     Returns:
         dict: Dictionary mapping namespaces to lists of VM names
+        
+    Raises:
+        ValueError: If there's an error accessing the cluster
     """
-    from kubernetes import client, config
-
-    # Load the provided kubeconfig file
-    config.load_kube_config(kubeconfig_file)
-    # Setup the cert
-    configuration = client.Configuration.get_default_copy()
-    configuration.ssl_ca_cert = "ca.crt"
-    api_client = client.ApiClient(configuration)
-    custom_api = client.CustomObjectsApi(api_client)
-
-    group = "kubevirt.io"
-    version = "v1"
-    plural = "virtualmachines"
+    logger.info(f"Getting VM inventory from {len(ns_list)} namespaces")
+    
     vm_map = {}
+    try:
+        # Always load the actual inventory
+        config.load_kube_config(kubeconfig_file)
+        custom_api = client.CustomObjectsApi()
 
-    for ns in ns_list:
-        try:
-            # List all VirtualMachine custom objects across the cluster
-            result = custom_api.list_namespaced_custom_object(
-                group=group,
-                version=version,
-                plural=plural,
-                namespace=ns,
-            )
-            # Iterate over each VirtualMachine and group by namespace
-            for item in result.get("items", []):
-                metadata = item.get("metadata", {})
-                name = metadata.get("name")
-                if ns and name:
-                    if ns not in vm_map:
-                        vm_map[ns] = []
-                    vm_map[ns].append(name)
-        except Exception as e:
-            print(f"Error listing all VirtualMachines: {e}")
-
-
-
+        group = "kubevirt.io"
+        version = "v1"
+        plural = "virtualmachines"
+        
+        for ns in ns_list:
+            try:
+                # List all VirtualMachine custom objects in the namespace
+                result = custom_api.list_namespaced_custom_object(
+                    group=group,
+                    version=version,
+                    plural=plural,
+                    namespace=ns,
+                )
+                # Iterate over each VirtualMachine and add to the map
+                vm_list = []
+                for item in result.get("items", []):
+                    metadata = item.get("metadata", {})
+                    name = metadata.get("name")
+                    if name:
+                        vm_list.append(name)
+                
+                if vm_list:  # Only add namespace if it has VMs
+                    vm_map[ns] = vm_list
+                    logger.info(f"Found {len(vm_list)} VMs in namespace {ns}")
+                
+            except Exception as e:
+                logger.error(f"Error listing VirtualMachines in namespace {ns}: {e}")
+                raise ValueError(f"Failed to access namespace {ns}: {e}")
+    except Exception as e:
+        logger.error(f"Error loading kubeconfig or accessing cluster: {e}")
+        raise ValueError(f"Failed to access cluster: {e}")
+    
     return vm_map
 
 
-if __name__ == "__main__":
+def parse_time_series(time_series):
+    """
+    Parse a comma-separated list of times in 24-hour format
+    
+    Args:
+        time_series (str): Comma-separated list of times (e.g., "0100,0245,0350")
+        
+    Returns:
+        list: List of datetime objects representing the specified times
+    """
+    times = []
+    
+    if not time_series:
+        return times
+        
+    time_strings = time_series.split(',')
+    
+    for time_str in time_strings:
+        time_str = time_str.strip()
+        
+        # Check if the time is in the expected format (24-hour format like "0100" or "2345")
+        if not re.match(r'^([01][0-9]|2[0-3])([0-5][0-9])$', time_str):
+            logger.error(f"Invalid time format: {time_str}. Expected format is HHMM in 24-hour format (e.g., 0100, 2345)")
+            continue
+        
+        # Extract hours and minutes
+        hours = int(time_str[:2])
+        minutes = int(time_str[2:])
+        
+        # Create datetime object with today's date and the specified time
+        time_obj = datetime.now().replace(hour=hours, minute=minutes, second=0, microsecond=0)
+        times.append(time_obj)
+    
+    return times
+
+
+def create_policies_for_time_series(time_series, dry_run=False):
+    """
+    Create schedule policies for each time in the time series
+    
+    Args:
+        time_series (list): List of datetime objects representing times
+        dry_run (bool, optional): If True, don't actually create policies
+        
+    Returns:
+        dict: Dictionary with keys:
+            - 'status': 'success' or 'error'
+            - 'policies': List of tuples (policy_name, policy_uid) for created policies
+            - 'existing_policies': List of existing policy names that caused failure
+            - 'message': Error message if status is 'error'
+    """
+    # First check if any of the policies already exist
+    existing_policies = []
+    existing_policies_details = []
+    all_policy_names = []
+    
+    for time_obj in time_series:
+        time_str = time_obj.strftime("%H%M")
+        policy_name = f"pxb-{time_str}"
+        all_policy_names.append(policy_name)
+        
+        exists, uid = check_policy_exists(policy_name, dry_run=dry_run)
+        if exists:
+            existing_policies.append(policy_name)
+            existing_policies_details.append((policy_name, uid))
+    
+    if existing_policies:
+        error_msg = f"The following schedule policies already exist: {', '.join(existing_policies)}"
+        logger.error(error_msg)
+        logger.error("Please delete these policies before proceeding.")
+        
+        # Construct a command example for deleting these policies
+        cleanup_commands = []
+        cleanup_commands.append("# To clean up existing policies, use these commands:")
+        cleanup_commands.append("")
+        
+        # Add specific delete commands for each existing policy
+        for policy_name, policy_uid in existing_policies_details:
+            delete_cmd = f"ansible-playbook examples/schedule_policy/delete.yaml --extra-vars '{{\"schedule_policies\": [{{\"name\": \"{policy_name}\", \"uid\": \"{policy_uid}\"}}]}}'"
+            cleanup_commands.append(delete_cmd)
+        
+        cleanup_cmd = "\n".join(cleanup_commands)
+        logger.error(f"\n{cleanup_cmd}")
+        
+        return {
+            'status': 'error',
+            'policies': [],
+            'existing_policies': existing_policies,
+            'existing_policies_details': existing_policies_details,
+            'all_policy_names': all_policy_names,
+            'message': error_msg,
+            'cleanup_help': cleanup_cmd
+        }
+    
+    # No existing policies found, proceed with creation
+    created_policies = []
+    for time_obj in time_series:
+        time_str = time_obj.strftime("%H%M")
+        policy_name = f"pxb-{time_str}"
+        
+        policy_name, policy_uid = create_schedule_policy(policy_name, time_obj, dry_run=dry_run)
+        if policy_name and policy_uid:
+            created_policies.append((policy_name, policy_uid))
+        else:
+            logger.error(f"Failed to create policy: {policy_name}")
+    
+    return {
+        'status': 'success',
+        'policies': created_policies,
+        'existing_policies': [],
+        'all_policy_names': all_policy_names,
+        'message': f"Successfully created {len(created_policies)} policies"
+    }
+
+def distribute_vms_to_policies(vm_map, policies):
+    """
+    Distribute VMs across policies
+    
+    Args:
+        vm_map (dict): Dictionary mapping namespaces to lists of VM names
+        policies (list): List of tuples (policy_name, policy_uid)
+        
+    Returns:
+        list: List of tuples (vm, namespace, policy_name, policy_uid)
+    """
+    # Flatten VM map into a list of (vm, namespace) tuples
+    vms = []
+    for namespace, vm_list in vm_map.items():
+        for vm in vm_list:
+            vms.append((vm, namespace))
+    
+    # Calculate how many VMs to assign to each policy
+    total_vms = len(vms)
+    policy_count = len(policies)
+    
+    if total_vms == 0 or policy_count == 0:
+        return []
+    
+    assignments = []
+    
+    # Distribute VMs evenly across policies
+    for i, (vm, namespace) in enumerate(vms):
+        policy_index = i % policy_count
+        policy_name, policy_uid = policies[policy_index]
+        assignments.append((vm, namespace, policy_name, policy_uid))
+    
+    return assignments
+
+def parse_input_map(map_str):
+    result = {}
+    for pair in map_str.split(','):
+        if ':' not in pair:
+            raise ValueError(f"Invalid pair format: {pair}")
+        key, value = pair.split(':', 1)
+        result[key.strip()] = value.strip()
+    return result
+
+def main():
     parser = argparse.ArgumentParser(description="Create backup schedules for virtual machines")
     parser.add_argument("--cluster", required=True, help="Name of the cluster to use (required)")
     parser.add_argument("--backup-location", required=True, help="Name of the backup location to use (required)")
-    parser.add_argument("--output", type=str, default="result", help="Output file for backup results")
-    parser.add_argument('--gap_minutes', type=int, default=2, help='Gap between schedules in minutes (default 2 min)')
-    parser.add_argument('--default_time', type=str, default='1800', help='Default time in HHMM format (default 1800 HOURS)')
-    
+    parser.add_argument("--namespaces", nargs="+", help="List of namespaces to check (required)")
+    parser.add_argument("--time-series", required=True, help="Comma-separated list of times in 24-hour format (e.g., '0100,0245,0350')")
+    parser.add_argument("--output", type=str, default="vm_schedule_result.json", help="Output file for backup results")
+    parser.add_argument("--dry-run", action="store_true", help="Show what would be done without making changes")
+    parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose logging")
+    parser.add_argument('--csiDriver_map',"-d", type=str, help='Map input in the form csiDriver1:VSC1,csiDriver2:VSC2')
+
     args = parser.parse_args()
 
-    GAP_MINUTES = 0
-    DEFAULT_START_TIME = args.default_time
+    if args.verbose:
+        logger.setLevel(logging.DEBUG)
+        
+    if args.dry_run:
+        logger.info("Running in DRY RUN mode. No changes will be made.")
     
     try:
+        # Parse time series
+        time_series_str = args.time_series
+        time_series = parse_time_series(time_series_str)
+        
+        if not time_series:
+            raise ValueError("No valid times provided in time-series. Expected format is HHMM in 24-hour format (e.g., 0100,2345)")
+            
+        logger.info(f"Using time series: {', '.join(t.strftime('%H:%M') for t in time_series)}")
+        
         # Get cluster info
-        cluster_name, cluster_uid = get_cluster_info(args.cluster)
+        cluster_name, cluster_uid = get_cluster_info(args.cluster, dry_run=args.dry_run)
+        logger.info(f"Using cluster: {cluster_name} (UID: {cluster_uid})")
+        
+        # Get backup location info
+        bl_name, bl_uid = get_backup_location_by_name(args.backup_location, dry_run=args.dry_run)
+        if not bl_name or not bl_uid:
+            raise ValueError(f"Backup location '{args.backup_location}' not found")
+            
+        backup_location_ref = {
+            "name": bl_name,
+            "uid": bl_uid
+        }
+        
+        cluster_ref = {
+            "name": cluster_name,
+            "uid": cluster_uid
+        }
+        
+        # Create policies for time series
+        policy_result = create_policies_for_time_series(time_series, dry_run=args.dry_run)
+        
+        # Handle the case where duplicate policies are found
+        if policy_result['status'] == 'error':
+            logger.error("Found duplicate schedule policies. Cannot proceed.")
+            
+            # Generate a report about the duplicate policies
+            report = generate_report(args, error=policy_result['message'], policy_result=policy_result)
+            
+            # Save the report to a file with timestamp to avoid overwriting
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            report_filename = f"duplicate_policies_report_{timestamp}.txt"
+            
+            try:
+                with open(report_filename, "w") as f:
+                    f.write(report)
+                logger.info(f"Report saved to {report_filename}")
+            except Exception as e:
+                logger.error(f"Failed to write report: {e}")
+            
+            # Print a summary of the error
+            print_summary(args, policy_result=policy_result)
+            
+            # Exit with error since we can't proceed
+            return 1
+            
+        # Proceed with successful policy creation
+        policies = policy_result['policies']
+        logger.info(f"Created/Found {len(policies)} schedule policies")
         
         # Inspect cluster and create kubeconfig
-        cluster_file = inspect_cluster(cluster_name, cluster_uid)
+        cluster_file = inspect_cluster(cluster_name, cluster_uid, dry_run=args.dry_run)
         if not cluster_file:
             raise ValueError("Failed to inspect cluster")
             
-        kubeconfig_file = create_kubeconfig(cluster_file)
-
-        ns_list = ["15405-dev", "15405-dev", "199077-dev-vm", "199077-dev-vm", "59893-dev-vm", "186743-test-vm", "187877-dev-vm",
-                   "190445-test-vm", "190577-test-vm", "198675-dev", "198675-dev-vm", "199077-dev-vm", "200579-test-vm",
-                   "202099-dev-vm", "202388-test-vm", "202757-dev", "203720-test-vm", "204588-dev", "206941-dev", "210331-test-vm",
-                   "211640-test-vm", "213389-dev", "215571-test-vm", "217212-test-vm", "217651-test-vm", "232160-test-vm", "232695-test-vm",
-                   "244221-test-vm", "41326-test-vm", "43264-dev-vm", "43266-dev-vm", "47034-dev", "48265-dev", "50067-test-vm", "51684-test-vm",
-                   "54874-dev-vm", "56212-dev", "56365-dev", "58151-dev-vm", "58174-windows-platform", "59893-dev-vm", "6195-dev-vm"]
-
+        kubeconfig_file = create_kubeconfig(cluster_file, dry_run=args.dry_run)
+        if not kubeconfig_file:
+            raise ValueError("Failed to create kubeconfig")
+        
         # Get VM inventory
-        vm_by_ns = get_inventory(ns_list, kubeconfig_file)
-
-        print(f"====================================================================")
-        for namespace, vms in vm_by_ns.items():
-            for vm in vms:
-                print(f"Namespace: {namespace}, VM Name: {vm}")
-
-        # Count total VMs
-        total_vm_count = sum(len(vms) for vms in vm_by_ns.values())
-        print(f"Total VM count: {total_vm_count}")
-
-        print(f"====================================================================")
+        ns_list = args.namespaces
+        if not ns_list:
+            logger.info("No namespaces specified, will check all namespaces with VirtualMachines")
+            # Get all namespaces if none specified
+            if not args.dry_run:
+                try:
+                    # Load the kubeconfig
+                    config.load_kube_config(kubeconfig_file)
+                    # Create the API client
+                    v1 = client.CoreV1Api()
+                    # List all namespaces
+                    namespaces = v1.list_namespace()
+                    ns_list = [ns.metadata.name for ns in namespaces.items]
+                    logger.info(f"Found {len(ns_list)} namespaces in the cluster")
+                except Exception as e:
+                    logger.error(f"Error listing namespaces: {e}")
+                    # Provide a default namespace as fallback
+                    ns_list = ["default"]
+            else:
+                # For dry run, just use some example namespaces
+                ns_list = ["default", "kube-system"]
+                
+        vm_map = get_inventory(ns_list, kubeconfig_file, dry_run=args.dry_run)
         
         # Count total VMs
-        total_vm_count = sum(len(vms) for vms in vm_by_ns.values())
-        print(f"Total VM count: {total_vm_count}")
+        total_vm_count = sum(len(vms) for vms in vm_map.values())
+        logger.info(f"Found {total_vm_count} VMs across {len(vm_map)} namespaces")
         
         if total_vm_count == 0:
-            raise ValueError("No VMs found in the cluster. Please verify the cluster has virtual machines.")
+            raise ValueError("No VMs found in the specified namespaces. Please verify the cluster has virtual machines.")
         
-        # Create policies and schedules
-        results = create_policies_and_schedules(
-            vm_by_ns, 
-            args.backup_location, 
-            args.cluster
-        )
+        # Distribute VMs across policies
+        vm_assignments = distribute_vms_to_policies(vm_map, policies)
+        
+        # Create backup schedules
+        results = {
+            "total_vms": total_vm_count,
+            "total_policies": len(policies),
+            "success_count": 0,
+            "failed_count": 0,
+            "successful_schedules": [],
+            "failed_schedules": []
+        }
+        
+        for vm, namespace, policy_name, policy_uid in vm_assignments:
+            success, backup_name = create_vm_backup_schedule(
+                vm, namespace, policy_name, policy_uid, 
+                backup_location_ref, cluster_ref,
+                parse_input_map(args.csiDriver_map),
+                dry_run=args.dry_run,
+            )
+            
+            if success:
+                results["success_count"] += 1
+                results["successful_schedules"].append({
+                    "vm": vm,
+                    "namespace": namespace,
+                    "backup_name": backup_name,
+                    "policy_name": policy_name
+                })
+            else:
+                results["failed_count"] += 1
+                results["failed_schedules"].append({
+                    "vm": vm,
+                    "namespace": namespace,
+                    "backup_name": backup_name,
+                    "policy_name": policy_name
+                })
         
         # Save results to file
         with open(args.output, "w") as f:
             json.dump(results, f, indent=2)
             
-        print(f"Results saved to {args.output}")
+        logger.info(f"Results saved to {args.output}")
+        
+        # Generate a full report
+        report = generate_report(args, results=results, policy_result=policy_result, vm_map=vm_map)
+        report_filename = f"vm_backup_schedule_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+        
+        try:
+            with open(report_filename, "w") as f:
+                f.write(report)
+            logger.info(f"Detailed report saved to {report_filename}")
+        except Exception as e:
+            logger.error(f"Failed to write detailed report: {e}")
+        
+        # Print summary
+        print_summary(args, results=results, policy_result=policy_result, vm_map=vm_map)
+        
+        if results["failed_count"] > 0:
+            logger.warning("\nSome backup schedules failed to be created. See result file for details.")
+            return 1
+        
+        logger.info("\nAll backup schedules created successfully!")
+        return 0
             
     except ValueError as e:
-        print(f"[ERROR] {str(e)}")
-        exit(1)
+        logger.error(f"{str(e)}")
+        
+        # Generate a report for the error
+        report = generate_report(args, error=str(e))
+        error_report_filename = f"error_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+        
+        try:
+            with open(error_report_filename, "w") as f:
+                f.write(report)
+            logger.info(f"Error report saved to {error_report_filename}")
+        except Exception as report_error:
+            logger.error(f"Failed to write error report: {report_error}")
+            
+        return 1
     except Exception as e:
-        print(f"[ERROR] An unexpected error occurred: {str(e)}")
-        exit(1)
+        logger.error(f"An unexpected error occurred: {str(e)}")
+        if args.verbose:
+            import traceback
+            logger.debug(traceback.format_exc())
+            
+        # Generate a report for the unexpected error
+        error_details = traceback.format_exc() if args.verbose else str(e)
+        report = generate_report(args, error=f"Unexpected error: {error_details}")
+        error_report_filename = f"unexpected_error_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+        
+        try:
+            with open(error_report_filename, "w") as f:
+                f.write(report)
+            logger.info(f"Error report saved to {error_report_filename}")
+        except Exception as report_error:
+            logger.error(f"Failed to write error report: {report_error}")
+            
+        return 1
 
-
-# -----------------------
-    # print("Total VM count in the cluster:", total_vm_count)
-# call a func to print summary
-
-    # Create dummy vm_by_ns dictionary
-    # vm_by_ns = {
-    #     "fed": ["vm-fed"],
-    #     "win": ["win2k22-template-1", "vgm-win2k22-mssql-1"]
-    # }
-# one vm per backup schedule 
-# no of backup scheduels per schedule policy
-
-# no of jobs/policy (batch count)
-    # TOTAL_NO_POLICY = total_vm_count/NO_VM_PER_BACKUP
-    # policy_name_uid = create_schedule_policy_loop("2:15AM", 3, TOTAL_NO_POLICY)
-    # print(f"Policy name to UID mapping: {policy_name_uid}")
-
-    # invoke_backup(vm_by_ns, policy_name_uid)
-
-# trigger every backup - based on param
-# no of backups per policy
-# start time.
-# gap time?
-
-# First Run -
-# 1. Query the inventory and finds out all the VMs.
-# 2. Create a backup job configuration for each individual VMs  
-# Name: VM1_Backup_Cfg
-# 3. Each VM has its own backup schedule configuration
-# Name: VM1_Backup_schedule
-# 4. Print out the summary of the total number of backup and the number of total vMs.
+if __name__ == "__main__":
+    sys.exit(main())
