@@ -364,7 +364,7 @@ def create_kubeconfig(cluster_file: str) -> Optional[str]:
             kubeconfig_text = base64.b64decode(kubeconfig_b64).decode("utf-8")
         except Exception as e:
             logging.error(f"Failed to decode kubeconfig: {e}")
-            return None
+            exit(1)
 
         # Define the output filename
         filename = f"{cluster_name}_kubeconfig"
@@ -378,7 +378,7 @@ def create_kubeconfig(cluster_file: str) -> Optional[str]:
         
     except Exception as e:
         logging.error(f"Failed to process cluster file: {e}")
-        return None
+        exit(1)
 
 def get_vm_inventory(kubeconfig_file: str, ns_list: Optional[List[str]] = None):
     # Load the provided kubeconfig file
@@ -414,6 +414,7 @@ def get_vm_inventory(kubeconfig_file: str, ns_list: Optional[List[str]] = None):
                         vm_map[ns].append(name)
             except Exception as e:
                 print(f"Error listing all VirtualMachines: {e}")
+                exit(1)
     else:
         try:
             # List all VirtualMachine custom objects across the cluster
@@ -433,6 +434,7 @@ def get_vm_inventory(kubeconfig_file: str, ns_list: Optional[List[str]] = None):
                     vm_map[namespace].append(name)
         except Exception as e:
             logging.error(f"Error listing all VirtualMachines: {e}")
+            exit(1)
     return vm_map
 
 def enumerate_backup_schedules(cluster_name: str = None, cluster_uid: str = None, org_id: str = "default") -> List[Dict[str, Any]]:
