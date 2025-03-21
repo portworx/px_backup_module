@@ -1,0 +1,32 @@
+---
+- name: Enumerate PX-Backup Schedule Policies
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - org_id is defined
+        fail_msg: "Required variables must be defined"
+
+  tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+    - name: Enumerate schedule policies
+      block:
+        - name: Get list of schedule policies
+          schedule_policy:
+            operation: INSPECT_ALL
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            org_id: "{{ org_id }}"
+            # Optional filters
+            labels: "{{ labels | default(omit) }}"
+            max_objects: "{{ max_objects | default(omit) }}"
+            validate_certs: "{{ validate_certs | default(true) }}"
+          register: schedule_policy_result

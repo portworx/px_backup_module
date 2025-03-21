@@ -1,0 +1,33 @@
+---
+- name: Delete PX-Backup Schedule Policy
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - schedule_policies_delete is defined
+        fail_msg: "Required variables must be defined"
+
+  tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+    - name: Delete schedule policies
+      block:
+        - name: Delete schedule_policy
+          schedule_policy:
+            operation: DELETE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            org_id: "{{ org_id | default('default') }}"
+            name: "{{ item.name }}"
+            uid: "{{ item.uid }}"
+          register: delete_result
+          loop: "{{ schedule_policies_delete }}"
+          loop_control:
+            label: "{{ item.name }}"

@@ -17,3 +17,5 @@
         org_id: "{{ org_id }}"
         enumerate_options:
           backup_object_type: "VirtualMachine"
+          cluster_name_filter: "{{ cluster_name_filter | default(omit) }}"
+          cluster_uid_filter: "{{ cluster_uid_filter | default(omit) }}"
