@@ -383,10 +383,10 @@ def get_vm_inventory(kubeconfig_file: str, ns_list: Optional[List[str]] = None):
     # Load the provided kubeconfig file
     config.load_kube_config(kubeconfig_file)
     # Setup the cert
-    # configuration = client.Configuration.get_default_copy()
-    # configuration.ssl_ca_cert = "ca.crt"
-    # api_client = client.ApiClient(configuration)
-    custom_api = client.CustomObjectsApi()
+    configuration = client.Configuration.get_default_copy()
+    configuration.ssl_ca_cert = "ca.crt"
+    api_client = client.ApiClient(configuration)
+    custom_api = client.CustomObjectsApi(api_client)
 
     group = "kubevirt.io"
     version = "v1"
@@ -1304,6 +1304,7 @@ def main():
         logging.getLogger().setLevel(logging.DEBUG)
     
     try:
+        report_file_name = f"vm-protection-report-{timestamp}.txt"
         backup_location_name = args.backup_location
         bl_name, bl_uid = get_backup_location_by_name(backup_location_name)
         # Get cluster info
@@ -1373,7 +1374,7 @@ def main():
             suspended_info,
             resumed_info,
             schedules_created,
-            report_file_path="vm_protection_report.txt"
+            report_file_path=report_file_name
         )
         if distribution_result:
             for p_name, data in distribution_result.items():
@@ -1399,9 +1400,9 @@ def main():
         # Join lines into a single report string
         report_str = "".join(lines)
         # Append report_str in vm_protection_report.txt file
-        with open("vm_protection_report.txt", "a") as f:
+        with open(report_file_name, "a") as f:
             f.write(report_str)
-        print("Please check vm_protection_report.txt for detailed report")
+        print(f"Please check {report_file_name} for detailed report")
 
     except Exception as e:
         logging.error(f"Error: {e}")
