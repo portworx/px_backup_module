@@ -18,6 +18,7 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[
         logging.FileHandler(LOG_FILE),
+        logging.StreamHandler(),
     ]
 )
 
@@ -306,6 +307,7 @@ def invoke_backup(resources, backup_info):
     # Construct include_resources dynamically
     include_resources = []
     vm_namespaces = backup_info.get("backup_info", {}).get("namespaces", [])
+    vscMap = backup_info.get("backup_info", {}).get("volume_snapshot_class_mapping", {})
 
     # for entry in vm_map:  # vm_map is a list of dicts
     #     namespace = entry.get("namespace")
@@ -335,6 +337,7 @@ def invoke_backup(resources, backup_info):
                 "backup_type": "Normal",
                 "backup_object_type": "VirtualMachine",
                 "skip_vm_auto_exec_rules": True,
+                "volume_snapshot_class_mapping": vscMap,
             }],
             "vm_namespaces": vm_namespaces,  # Pass extracted namespaces
             "include_resources": resources  # Pass extracted include_resources
@@ -485,7 +488,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.verbose:
-        logging.setLevel(logging.DEBUG)
+        logging.getLogger().setLevel(logging.DEBUG)
 
     cluster_uid = enumerate_cluster(args.cluster_name)
     logging.info(f"Backing up cluster: {args.cluster_name} with uid {cluster_uid}")
