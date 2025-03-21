@@ -11,7 +11,7 @@ import yaml
 import logging
 
 
-timestamp = datetime.now().strftime("%d%m%Y_%H%M%S")
+timestamp = datetime.datetime.now().strftime("%d%m%Y_%H%M%S")
 LOG_FILE = f"retry-failed-logs_{timestamp}.log"
 logging.basicConfig(
     level=logging.INFO,
