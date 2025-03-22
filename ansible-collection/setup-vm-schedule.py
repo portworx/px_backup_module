@@ -25,6 +25,7 @@ from datetime import datetime, timedelta
 # Third-party imports
 import yaml
 from kubernetes import client, config
+from tabulate import tabulate
 
 # Set up logging
 LOG_FILE = "setup-vm-schedule.log"
@@ -1159,6 +1160,41 @@ def create_kubeconfig(cluster_file, dry_run=False):
         raise ValueError(f"Failed to process cluster file: {e}")
 
 
+def extract_pvc_name_from_volume(vol):
+    """
+    Extracts the PVC name reference from a volume in a VirtualMachine spec.
+    The function checks for three possible keys:
+      - If the volume has a "persistentVolumeClaim", it returns its 'claimName'.
+      - Else if the volume has a "dataVolume", it returns its 'name'.
+      - Else if the volume is defined as a "containerDisk", it returns the volume's own name.
+    Returns None if none of these are present.
+    """
+    if "persistentVolumeClaim" in vol:
+        return vol["persistentVolumeClaim"].get("claimName")
+    elif "dataVolume" in vol:
+        return vol["dataVolume"].get("name")
+    # elif "containerDisk" in vol:
+    #     return vol.get("name")
+    # elif "cloudInitNoCloud" in vol:
+    #     return vol.get("name")
+    # elif "cloudInitConfigDrive" in vol:
+    #     return vol.get("name")
+    # elif "ephemeral" in vol:
+    #     return vol.get("name")
+    # elif "emptydisk" in vol:
+    #     return vol.get("name")
+    # elif "hostDisk" in vol:
+    #     return vol.get("name")
+    # elif "configMap" in vol:
+    #     return vol.get("name")
+    # elif "secret" in vol:
+    #     return vol.get("name")
+    # elif "serviceAccount" in vol:
+    #     return vol.get("name")
+    # elif "downwardMetrics" in vol:
+    #     return vol.get("name")
+    return None
+
 def get_inventory(ns_list, kubeconfig_file, dry_run=False):
     """
     Get inventory of all VirtualMachine resources in the cluster
@@ -1175,8 +1211,10 @@ def get_inventory(ns_list, kubeconfig_file, dry_run=False):
         ValueError: If there's an error accessing the cluster
     """
     logging.info(f"Getting VM inventory from {len(ns_list)} namespaces")
-    
+
     vm_map = {}
+    fada_vm = {}
+
     try:
         # Always load the actual inventory
         config.load_kube_config(kubeconfig_file)
@@ -1189,7 +1227,35 @@ def get_inventory(ns_list, kubeconfig_file, dry_run=False):
         group = "kubevirt.io"
         version = "v1"
         plural = "virtualmachines"
-        
+
+        storage_api = client.StorageV1Api()
+        core_api = client.CoreV1Api()
+
+        # List all storage classes
+        storage_classes = storage_api.list_storage_class()
+
+        # Set to store StorageClass names with backend "pure_block"
+        pure_block_storageclasses = set()
+        for sc in storage_classes.items:
+            parameters = sc.parameters or {}
+            backend = parameters.get("backend")
+            if backend == "pure_block":
+                pure_block_storageclasses.add(sc.metadata.name)
+
+        logging.debug(f"StorageClasses with backend 'pure_block': {pure_block_storageclasses}")
+
+        # Set to store PVC names using "pure_block" storage classes
+        pure_block_pvcs = set()
+        pvc_to_sc_map = {}  # Optional: map pvc name to its sc for debugging
+
+        for ns in ns_list:
+            pvcs = core_api.list_namespaced_persistent_volume_claim(namespace=ns)
+            for pvc in pvcs.items:
+                sc_name = pvc.spec.storage_class_name
+                if sc_name in pure_block_storageclasses:
+                    pure_block_pvcs.add(pvc.metadata.name)
+                    pvc_to_sc_map[pvc.metadata.name] = sc_name
+
         for ns in ns_list:
             try:
                 # List all VirtualMachine custom objects in the namespace
@@ -1206,19 +1272,42 @@ def get_inventory(ns_list, kubeconfig_file, dry_run=False):
                     name = metadata.get("name")
                     if name:
                         vm_list.append(name)
-                
-                if vm_list:  # Only add namespace if it has VMs
+
+                if vm_list:
                     vm_map[ns] = vm_list
                     logging.info(f"Found {len(vm_list)} VMs in namespace {ns}")
-                
+
+                    for vm_name in vm_list:
+                        vm_obj = custom_api.get_namespaced_custom_object(
+                            group=group,
+                            version=version,
+                            namespace=ns,
+                            plural=plural,
+                            name=vm_name
+                        )
+                        volumes = vm_obj.get("spec", {}).get("template", {}).get("spec", {}).get("volumes", [])
+                        matched_pvcs = []
+
+                        for vol in volumes:
+                            pvc_name = extract_pvc_name_from_volume(vol)
+                            if pvc_name in pure_block_pvcs:
+                                matched_pvcs.append(pvc_name)
+
+                        if matched_pvcs:
+                            if ns not in fada_vm:
+                                fada_vm[ns] = {}
+                            fada_vm[ns][vm_name] = matched_pvcs
+
             except Exception as e:
                 logging.error(f"Error listing VirtualMachines in namespace {ns}: {e}")
                 raise ValueError(f"Failed to access namespace {ns}: {e}")
+
     except Exception as e:
         logging.error(f"Error loading kubeconfig or accessing cluster: {e}")
         raise ValueError(f"Failed to access cluster: {e}")
-    
-    return vm_map
+
+    logging.info(f"fada_vm result: {fada_vm}")
+    return vm_map, fada_vm
 
 
 def parse_time_series(time_series):
@@ -1379,6 +1468,19 @@ def parse_input_map(map_str):
             result[key.strip()] = value.strip()
     return result
 
+
+def print_fada_volumes(fada_vm):
+    print("\nList of FADA volumes\n")
+
+    table = []
+    for ns, vm_map in fada_vm.items():
+        for vm, pvc_list in vm_map.items():
+            table.append([ns, vm, ", ".join(pvc_list)])
+
+    headers = ["Namespace", "Virtual Machine", "FADA PVCs"]
+    print(tabulate(table, headers=headers, tablefmt="grid"))
+    logging.info("FADA volume inventory printed in tabular format.")
+
 def main():
     parser = argparse.ArgumentParser(description="Create backup schedules for virtual machines")
     parser.add_argument("--cluster", required=True, help="Name of the cluster to use (required)")
@@ -1461,7 +1563,7 @@ def main():
                 # For dry run, just use some example namespaces
                 ns_list = ["default", "kube-system"]
                 
-        vm_map = get_inventory(ns_list, kubeconfig_file, dry_run=args.dry_run)
+        vm_map, fada_vm = get_inventory(ns_list, kubeconfig_file, dry_run=args.dry_run)
         
         # Count total VMs
         total_vm_count = sum(len(vms) for vms in vm_map.values())
@@ -1560,6 +1662,7 @@ def main():
         # Print summary
         print_summary(args, results=results, policy_result=policy_result, vm_map=vm_map)
         log_summary(args, results=results, policy_result=policy_result, vm_map=vm_map)
+        print_fada_volumes(fada_vm)
         
         if results["failed_count"] > 0:
             logging.warning("\nSome backup schedules failed to be created. See result file for details.")
