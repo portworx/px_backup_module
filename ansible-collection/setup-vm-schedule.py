@@ -25,6 +25,7 @@ from datetime import datetime, timedelta
 # Third-party imports
 import yaml
 from kubernetes import client, config
+from tabulate import tabulate
 
 # Set up logging
 LOG_FILE = "setup-vm-schedule.log"
@@ -1159,66 +1160,128 @@ def create_kubeconfig(cluster_file, dry_run=False):
         raise ValueError(f"Failed to process cluster file: {e}")
 
 
+def extract_pvc_name_from_volume(vol):
+    """
+    Extracts the PVC name reference from a volume in a VirtualMachine spec.
+    The function checks for three possible keys:
+      - If the volume has a "persistentVolumeClaim", it returns its 'claimName'.
+      - Else if the volume has a "dataVolume", it returns its 'name'.
+      - Else if the volume is defined as a "containerDisk", it returns the volume's own name.
+    Returns None if none of these are present.
+    """
+    if "persistentVolumeClaim" in vol:
+        return vol["persistentVolumeClaim"].get("claimName")
+    elif "dataVolume" in vol:
+        return vol["dataVolume"].get("name")
+    # elif "containerDisk" in vol:
+    #     return vol.get("name")
+    # elif "cloudInitNoCloud" in vol:
+    #     return vol.get("name")
+    # elif "cloudInitConfigDrive" in vol:
+    #     return vol.get("name")
+    # elif "ephemeral" in vol:
+    #     return vol.get("name")
+    # elif "emptydisk" in vol:
+    #     return vol.get("name")
+    # elif "hostDisk" in vol:
+    #     return vol.get("name")
+    # elif "configMap" in vol:
+    #     return vol.get("name")
+    # elif "secret" in vol:
+    #     return vol.get("name")
+    # elif "serviceAccount" in vol:
+    #     return vol.get("name")
+    # elif "downwardMetrics" in vol:
+    #     return vol.get("name")
+    return None
+
 def get_inventory(ns_list, kubeconfig_file, dry_run=False):
     """
-    Get inventory of all VirtualMachine resources in the cluster
-    
+    Get inventory of all VirtualMachine resources in the cluster.
+
     Args:
-        ns_list (list): List of namespaces to check
-        kubeconfig_file (str): Path to the kubeconfig file
-        dry_run (bool, optional): If True, don't make any changes but still get real data
-        
+        kubeconfig_file (str): Path to the kubeconfig file.
+        ns_list (list): List of namespaces to check.
+        dry_run (bool, optional): If True, don't make any changes but still get real data.
+
     Returns:
-        dict: Dictionary mapping namespaces to lists of VM names
-        
-    Raises:
-        ValueError: If there's an error accessing the cluster
+        tuple: (vm_map, fada_vm)
     """
     logging.info(f"Getting VM inventory from {len(ns_list)} namespaces")
-    
     vm_map = {}
+    fada_vm = {}
+
     try:
-        # Always load the actual inventory
         config.load_kube_config(kubeconfig_file)
-        # Setup the cert
-        configuration = client.Configuration.get_default_copy()
-        configuration.ssl_ca_cert = "ca.crt"
-        api_client = client.ApiClient(configuration)
-        custom_api = client.CustomObjectsApi(api_client)
+        custom_api = client.CustomObjectsApi()
+        storage_api = client.StorageV1Api()
+        core_api = client.CoreV1Api()
 
         group = "kubevirt.io"
         version = "v1"
         plural = "virtualmachines"
-        
+
+        # Get pure_block storage classes
+        pure_block_storageclasses = {
+            sc.metadata.name
+            for sc in storage_api.list_storage_class().items
+            if (sc.parameters or {}).get("backend") == "pure_block"
+        }
+        logging.debug(f"pure_block storage classes: {pure_block_storageclasses}")
+
+        # For each namespace, handle PVCs and VMs
         for ns in ns_list:
+            pure_block_pvcs_in_ns = set()
+
             try:
-                # List all VirtualMachine custom objects in the namespace
-                result = custom_api.list_namespaced_custom_object(
+                # Get PVCs in this namespace
+                pvcs = core_api.list_namespaced_persistent_volume_claim(ns).items
+                for pvc in pvcs:
+                    if pvc.spec.storage_class_name in pure_block_storageclasses:
+                        pure_block_pvcs_in_ns.add(pvc.metadata.name)
+
+                # Get VMs in this namespace
+                vms = custom_api.list_namespaced_custom_object(
                     group=group,
                     version=version,
                     plural=plural,
                     namespace=ns,
-                )
-                # Iterate over each VirtualMachine and add to the map
-                vm_list = []
-                for item in result.get("items", []):
-                    metadata = item.get("metadata", {})
-                    name = metadata.get("name")
-                    if name:
-                        vm_list.append(name)
-                
-                if vm_list:  # Only add namespace if it has VMs
-                    vm_map[ns] = vm_list
-                    logging.info(f"Found {len(vm_list)} VMs in namespace {ns}")
-                
+                ).get("items", [])
+
+                if not vms:
+                    continue
+
+                vm_names = []
+                for vm in vms:
+                    name = vm.get("metadata", {}).get("name")
+                    if not name:
+                        continue
+                    vm_names.append(name)
+
+                    volumes = vm.get("spec", {}).get("template", {}).get("spec", {}).get("volumes", [])
+                    matched_pvcs = [
+                        pvc_name
+                        for pvc_name in (extract_pvc_name_from_volume(vol) for vol in volumes)
+                        if pvc_name and pvc_name in pure_block_pvcs_in_ns
+                    ]
+
+                    if matched_pvcs:
+                        fada_vm.setdefault(ns, {})[name] = matched_pvcs
+
+                if vm_names:
+                    vm_map[ns] = vm_names
+                    logging.info(f"Found {len(vm_names)} VMs in namespace {ns}")
+
             except Exception as e:
-                logging.error(f"Error listing VirtualMachines in namespace {ns}: {e}")
+                logging.error(f"Error processing namespace {ns}: {e}")
                 raise ValueError(f"Failed to access namespace {ns}: {e}")
+
     except Exception as e:
-        logging.error(f"Error loading kubeconfig or accessing cluster: {e}")
+        logging.error(f"Error accessing cluster: {e}")
         raise ValueError(f"Failed to access cluster: {e}")
-    
-    return vm_map
+
+    logging.info(f"Final fada_vm result: {fada_vm}")
+    return vm_map, fada_vm
 
 
 def parse_time_series(time_series):
@@ -1379,6 +1442,19 @@ def parse_input_map(map_str):
             result[key.strip()] = value.strip()
     return result
 
+
+def print_fada_volumes(fada_vm):
+    print("\nList of FADA volumes\n")
+
+    table = []
+    for ns, vm_map in fada_vm.items():
+        for vm, pvc_list in vm_map.items():
+            table.append([ns, vm, ", ".join(pvc_list)])
+
+    headers = ["Namespace", "Virtual Machine", "FADA PVCs"]
+    print(tabulate(table, headers=headers, tablefmt="grid"))
+    logging.info("FADA volume inventory printed in tabular format.")
+
 def main():
     parser = argparse.ArgumentParser(description="Create backup schedules for virtual machines")
     parser.add_argument("--cluster", required=True, help="Name of the cluster to use (required)")
@@ -1461,7 +1537,7 @@ def main():
                 # For dry run, just use some example namespaces
                 ns_list = ["default", "kube-system"]
                 
-        vm_map = get_inventory(ns_list, kubeconfig_file, dry_run=args.dry_run)
+        vm_map, fada_vm = get_inventory(ns_list, kubeconfig_file, dry_run=args.dry_run)
         
         # Count total VMs
         total_vm_count = sum(len(vms) for vms in vm_map.values())
@@ -1560,6 +1636,7 @@ def main():
         # Print summary
         print_summary(args, results=results, policy_result=policy_result, vm_map=vm_map)
         log_summary(args, results=results, policy_result=policy_result, vm_map=vm_map)
+        print_fada_volumes(fada_vm)
         
         if results["failed_count"] > 0:
             logging.warning("\nSome backup schedules failed to be created. See result file for details.")
