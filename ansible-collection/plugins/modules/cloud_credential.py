@@ -1,8 +1,14 @@
-"- #!/usr/bin/python"
+#!/usr/bin/python
 # -*- coding: utf-8 -*-
 
 """
 PX-Backup Cloud Credential Management Module
+
+This Ansible module manages cloud credential in PX-Backup, providing operations for:
+- Creating new cloud credential
+- Updating existing cloud credential
+- Deleting cloud credential
+- Inspecting cloud credential (single or all)
 """
 
 from __future__ import absolute_import, division, print_function
