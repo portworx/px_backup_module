@@ -168,7 +168,7 @@ def get_failed_backups(file_path, min_last_update, tz_str=None):
     for backup in data.get("backups", []):
         status = backup.get("backup_info", {}).get("status", {}).get("status")
         backup_type = backup.get("backup_info", {}).get("backup_object_type", {}).get("type")
-        last_update_str = backup.get("metadata", {}).get("last_update_time")
+        last_update_str = backup.get("metadata", {}).get("create_time")
         if not last_update_str:
             continue
 
@@ -522,6 +522,4 @@ if __name__ == "__main__":
         backup_info = load_json(file_path)
 
         new_backup_name = invoke_backup(resources, backup_info)
-        logging.debug("Created retry backup for failed VMs: ", new_backup_name)
-        # sleep for 2 minutes
-        time.sleep(120)
+        logging.debug(f"Created retry backup for failed VMs: {new_backup_name}")
