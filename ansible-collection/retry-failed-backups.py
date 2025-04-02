@@ -254,7 +254,7 @@ def get_resources_from_backup(file_path):
     with open(file_path, 'r') as f:
         data = json.load(f)
 
-    resources = data.get("backup_info", {}).get("include_resources", [])
+    resources = data.get("backup_info", {}).get("resources", [])
     return resources
 
 def create_yaml_file(vm_map, output_filename):
@@ -482,14 +482,23 @@ def inspect_cluster(cluster_name):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Backup Processing Script")
     parser.add_argument("--cluster-name", required=True, help="Name of the application cluster")
-    parser.add_argument("--timestamp", required=True,
-                        help="Timestamp for filtering failed backups in MM/DD/YYYY HH:MMAM/PM format e.g., 03/18/2025 07:25AM")
+    parser.add_argument("--timestamp", required=False,
+                        help="Timestamp for filtering failed backups in MM/DD/YYYY HH:MMAM/PM format "
+                             "e.g., 03/18/2025 07:25AM")
+    parser.add_argument("--hours-ago", type=int,
+                        help="Number of hours ago to use if no timestamp is provided. Defaults to 12.")
     parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose logging")
     parser.add_argument("--dry-run", action="store_true", help="Dry run mode")
 
     args = parser.parse_args()
     print(f"Logs are getting captured at {LOG_FILE}")
     retried_backups = []
+
+    if not args.timestamp:
+        hours = args.hours_ago if args.hours_ago else 12
+        hours_ago_time = datetime.datetime.now() - datetime.timedelta(hours=hours)
+        args.timestamp = hours_ago_time.strftime("%m/%d/%Y %I:%M%p")
+        logging.info(f"No timestamp provided. Defaulting to {hours} hours ago: {args.timestamp}")
 
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)

@@ -667,7 +667,7 @@ def update_schedules(matching_schedules, suspend=False):
     return
 
 
-def suspend_schedules(ns_vm_map, active_ns_vm_schedules):
+def suspend_schedules(ns_vm_map, active_ns_vm_schedules, dry_run=False):
     """
     Suspends schedules for VMs that no longer exist in the cluster.
 
@@ -710,17 +710,18 @@ def suspend_schedules(ns_vm_map, active_ns_vm_schedules):
                     suspended_info[namespace] = {}
                 suspended_info[namespace][vm_name] = schedule_name
 
-    if to_suspend:
-        logging.info(f"Suspending {len(to_suspend)} schedules for VMs no longer in the cluster")
-        # Call your actual suspend function, passing the list of schedule objects
-        update_schedules(to_suspend, suspend=True)
-    else:
-        logging.info("No schedules to suspend (all VMs are still present)")
+    if not dry_run:
+        if to_suspend:
+            logging.info(f"Suspending {len(to_suspend)} schedules for VMs no longer in the cluster")
+            # Call your actual suspend function, passing the list of schedule objects
+            update_schedules(to_suspend, suspend=True)
+        else:
+            logging.info("No schedules to suspend (all VMs are still present)")
 
     return suspended_info
 
 
-def resume_schedules(ns_vm_map, suspended_ns_vm_schedules):
+def resume_schedules(ns_vm_map, suspended_ns_vm_schedules, dry_run=False):
     """
     Resumes schedules for VMs that are currently suspended but have reappeared in the cluster.
 
@@ -777,13 +778,13 @@ def resume_schedules(ns_vm_map, suspended_ns_vm_schedules):
 
                 # Collect the schedule object in a list to pass to update_schedules
                 to_resume.append(schedule_obj)
-
-    if to_resume:
-        logging.info(f"Resuming {len(to_resume)} schedules for VMs that reappeared in the cluster")
-        # Actually resume them by calling your update function with suspend=False
-        update_schedules(to_resume, suspend=False)
-    else:
-        logging.info("No schedules to resume (no suspended VMs re-appeared in the cluster)")
+    if not dry_run:
+        if to_resume:
+            logging.info(f"Resuming {len(to_resume)} schedules for VMs that reappeared in the cluster")
+            # Actually resume them by calling your update function with suspend=False
+            update_schedules(to_resume, suspend=False)
+        else:
+            logging.info("No schedules to resume (no suspended VMs re-appeared in the cluster)")
 
     return resumed_info
 
@@ -942,11 +943,18 @@ def print_namespace_vm_schedules(ns_vm_map):
     }
     """
     for namespace, vms in ns_vm_map.items():
-        logging.info(namespace)
+        print(f"\n{namespace}")
         for vm, schedule in vms.items():
             metadata = schedule.get("metadata", {})
             schedule_name = metadata.get("name", "")
-            logging.info(f"  {vm} => {schedule_name}")
+            print(f"  {vm} => {schedule_name}")
+
+
+def print_new_vm_schedules(ns_vm_map):
+    for namespace, vms in ns_vm_map.items():
+        print(f"\n{namespace}")
+        for vm in vms:
+            print(f"  {vm}")
 
 
 def enumerate_schedule_policies(name_filter=None):
@@ -1132,8 +1140,9 @@ def distribute_vms_schedules(new_vms_map, policy_dict, backup_location_ref, clus
     schedules_created = {}
     for p_name, data in distribution.items():
         for namespace, vm_name in data["vms"]:
-            success, backup_schedule_name = create_vm_backup_schedule(vm_name, namespace, p_name, data["policy_uid"], backup_location_ref, cluster_ref,
-                                      csi_driver_map)
+            success, backup_schedule_name = create_vm_backup_schedule(vm_name, namespace, p_name, data["policy_uid"],
+                                                                      backup_location_ref, cluster_ref,
+                                                                      csi_driver_map)
             if success:
                 if namespace not in schedules_created:
                     schedules_created[namespace] = {}
@@ -1300,12 +1309,26 @@ def generate_report(
     with open(report_file_path, "w") as f:
         f.write(report_str)
 
+
+def print_info(info):
+    if info:
+        for ns, vm_dict in info.items():
+            print(f"\n{ns}:")
+            for vm, schedule in vm_dict.items():
+                print(f"      {vm} -> {schedule}")
+    else:
+        print("    (None)\n")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Synchronize VM backup schedules with current VM inventory")
-    parser.add_argument("--cluster", required=True, help="Name of the cluster to use")
-    parser.add_argument("--namespaces", nargs="+", help="List of namespaces to check (if not specified, checks all namespaces)")
+    parser.add_argument("--cluster-name", required=True, help="Name of the cluster to use")
+    parser.add_argument("--cluster-uid", required=True, help="UID of the cluster to use")
+    parser.add_argument("--namespaces", nargs="+",
+                        help="List of namespaces to check (if not specified, checks all namespaces)")
     parser.add_argument("--backup-location", required=True, help="Name of the backup location to use (required)")
     parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose logging")
+    parser.add_argument("--dry-run", action="store_true", help="Dry run to list the vm list")
     parser.add_argument('--csiDriver_map', "-d", type=str, help='Map input in the form csiDriver1:VSC1,csiDriver2:VSC2')
     
     args = parser.parse_args()
@@ -1317,9 +1340,11 @@ def main():
     try:
         report_file_name = f"vm-protection-report-{timestamp}.txt"
         backup_location_name = args.backup_location
+        cluster_name = args.cluster_name
+        cluster_uid = args.cluster_uid
         bl_name, bl_uid = get_backup_location_by_name(backup_location_name)
         # Get cluster info
-        cluster_name, cluster_uid = get_cluster_info(args.cluster)
+
         logging.info(f"Using cluster: {cluster_name} (UID: {cluster_uid})")
         
         # Inspect cluster and create kubeconfig
@@ -1353,17 +1378,32 @@ def main():
         
         # Extract VM information from schedules
         active_ns_vm_schedules, suspended_ns_vm_schedules, all_ns_vm_schedules = extract_vm_schedules(schedules)
+        new_vm_map = get_new_vms(ns_vm_map, all_ns_vm_schedules)
+
+        logging.info("Active vm schedules:")
         print_namespace_vm_schedules(active_ns_vm_schedules)
+
+        logging.info("Suspended vm schedules:")
         print_namespace_vm_schedules(suspended_ns_vm_schedules)
+
+        logging.info("All vm schedules:")
         print_namespace_vm_schedules(all_ns_vm_schedules)
 
-        suspended_info = suspend_schedules(ns_vm_map, active_ns_vm_schedules)
-        logging.info(suspended_info)
+        logging.info("New VMs:")
+        print_new_vm_schedules(new_vm_map)
 
+        suspended_info = suspend_schedules(ns_vm_map, active_ns_vm_schedules, args.dry_run)
+        logging.info("Schedules to suspend:")
+        print_info(suspended_info)
 
         # VMs to add (in inventory but no active schedule)
-        resumed_info = resume_schedules(ns_vm_map, suspended_ns_vm_schedules)
-        logging.info(resumed_info)
+        resumed_info = resume_schedules(ns_vm_map, suspended_ns_vm_schedules, args.dry_run)
+        logging.info("Schedules to resume:")
+        print_info(resumed_info)
+
+        if args.dry_run:
+            logging.info("Dry run mode: No changes made, exiting gracefully.")
+            exit(0)  # Exit with success status code
 
         backup_location_ref = {
             "name": bl_name,
@@ -1373,9 +1413,9 @@ def main():
             "name": cluster_name,
             "uid": cluster_uid
         }
-        new_vm_map = get_new_vms(ns_vm_map, all_ns_vm_schedules)
-        distribution_result, schedules_created = distribute_vms_schedules(new_vm_map, matched_policies, backup_location_ref, cluster_ref, parse_input_map(args.csiDriver_map))
-
+        distribution_result, schedules_created = distribute_vms_schedules(new_vm_map, matched_policies,
+                                                                          backup_location_ref, cluster_ref,
+                                                                          parse_input_map(args.csiDriver_map))
 
         generate_report(
             ns_vm_map,
