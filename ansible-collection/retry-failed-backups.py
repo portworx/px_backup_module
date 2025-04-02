@@ -1,15 +1,14 @@
 import argparse
 import datetime
 import json
-import os
+import logging
 import re
 import subprocess
 import time
+from collections import defaultdict
 from zoneinfo import ZoneInfo
 
 import yaml
-import logging
-
 
 timestamp = datetime.datetime.now().strftime("%d%m%Y_%H%M%S")
 LOG_FILE = f"retry-failed-logs_{timestamp}.log"
@@ -257,6 +256,174 @@ def get_resources_from_backup(file_path):
     resources = data.get("backup_info", {}).get("resources", [])
     return resources
 
+def get_resources_from_backup_schedule(file_path):
+    with open(file_path, 'r') as f:
+        data = json.load(f)
+
+    backup_schedule = data.get("backup_info", {}).get("backup_schedule", {})
+    schedule_name = backup_schedule.get("name")
+    schedule_uid = backup_schedule.get("uid")
+
+    schedule_inspect_response = inspect_backup_schedule(schedule_name, schedule_uid, dry_run=args.dry_run, verbose=args.verbose)
+    logging.info(
+        f"Successfully retrieved schedule: {schedule_inspect_response.get('backup_schedule', {}).get('metadata', {}).get('name', '')}")
+    return schedule_inspect_response.get('backup_schedule', {}).get('backup_schedule_info', {}).get('include_resources', [])
+
+def inspect_backup_schedule(name, uid, org_id="default", dry_run=False, verbose=False):
+    """
+    Inspect a specific backup schedule in PX-Backup using Ansible
+
+    Args:
+        name (str): Name of the backup schedule to inspect
+        uid (str): UID of the backup schedule to inspect
+        org_id (str, optional): Organization ID. Defaults to "default".
+        dry_run (bool, optional): If True, don't actually run the command
+        verbose (bool, optional): If True, print detailed debug info
+
+    Returns:
+        dict: The backup schedule object if found, None otherwise
+    """
+    logging.info(f"Inspecting backup schedule: {name} (UID: {uid})")
+
+    if dry_run:
+        logging.debug(f"[DRY RUN] Would inspect backup schedule: {name}")
+        return {"metadata": {"name": name, "uid": uid}, "backup_schedule_info": {}}
+
+    # Prepare extra vars for the Ansible command
+    extra_vars = {
+        "name": name,
+        "uid": uid,
+        "org_id": org_id
+    }
+
+    # Convert to JSON string
+    extra_vars_json = json.dumps(extra_vars)
+
+    # Run the Ansible command
+    cmd = [
+        "ansible-playbook", "examples/backup_schedule/inspect.yaml", "-vvvv",
+        "--extra-vars", extra_vars_json
+    ]
+
+    cmd_str = " ".join(cmd)
+    logging.info(f"Running command: {cmd_str}")
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        logging.info(f"Command completed with return code: {result.returncode}")
+
+        if verbose:
+            # Print first few lines of stdout and stderr if verbose is enabled
+            stdout_preview = "\n".join(result.stdout.splitlines()[:20])
+            stderr_preview = "\n".join(result.stderr.splitlines()[:20])
+            logging.info(f"Command stdout preview:\n{stdout_preview}\n...")
+            if result.stderr:
+                logging.info(f"Command stderr preview:\n{stderr_preview}\n...")
+
+        if result.returncode != 0:
+            error_msg = f"Failed to inspect backup schedule: {name}, return code: {result.returncode}"
+            if result.stderr:
+                error_msg += f"\nError output: {result.stderr[:500]}..."
+            logging.error(error_msg)
+            return None
+
+        # Extract backup schedule from output
+        stdout_text = result.stdout
+
+        if verbose:
+            # Save the full output to a file for debugging
+            debug_file = f"debug_backup_schedule_{name}_{int(time.time())}.log"
+            with open(debug_file, 'w') as f:
+                f.write(f"STDOUT:\n{result.stdout}\n\nSTDERR:\n{result.stderr}")
+            logging.info(f"Full command output saved to {debug_file}")
+
+        # Look for the inspection task output - match various possible task names
+        ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
+        cleaned_output = ansi_escape.sub('', stdout_text)
+
+        # 2) Regex to capture: "backup_schedule": { ... } block
+        #    - Use a non-greedy pattern, matching everything (including newlines) until the first closing '}'
+        task_pattern = (
+            r"(TASK \[List Backup Schedule\][\s\S]*?)"  # Capture block
+            r"(?=TASK \[|PLAY RECAP|$)"  # Stop at next task/play or end of file
+        )
+        task_match = re.search(task_pattern, cleaned_output)
+        if not task_match:
+            logging.error("Could not find 'TASK [List Backup Schedule]' block in the output.")
+            return {}
+
+        task_block = task_match.group(1)
+
+        # --- (2) Within that block, find the "backup_schedule": { ... } object ---
+
+        # Regex to locate "backup_schedule": followed by an opening brace
+        # --- 2) Locate `"backup_schedule": {` in that block ---
+        start_pattern = r'"backup_schedule"\s*:\s*\{'
+        start_match = re.search(start_pattern, task_block)
+        if not start_match:
+            logging.error("No 'backup_schedule' object found under 'TASK [List Backup Schedule]'.")
+            return {}
+
+        # Instead of jumping directly to the '{', we start at the beginning of `"backup_schedule":`
+        # so that substring includes `"backup_schedule": { ... }`
+        start_index = start_match.start()
+
+        # --- 3) Match braces from the '{' that follows "backup_schedule": ---
+        # Find the actual position of '{'
+        brace_char_pos = task_block.find('{', start_index)
+        if brace_char_pos == -1:
+            logging.error("Could not find opening brace after 'backup_schedule':")
+            return {}
+
+        brace_depth = 0
+        i = brace_char_pos
+        while i < len(task_block):
+            if task_block[i] == '{':
+                brace_depth += 1
+            elif task_block[i] == '}':
+                brace_depth -= 1
+                if brace_depth == 0:
+                    # Found matching closing brace
+                    break
+            i += 1
+
+        if brace_depth != 0:
+            logging.error("Mismatched braces in 'backup_schedule' JSON.")
+            return {}
+
+        # Substring from `"backup_schedule": {` up to the matching '}'
+        # e.g.  `"backup_schedule": { "backup_schedule_info": {...}, "metadata": {...} }`
+        snippet = task_block[start_index: i + 1]
+
+        # --- 4) Make it a valid top-level JSON by wrapping in curly braces ---
+        # Right now, `snippet` is something like:
+        #
+        #   "backup_schedule": {
+        #       "backup_schedule_info": ...,
+        #       "metadata": ...
+        #   }
+        #
+        # That is *not* valid JSON by itself. We want:
+        #
+        #   {
+        #     "backup_schedule": { ... }
+        #   }
+        #
+        # So we wrap it:
+        wrapped_json = '{' + snippet + '}'
+
+        # --- 5) Parse the final JSON ---
+        try:
+            parsed = json.loads(wrapped_json)
+            return parsed  # e.g.  { "backup_schedule": { ... } }
+        except json.JSONDecodeError as exc:
+            logging.error(f"Failed to parse 'backup_schedule' JSON: {exc}")
+            return {}
+
+    except Exception as e:
+        logging.error(f"Exception when inspecting backup schedule: {str(e)}")
+        return None
+
 def create_yaml_file(vm_map, output_filename):
     """
     Converts the vm_map (a dictionary mapping namespace -> list of VM names) into an array of objects.
@@ -306,7 +473,6 @@ def invoke_backup(resources, backup_info):
     cluster_ref = backup_info.get("backup_info", {}).get("cluster_ref", {})
 
     # Construct include_resources dynamically
-    include_resources = []
     vm_namespaces = backup_info.get("backup_info", {}).get("namespaces", [])
     vscMap = backup_info.get("backup_info", {}).get("volume_snapshot_class_mapping", {})
 
@@ -364,7 +530,7 @@ def invoke_backup(resources, backup_info):
     ansible_cmd = [
         "ansible-playbook", playbook_file, "-vvvv",
         "--extra-vars", f"vm_namespaces='{json.dumps(vm_namespaces)}'",
-        "--extra-vars", f"include_resources='{json.dumps(include_resources)}'",
+        "--extra-vars", f"include_resources='{json.dumps(resources)}'",
     ]
 
     result = subprocess.run(ansible_cmd, capture_output=True, text=True)
@@ -516,20 +682,26 @@ if __name__ == "__main__":
         backup_uid = backup.get("metadata", {}).get("uid")
         # Inspect Backup
         file_path = inspect_backup(backup_name, backup_uid)
-        vms_in_backup = get_all_vms_from_backup(file_path)
-        lines.append(f"\nVMs found in {backup_name}:\n")
-        for ns, vms in vms_in_backup.items():
-            lines.append(f"Namespace: {ns}\n")
-            for vm in vms:
-                lines.append(f"  - {vm}\n")
         retried_backups.append(backup_name)
-        logging.debug(json.dumps(vms_in_backup, indent=2))
-        resources = get_resources_from_backup(file_path)
+        resources = get_resources_from_backup_schedule(file_path)
+        lines.append(f"\nVMs found in {backup_name}:\n")
+        grouped = defaultdict(list)
+        for resource in resources:
+            ns = resource.get("namespace")
+            vm = resource.get("name")
+            grouped[ns].append(vm)
+
+            for ns, vm_names in grouped.items():
+                lines.append(f"Namespace: {ns}\n")
+                for vm_name in vm_names:
+                    lines.append(f"  - {vm}\n")
+
         backup_info = load_json(file_path)
         if args.dry_run:
             logging.info("Dry run mode enabled. Skipping backup invocation.")
             continue
         logging.info(f"Invoking backup: {backup_name} with uid {backup_uid}")
+        logging.info(f"Resources to be backed up: {resources}")
         new_backup_name = invoke_backup(resources, backup_info)
         logging.debug(f"Created retry backup for failed VMs: {new_backup_name}")
     if retried_backups:

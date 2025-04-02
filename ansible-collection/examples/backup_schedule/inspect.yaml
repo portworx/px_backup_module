@@ -10,14 +10,14 @@
     - name: Login and fetch Px-Backup token
       include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
 
-    - name: List  Backup Schedule
+    - name: List Backup Schedule
       backup_schedule:
         operation: INSPECT_ONE
         api_url: "{{ px_backup_api_url }}"
         token: "{{ px_backup_token }}"
         org_id: "{{ org_id }}"
-        uid: "092c9ac5-fe55-4eb5-b7c5-23d45eb0a95e"
-        name: "bs-1"
+        uid: "{{ uid }}"
+        name: "{{ name }}"
 
 
 
