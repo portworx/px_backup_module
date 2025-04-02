@@ -648,6 +648,7 @@ def inspect_cluster(cluster_name):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Backup Processing Script")
     parser.add_argument("--cluster-name", required=True, help="Name of the application cluster")
+    parser.add_argument("--cluster-uid", required=True, help="UID of the cluster to use")
     parser.add_argument("--timestamp", required=False,
                         help="Timestamp for filtering failed backups in MM/DD/YYYY HH:MMAM/PM format "
                              "e.g., 03/18/2025 07:25AM")
@@ -669,9 +670,10 @@ if __name__ == "__main__":
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
 
-    cluster_uid = enumerate_cluster(args.cluster_name)
-    logging.info(f"Backing up cluster: {args.cluster_name} with uid {cluster_uid}")
-    enumerate_response = get_all_backups(args.cluster_name, cluster_uid)
+    cluster_name = args.cluster_name
+    cluster_uid = args.cluster_uid
+    logging.info(f"Backing up cluster: {cluster_name} with uid {cluster_uid}")
+    enumerate_response = get_all_backups(cluster_name, cluster_uid)
     failed_backups = get_failed_backups(enumerate_response, args.timestamp)
     # print only the backup name from the failed backups
     failed_backup_names = [backup.get("metadata", {}).get("name") for backup in failed_backups]
@@ -705,7 +707,7 @@ if __name__ == "__main__":
         new_backup_name = invoke_backup(resources, backup_info)
         logging.debug(f"Created retry backup for failed VMs: {new_backup_name}")
     if retried_backups:
-        lines.append(f"\n\nBackups which will be retried\n")
+        lines.append(f"\n\nBackups which will be retried:\n")
         for backup in retried_backups:
             lines.append(f"{backup}\n")
 
