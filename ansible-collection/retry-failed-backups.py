@@ -210,10 +210,11 @@ def inspect_backup(backup_name, backup_uid):
     # Run the command
     result = subprocess.run(cmd, capture_output=True, text=True)
 
-    logging.debug(f"Ansible command completed with return code: {result.returncode}")
+    logging.info(f"Ansible command completed with return code: {result.returncode}")
 
     # Extract stdout
     stdout_text = result.stdout
+    logging.debug(f"Ansible stdout: {stdout_text}")
 
     if not stdout_text:
         logging.error("No output from Ansible playbook.")
@@ -243,7 +244,7 @@ def inspect_backup(backup_name, backup_uid):
         output_file = f"backup_data_{backup_name}.json"
         with open(output_file, "w") as json_file:
             json.dump(parsed_json, json_file, indent=4)
-        logging.debug(f"Extracted backup data successfully. File saved as {output_file}")
+        logging.info(f"Extracted backup data successfully. File saved as {output_file}")
         return output_file
 
     except json.JSONDecodeError as e:
@@ -405,7 +406,7 @@ def get_all_vms_from_backup(file_path):
     with open(file_path, 'r') as f:
         data = json.load(f)
 
-    resources = data.get("backup_info", {}).get("include_resources", [])
+    resources = data.get("backup_info", {}).get("resources", [])
     vm_map = {}
     for resource in resources:
         if resource.get("group") == "kubevirt.io" and resource.get("kind") == "VirtualMachine":
@@ -484,9 +485,11 @@ if __name__ == "__main__":
     parser.add_argument("--timestamp", required=True,
                         help="Timestamp for filtering failed backups in MM/DD/YYYY HH:MMAM/PM format e.g., 03/18/2025 07:25AM")
     parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose logging")
+    parser.add_argument("--dry-run", action="store_true", help="Dry run mode")
 
     args = parser.parse_args()
     print(f"Logs are getting captured at {LOG_FILE}")
+    retried_backups = []
 
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
@@ -498,28 +501,35 @@ if __name__ == "__main__":
     # print only the backup name from the failed backups
     failed_backup_names = [backup.get("metadata", {}).get("name") for backup in failed_backups]
     logging.debug(f"Enumerated backup list: {failed_backup_names}")
+    lines = ["*** Summary of backups to be retried ***\n"]
     for backup in failed_backups:
         backup_name = backup.get("metadata", {}).get("name")
         backup_uid = backup.get("metadata", {}).get("uid")
         # Inspect Backup
         file_path = inspect_backup(backup_name, backup_uid)
         vms_in_backup = get_all_vms_from_backup(file_path)
-        # logging.debug the failed VM names and namespaces
-        logging.debug(f"VMs in failed backup {backup_name}:")
+        lines.append(f"\nVMs found in {backup_name}:\n")
+        for ns, vms in vms_in_backup.items():
+            lines.append(f"Namespace: {ns}\n")
+            for vm in vms:
+                lines.append(f"  - {vm}\n")
+        retried_backups.append(backup_name)
         logging.debug(json.dumps(vms_in_backup, indent=2))
         resources = get_resources_from_backup(file_path)
-        # logging.debug("\nMapping of namespace to KubeVirt VM names referencing a failed PVC:")
-        # logging.debug(json.dumps(resources, indent=2))
-
-        # Create the YAML file as an array of objects with each object having the keys "namespace" and "vmlist"
-        # yaml_filename = create_yaml_file(resources, backup_name)
-        # logging.debug(f"VM list saved to {yaml_filename}")
-        #
-        # # Load VM mapping (YAML)
-        # vm_map = load_yaml(yaml_filename)
-        #
-        # Load backup info (JSON)
         backup_info = load_json(file_path)
-
+        if args.dry_run:
+            logging.info("Dry run mode enabled. Skipping backup invocation.")
+            continue
+        logging.info(f"Invoking backup: {backup_name} with uid {backup_uid}")
         new_backup_name = invoke_backup(resources, backup_info)
         logging.debug(f"Created retry backup for failed VMs: {new_backup_name}")
+    if retried_backups:
+        lines.append(f"\n\nBackups which will be retried\n")
+        for backup in retried_backups:
+            lines.append(f"{backup}\n")
+
+    report_file_name = f"retry-failed-backups-{timestamp}.txt"
+    report_str = "".join(lines)
+    with open(report_file_name, "a") as f:
+        f.write(report_str)
+    print(f"Please check {report_file_name} for detailed report")
