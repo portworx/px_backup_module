@@ -211,12 +211,19 @@ def enumerate_clusters(name_filter: Optional[str] = None) -> List[Dict[str, Any]
             return []
     
     task_output = task_match.group(2)
+    logging.info(f"Enumerated clusters: {task_output}")
+    ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
+    task_output_clean = ansi_escape.sub('', task_output)
+    stdout_text_clean = ansi_escape.sub('', stdout_text)
+
+    # Regex to capture the "clusters": [ ... ] block (non-greedy)
+    pattern = r'"clusters"\s*:\s*(\[[\s\S]*?\])'
     
     # Try to extract JSON
-    json_match = re.search(r'"clusters"\s*:\s*(\[.*?\])', task_output, re.DOTALL)
+    json_match = re.search(pattern, task_output_clean, re.DOTALL)
     if not json_match:
         # Try to find the clusters JSON in the entire output as a fallback
-        json_match = re.search(r'"clusters"\s*:\s*(\[.*?\])', stdout_text, re.DOTALL)
+        json_match = re.search(r'"clusters"\s*:\s*(\[[\s\S]*?\])', stdout_text_clean, re.DOTALL)
         if not json_match:
             logging.error("Could not extract clusters list from task output")
             return []
