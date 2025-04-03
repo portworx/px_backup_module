@@ -253,7 +253,7 @@ def get_resources_from_backup(file_path):
     with open(file_path, 'r') as f:
         data = json.load(f)
 
-    resources = data.get("backup_info", {}).get("resources", [])
+    resources = data.get("backup_info", {}).get("include_resources", [])
     return resources
 
 def get_resources_from_backup_schedule(file_path):
@@ -264,12 +264,21 @@ def get_resources_from_backup_schedule(file_path):
     schedule_name = backup_schedule.get("name")
     schedule_uid = backup_schedule.get("uid")
 
-    schedule_inspect_response = inspect_backup_schedule(schedule_name, schedule_uid, dry_run=args.dry_run, verbose=args.verbose)
+    schedule_inspect_response = inspect_backup_schedule(schedule_name, schedule_uid, verbose=args.verbose)
     logging.info(
         f"Successfully retrieved schedule: {schedule_inspect_response.get('backup_schedule', {}).get('metadata', {}).get('name', '')}")
     return schedule_inspect_response.get('backup_schedule', {}).get('backup_schedule_info', {}).get('include_resources', [])
 
-def inspect_backup_schedule(name, uid, org_id="default", dry_run=False, verbose=False):
+def is_scheduled_backup(file_path):
+    with open(file_path, 'r') as f:
+        data = json.load(f)
+    backup_schedule = data.get("backup_info", {}).get("backup_schedule", {})
+    if backup_schedule:
+        return True
+    else:
+        return False
+
+def inspect_backup_schedule(name, uid, org_id="default", verbose=False):
     """
     Inspect a specific backup schedule in PX-Backup using Ansible
 
@@ -284,10 +293,6 @@ def inspect_backup_schedule(name, uid, org_id="default", dry_run=False, verbose=
         dict: The backup schedule object if found, None otherwise
     """
     logging.info(f"Inspecting backup schedule: {name} (UID: {uid})")
-
-    if dry_run:
-        logging.debug(f"[DRY RUN] Would inspect backup schedule: {name}")
-        return {"metadata": {"name": name, "uid": uid}, "backup_schedule_info": {}}
 
     # Prepare extra vars for the Ansible command
     extra_vars = {
@@ -685,7 +690,12 @@ if __name__ == "__main__":
         # Inspect Backup
         file_path = inspect_backup(backup_name, backup_uid)
         retried_backups.append(backup_name)
-        resources = get_resources_from_backup_schedule(file_path)
+        if is_scheduled_backup(file_path):
+            logging.info(f"Fetching resources for scheduled backup: {backup_name}")
+            resources = get_resources_from_backup_schedule(file_path)
+        else:
+            logging.info(f"Fetching resources for manual backup: {backup_name}")
+            resources = get_resources_from_backup(file_path)
         lines.append(f"\nVMs found in {backup_name}:\n")
         grouped = defaultdict(list)
         for resource in resources:
@@ -693,17 +703,17 @@ if __name__ == "__main__":
             vm = resource.get("name")
             grouped[ns].append(vm)
 
-            for ns, vm_names in grouped.items():
-                lines.append(f"Namespace: {ns}\n")
-                for vm_name in vm_names:
-                    lines.append(f"  - {vm}\n")
+        for ns, vm_names in grouped.items():
+            lines.append(f"Namespace: {ns}\n")
+            for vm_name in vm_names:
+                lines.append(f"  - {vm_name}\n")
 
-        backup_info = load_json(file_path)
+        logging.debug(f"Resources to be backed up: {resources}")
         if args.dry_run:
             logging.info("Dry run mode enabled. Skipping backup invocation.")
             continue
+        backup_info = load_json(file_path)
         logging.info(f"Invoking backup: {backup_name} with uid {backup_uid}")
-        logging.info(f"Resources to be backed up: {resources}")
         new_backup_name = invoke_backup(resources, backup_info)
         logging.debug(f"Created retry backup for failed VMs: {new_backup_name}")
     if retried_backups:
