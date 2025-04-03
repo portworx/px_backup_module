@@ -62,7 +62,7 @@ def generate_report(args, results=None, error=None, policy_result=None, vm_map=N
     
     # Command line arguments
     report.append("COMMAND LINE ARGUMENTS:")
-    report.append(f"  Cluster: {args.cluster}")
+    report.append(f"  Cluster: {args.cluster_name}")
     report.append(f"  Backup Location: {args.backup_location}")
     report.append(f"  Time Series: {args.time_series}")
     report.append(f"  Namespaces: {args.namespaces if args.namespaces else 'All namespaces'}")
@@ -221,7 +221,7 @@ def print_summary(args, results=None, policy_result=None, vm_map=None):
     # Input parameters
     print(f"\n{'INPUT PARAMETERS':^80}")
     print(f"{'=' * 16:^80}")
-    print(f"Cluster:         {args.cluster}")
+    print(f"Cluster:         {args.cluster_name}")
     print(f"Backup Location: {args.backup_location}")
     print(f"Time Series:     {args.time_series}")
     print(f"Dry Run:         {'Yes' if args.dry_run else 'No'}")
@@ -340,7 +340,7 @@ def log_summary(args, results=None, policy_result=None, vm_map=None):
 
     logging.info(f"\n{'INPUT PARAMETERS':^80}")
     logging.info(f"{'=' * 16:^80}")
-    logging.info(f"Cluster:         {args.cluster}")
+    logging.info(f"Cluster:         {args.cluster_name}")
     logging.info(f"Backup Location: {args.backup_location}")
     logging.info(f"Time Series:     {args.time_series}")
     logging.info(f"Dry Run:         {'Yes' if args.dry_run else 'No'}")
@@ -599,34 +599,55 @@ def enumerate_backup_locations(name_filter=None, dry_run=False):
     
     # Extract backup locations from output
     stdout_text = result.stdout
-    
-    # Look for the backup locations task output - match various possible task names
-    task_match = re.search(r"TASK \[(Enumerate backup locations|Backup Location Enumerate call)].*?\n(.*?)\nTASK ", stdout_text, re.DOTALL)
+    ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
+    cleaned_output = ansi_escape.sub('', stdout_text)
+
+    task_pattern = (
+        r"(TASK \[Backup Location Enumerate call\][\s\S]*?)"
+        r"(?=TASK \[|PLAY RECAP|$)"
+    )
+    task_match = re.search(task_pattern, cleaned_output)
     if not task_match:
-        # Try looking for it at the end of the output (last task)
-        task_match = re.search(r"TASK \[(Enumerate backup locations|Backup Location Enumerate call)].*?\n(.*?)$", stdout_text, re.DOTALL)
-        if not task_match:
-            logging.error("Could not find backup locations task output")
-            return []
-    
-    task_output = task_match.group(2)
-    
-    # Try to extract JSON
-    json_match = re.search(r'"backup_locations"\s*:\s*(\[.*?\])', task_output, re.DOTALL)
-    if not json_match:
-        # Try to find the backup_locations JSON in the entire output as a fallback
-        json_match = re.search(r'"backup_locations"\s*:\s*(\[.*?\])', stdout_text, re.DOTALL)
-        if not json_match:
-            logging.error("Could not extract backup locations list from task output")
-            return []
-    
+        logging.error("Could not find 'TASK [Backup Location Enumerate call]' block in the output.")
+        return {}
+
+    task_block = task_match.group(1)
+
+    start_pattern = r'"backup_locations"\s*:\s*\['
+    start_match = re.search(start_pattern, task_block)
+    if not start_match:
+        logging.error("No 'backup_locations' array found in 'TASK [Backup Location Enumerate call]' block.")
+        return {}
+
+    start_index = task_block.find('[', start_match.start())
+    if start_index == -1:
+        logging.error("Could not find '[' after 'backup_locations':")
+        return {}
+
+    bracket_depth = 0
+    i = start_index
+    while i < len(task_block):
+        if task_block[i] == '[':
+            bracket_depth += 1
+        elif task_block[i] == ']':
+            bracket_depth -= 1
+            if bracket_depth == 0:
+                break
+        i += 1
+
+    if bracket_depth != 0:
+        logging.error("Mismatched brackets in 'backup_locations' JSON array.")
+        return {}
+
+    array_snippet = task_block[start_index: i + 1]
+    wrapped_json = '{ "backup_locations": ' + array_snippet + ' }'
+
     try:
-        locations_json = json_match.group(1)
-        locations = json.loads(locations_json)
-        return locations
-    except json.JSONDecodeError as e:
-        logging.error(f"Failed to parse backup locations JSON: {e}")
-        return []
+        parsed = json.loads(wrapped_json)
+        return parsed
+    except json.JSONDecodeError as exc:
+        logging.error(f"Failed to parse 'backup_locations' JSON: {exc}")
+        return {}
 
 
 def get_backup_location_by_name(location_name, dry_run=False):
@@ -645,19 +666,16 @@ def get_backup_location_by_name(location_name, dry_run=False):
         return location_name, "dry-run-location-uid"
     
     # First enumerate backup locations with the name filter
-    locations = enumerate_backup_locations(name_filter=location_name)
-    
-    if not locations:
-        logging.error(f"No backup locations found with name: {location_name}")
-        return None, None
-    
+    enumerate_response = enumerate_backup_locations(name_filter=location_name)
+
+    locations = enumerate_response.get("backup_locations", [])
+
     # Find exact match
     for location in locations:
         if location.get("metadata", {}).get("name") == location_name:
             location_uid = location.get("metadata", {}).get("uid")
             return location_name, location_uid
-    
-    # If no exact match, use the first one with partial match
+
     if locations:
         location = locations[0]
         location_name = location.get("metadata", {}).get("name")
@@ -812,7 +830,7 @@ def create_schedule_policy(policy_name, policy_time, dry_run=False):
                 "schedule_policy": {
                     "daily": {
                         "time": formatted_time,
-                        "retain": 5,
+                        "retain": 14,
                         "incremental_count": {
                             "count": 6
                         }
@@ -1381,7 +1399,8 @@ def parse_input_map(map_str):
 
 def main():
     parser = argparse.ArgumentParser(description="Create backup schedules for virtual machines")
-    parser.add_argument("--cluster", required=True, help="Name of the cluster to use (required)")
+    parser.add_argument("--cluster-name", required=True, help="Name of the cluster to use (required)")
+    parser.add_argument("--cluster-uid", required=True, help="UID of the cluster to use (required)")
     parser.add_argument("--backup-location", required=True, help="Name of the backup location to use (required)")
     parser.add_argument("--namespaces", nargs="+", help="List of namespaces to check (e.g., 'ns1' 'ns2')")
     parser.add_argument("--time-series", required=True, help="Comma-separated list of times in 24-hour format (e.g., '0100,0245,0350')")
@@ -1411,8 +1430,9 @@ def main():
         logging.info(f"Using time series: {', '.join(t.strftime('%H:%M') for t in time_series)}")
         
         # Get cluster info
-        cluster_name, cluster_uid = get_cluster_info(args.cluster, dry_run=args.dry_run)
-        logging.info(f"Using cluster: {cluster_name} (UID: {cluster_uid})")
+        cluster_name = args.cluster_name
+        cluster_uid = args.cluster_uid
+        logging.info(f"Backing up cluster: {cluster_name} with uid {cluster_uid}")
         
         # Get backup location info
         bl_name, bl_uid = get_backup_location_by_name(args.backup_location, dry_run=args.dry_run)
