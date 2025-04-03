@@ -264,12 +264,17 @@ def update_backup_schedule(module, client):
 def enumerate_backup_schedules(module, client):
     """List all backup schedule"""
     backup_location_ref = module.params.get('backup_location_ref', {})
+    cluster_ref = module.params.get('cluster_ref', {}) 
     enumerate_options = module.params.get('enumerate_options', {})
     params ={}
 
     if backup_location_ref:
         params['backup_location_ref.name'] = backup_location_ref.get('name')
         params['backup_location_ref.uid'] = backup_location_ref.get('uid')
+
+    if cluster_ref:
+        params['cluster_ref.name'] = cluster_ref.get('name')
+        params['cluster_ref.uid'] = cluster_ref.get('uid')
 
     if enumerate_options:
         time_range = enumerate_options.get("time_range", {})
@@ -366,8 +371,7 @@ def backup_schedule_request_body(module):
         backup_schedule_request['post_exec_rule_ref'] = module.params['post_exec_rule_ref']
         backup_schedule_request['post_exec_rule'] = module.params['post_exec_rule']
     
-    if module.params.get('backup_object_type') == 'VirtualMachine' and module.params.get('skip_vm_auto_exec_rules'):
-        backup_schedule_request['backup_object_type'] = module.params['backup_object_type']
+    if module.params.get('backup_object_type').get("type") == 'VirtualMachine' and module.params.get('skip_vm_auto_exec_rules'):
         backup_schedule_request['skip_vm_auto_exec_rules'] = module.params['skip_vm_auto_exec_rules']
 
     if module.params.get('exclude_resource_types'):
