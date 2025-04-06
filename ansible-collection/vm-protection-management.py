@@ -799,7 +799,9 @@ def get_backup_location_by_name(location_name):
         tuple: (location_name, location_uid) if found, otherwise (None, None)
     """
     # First enumerate backup locations with the name filter
-    locations = enumerate_backup_locations(name_filter=location_name)
+    enumerate_response = enumerate_backup_locations(name_filter=location_name)
+    locations = enumerate_response.get("backup_locations", [])
+    print(f"Enumerated backup locations: {locations}")
 
     if not locations:
         logging.error(f"No backup locations found with name: {location_name}")
@@ -822,17 +824,22 @@ def get_backup_location_by_name(location_name):
     return None, None
 
 
-def enumerate_backup_locations(name_filter=None):
+def enumerate_backup_locations(name_filter=None, dry_run=False):
     """
     Enumerate backup locations in PX-Backup using Ansible
 
     Args:
         name_filter (str, optional): Filter backup locations by name
+        dry_run (bool, optional): If True, don't actually run the command
 
     Returns:
         list: List of matching backup locations
     """
     logging.info(f"Enumerating backup locations with filter: {name_filter}")
+
+    if dry_run:
+        logging.debug(f"[DRY RUN] Would enumerate backup locations")
+        return []
 
     # Prepare extra vars for the Ansible command
     extra_vars = {}
@@ -848,8 +855,9 @@ def enumerate_backup_locations(name_filter=None):
         "--extra-vars", extra_vars_json
     ]
 
+    logging.debug(f"Executing command: {' '.join(cmd)}")
     result = subprocess.run(cmd, capture_output=True, text=True)
-    logging.debug(f"Ansible command completed with return code: {result.returncode}")
+    logging.debug(f"Command completed with return code: {result.returncode}")
 
     if result.returncode != 0:
         logging.error(f"Failed to enumerate backup locations")
@@ -857,36 +865,55 @@ def enumerate_backup_locations(name_filter=None):
 
     # Extract backup locations from output
     stdout_text = result.stdout
+    ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
+    cleaned_output = ansi_escape.sub('', stdout_text)
 
-    # Look for the backup locations task output - match various possible task names
-    task_match = re.search(r"TASK \[(Enumerate backup locations|Backup Location Enumerate call)].*?\n(.*?)\nTASK ",
-                           stdout_text, re.DOTALL)
+    task_pattern = (
+        r"(TASK \[Backup Location Enumerate call\][\s\S]*?)"
+        r"(?=TASK \[|PLAY RECAP|$)"
+    )
+    task_match = re.search(task_pattern, cleaned_output)
     if not task_match:
-        # Try looking for it at the end of the output (last task)
-        task_match = re.search(r"TASK \[(Enumerate backup locations|Backup Location Enumerate call)].*?\n(.*?)$",
-                               stdout_text, re.DOTALL)
-        if not task_match:
-            logging.error("Could not find backup locations task output")
-            return []
+        logging.error("Could not find 'TASK [Backup Location Enumerate call]' block in the output.")
+        return {}
 
-    task_output = task_match.group(2)
+    task_block = task_match.group(1)
 
-    # Try to extract JSON
-    json_match = re.search(r'"backup_locations"\s*:\s*(\[.*?\])', task_output, re.DOTALL)
-    if not json_match:
-        # Try to find the backup_locations JSON in the entire output as a fallback
-        json_match = re.search(r'"backup_locations"\s*:\s*(\[.*?\])', stdout_text, re.DOTALL)
-        if not json_match:
-            logging.error("Could not extract backup locations list from task output")
-            return []
+    start_pattern = r'"backup_locations"\s*:\s*\['
+    start_match = re.search(start_pattern, task_block)
+    if not start_match:
+        logging.error("No 'backup_locations' array found in 'TASK [Backup Location Enumerate call]' block.")
+        return {}
+
+    start_index = task_block.find('[', start_match.start())
+    if start_index == -1:
+        logging.error("Could not find '[' after 'backup_locations':")
+        return {}
+
+    bracket_depth = 0
+    i = start_index
+    while i < len(task_block):
+        if task_block[i] == '[':
+            bracket_depth += 1
+        elif task_block[i] == ']':
+            bracket_depth -= 1
+            if bracket_depth == 0:
+                break
+        i += 1
+
+    if bracket_depth != 0:
+        logging.error("Mismatched brackets in 'backup_locations' JSON array.")
+        return {}
+
+    array_snippet = task_block[start_index: i + 1]
+    wrapped_json = '{ "backup_locations": ' + array_snippet + ' }'
 
     try:
-        locations_json = json_match.group(1)
-        locations = json.loads(locations_json)
-        return locations
-    except json.JSONDecodeError as e:
-        logging.error(f"Failed to parse backup locations JSON: {e}")
-        return []
+        parsed = json.loads(wrapped_json)
+        return parsed
+    except json.JSONDecodeError as exc:
+        logging.error(f"Failed to parse 'backup_locations' JSON: {exc}")
+        return {}
 
 def get_new_vms(ns_vm_map, all_ns_vm_schedules):
     """
