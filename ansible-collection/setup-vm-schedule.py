@@ -1467,8 +1467,12 @@ def main():
                 try:
                     # Load the kubeconfig
                     config.load_kube_config(kubeconfig_file)
+                    # Setup the cert
+                    configuration = client.Configuration.get_default_copy()
+                    configuration.ssl_ca_cert = "ca.crt"
+                    api_client = client.ApiClient(configuration)
                     # Create the API client
-                    v1 = client.CoreV1Api()
+                    v1 = client.CoreV1Api(api_client)
                     # List all namespaces
                     namespaces = v1.list_namespace()
                     ns_list = [ns.metadata.name for ns in namespaces.items]
