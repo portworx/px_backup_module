@@ -187,7 +187,7 @@ def get_failed_backups(file_path, min_last_update, tz_str=None):
             continue
 
         # Check filters
-        if backup_type == "VirtualMachine" and status in ["Failed", "PartialSuccess"] and last_update_dt > min_last_update_dt:
+        if backup_type == "VirtualMachine" and status in ["Failed", "PartialSuccess"] and last_update_dt >= min_last_update_dt:
             # Append the entire backup object but keep only metadata + backup_info
             new_backup_obj = {
                 "metadata": backup.get("metadata", {}),
