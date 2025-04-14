@@ -650,6 +650,21 @@ def inspect_cluster(cluster_name):
     except json.JSONDecodeError as e:
         logging.error(f"JSON parsing failed: {str(e)}")
 
+def map_failed_vms_by_namespace(file_path):
+    with open(file_path, 'r') as f:
+        data = json.load(f)
+
+    failed_volume_map = defaultdict(list)
+    volumes = data.get("backup_info", {}).get("volumes", {})
+    for vol in volumes.values():
+        status = vol.get("status", {}).get("status")
+        if status == 4 or status == "Failed":
+            namespace = vol.get("namespace")
+            vm_name = vol.get("virtual_machine_name")
+            if namespace and vm_name:
+                failed_volume_map[namespace].append(vm_name)
+    return failed_volume_map
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Backup Processing Script")
     parser.add_argument("--cluster-name", required=True, help="Name of the application cluster")
@@ -697,24 +712,29 @@ if __name__ == "__main__":
             logging.info(f"Fetching resources for manual backup: {backup_name}")
             resources = get_resources_from_backup(file_path)
         lines.append(f"\nVMs found in {backup_name}:\n")
-        grouped = defaultdict(list)
-        for resource in resources:
-            ns = resource.get("namespace")
-            vm = resource.get("name")
-            grouped[ns].append(vm)
+        # get the list of vms which has failed and map it with ns so that doesn't get added to resource
+        failed_volumes = map_failed_vms_by_namespace(file_path)
 
-        for ns, vm_names in grouped.items():
+        for ns, vm_names in failed_volumes.items():
             lines.append(f"Namespace: {ns}\n")
             for vm_name in vm_names:
                 lines.append(f"  - {vm_name}\n")
 
-        logging.debug(f"Resources to be backed up: {resources}")
+        # Filter only the resources matching failed VMs
+        failed_resources = []
+        for resource in resources:
+            ns = resource.get("namespace")
+            vm_name = resource.get("name")
+            if ns in failed_volumes and vm_name in failed_volumes[ns]:
+                failed_resources.append(resource)
+
+        logging.debug(f"Resources to be backed up: {failed_resources}")
         if args.dry_run:
             logging.info("Dry run mode enabled. Skipping backup invocation.")
             continue
         backup_info = load_json(file_path)
         logging.info(f"Invoking backup: {backup_name} with uid {backup_uid}")
-        new_backup_name = invoke_backup(resources, backup_info)
+        new_backup_name = invoke_backup(failed_resources, backup_info)
         logging.debug(f"Created retry backup for failed VMs: {new_backup_name}")
     if retried_backups:
         lines.append(f"\n\nBackups which will be retried:\n")
