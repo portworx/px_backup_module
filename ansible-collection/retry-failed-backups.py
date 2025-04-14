@@ -160,9 +160,7 @@ def get_failed_backups(file_path, min_last_update, tz_str=None):
     except ValueError as e:
         raise ValueError("min_last_update must be in 'MM/DD/YYYY HH:MMAM/PM' format") from e
 
-    with open(file_path, 'r') as f:
-        data = json.load(f)
-
+    data = load_json(file_path)
     failed_backups = []
     for backup in data.get("backups", []):
         status = backup.get("backup_info", {}).get("status", {}).get("status")
@@ -249,17 +247,11 @@ def inspect_backup(backup_name, backup_uid):
     except json.JSONDecodeError as e:
         logging.error(f"JSON parsing failed: {str(e)}")
 
-def get_resources_from_backup(file_path):
-    with open(file_path, 'r') as f:
-        data = json.load(f)
-
+def get_resources_from_backup(data):
     resources = data.get("backup_info", {}).get("include_resources", [])
     return resources
 
-def get_resources_from_backup_schedule(file_path):
-    with open(file_path, 'r') as f:
-        data = json.load(f)
-
+def get_resources_from_backup_schedule(data):
     backup_schedule = data.get("backup_info", {}).get("backup_schedule", {})
     schedule_name = backup_schedule.get("name")
     schedule_uid = backup_schedule.get("uid")
@@ -269,9 +261,7 @@ def get_resources_from_backup_schedule(file_path):
         f"Successfully retrieved schedule: {schedule_inspect_response.get('backup_schedule', {}).get('metadata', {}).get('name', '')}")
     return schedule_inspect_response.get('backup_schedule', {}).get('backup_schedule_info', {}).get('include_resources', [])
 
-def is_scheduled_backup(file_path):
-    with open(file_path, 'r') as f:
-        data = json.load(f)
+def is_scheduled_backup(data):
     backup_schedule = data.get("backup_info", {}).get("backup_schedule", {})
     if backup_schedule:
         return True
@@ -477,8 +467,15 @@ def invoke_backup(resources, backup_info):
     backup_location_ref = backup_info.get("backup_info", {}).get("backup_location_ref", {})
     cluster_ref = backup_info.get("backup_info", {}).get("cluster_ref", {})
 
-    # Construct include_resources dynamically
-    vm_namespaces = backup_info.get("backup_info", {}).get("namespaces", [])
+    # Construct namespace dynamically
+    if resources:
+        # parse the resources to get all the namespaces and put them in a list
+        vm_namespaces = [resource.get("namespace") for resource in resources]
+        # remove duplicates
+        vm_namespaces = list(set(vm_namespaces))
+    else:
+        # if no resources, get the namespaces from the backup_info
+        vm_namespaces = backup_info.get("backup_info", {}).get("namespaces", [])
     vscMap = backup_info.get("backup_info", {}).get("volume_snapshot_class_mapping", {})
 
     # for entry in vm_map:  # vm_map is a list of dicts
@@ -574,9 +571,7 @@ def invoke_backup(resources, backup_info):
     return new_backup_name
 
 def get_all_vms_from_backup(file_path):
-    with open(file_path, 'r') as f:
-        data = json.load(f)
-
+    data = load_json(file_path)
     resources = data.get("backup_info", {}).get("resources", [])
     vm_map = {}
     for resource in resources:
@@ -650,6 +645,18 @@ def inspect_cluster(cluster_name):
     except json.JSONDecodeError as e:
         logging.error(f"JSON parsing failed: {str(e)}")
 
+def map_failed_vms_by_namespace(data):
+    failed_volume_map = defaultdict(set)
+    volumes = data.get("backup_info", {}).get("volumes", {})
+    for vol in volumes:
+        status = vol.get("status", {}).get("status")
+        if status in ["4", "Failed"]:
+            namespace = vol.get("namespace")
+            vm_name = vol.get("virtual_machine_name")
+            if namespace and vm_name:
+                failed_volume_map[namespace].add(vm_name)
+    return dict(failed_volume_map)
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Backup Processing Script")
     parser.add_argument("--cluster-name", required=True, help="Name of the application cluster")
@@ -690,31 +697,45 @@ if __name__ == "__main__":
         # Inspect Backup
         file_path = inspect_backup(backup_name, backup_uid)
         retried_backups.append(backup_name)
-        if is_scheduled_backup(file_path):
+        data = load_json(file_path)
+        if is_scheduled_backup(data):
             logging.info(f"Fetching resources for scheduled backup: {backup_name}")
-            resources = get_resources_from_backup_schedule(file_path)
+            resources = get_resources_from_backup_schedule(data)
         else:
             logging.info(f"Fetching resources for manual backup: {backup_name}")
-            resources = get_resources_from_backup(file_path)
+            resources = get_resources_from_backup(data)
         lines.append(f"\nVMs found in {backup_name}:\n")
-        grouped = defaultdict(list)
-        for resource in resources:
-            ns = resource.get("namespace")
-            vm = resource.get("name")
-            grouped[ns].append(vm)
+        backup_status = data.get("backup_info", {}).get("status", {}).get("status")
+        if backup_status == "Failed":
+            failed_volumes = defaultdict(set)
+            for resource in resources:
+                ns = resource.get("namespace")
+                vm = resource.get("name")
+                failed_volumes[ns].add(vm)
+            failed_resources = resources
+        else:
+            # get the list of vms which has failed and map it with ns so that doesn't get added to resource
+            failed_volumes = map_failed_vms_by_namespace(data)
 
-        for ns, vm_names in grouped.items():
+            # Filter only the resources matching failed VMs
+            failed_resources = []
+            for resource in resources:
+                ns = resource.get("namespace")
+                vm_name = resource.get("name")
+                if ns in failed_volumes and vm_name in failed_volumes[ns]:
+                    failed_resources.append(resource)
+
+        for ns, vm_names in failed_volumes.items():
             lines.append(f"Namespace: {ns}\n")
             for vm_name in vm_names:
                 lines.append(f"  - {vm_name}\n")
 
-        logging.debug(f"Resources to be backed up: {resources}")
+        logging.debug(f"Resources to be backed up: {failed_resources}")
         if args.dry_run:
             logging.info("Dry run mode enabled. Skipping backup invocation.")
             continue
-        backup_info = load_json(file_path)
         logging.info(f"Invoking backup: {backup_name} with uid {backup_uid}")
-        new_backup_name = invoke_backup(resources, backup_info)
+        new_backup_name = invoke_backup(failed_resources, data)
         logging.debug(f"Created retry backup for failed VMs: {new_backup_name}")
     if retried_backups:
         lines.append(f"\n\nBackups which will be retried:\n")
