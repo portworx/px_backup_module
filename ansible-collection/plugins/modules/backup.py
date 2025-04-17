@@ -31,7 +31,7 @@ module: backup
 
 short_description: Manage backups in PX-Backup
 
-version_added: "2.8.3"
+version_added: "2.8.4"
 
 description:
     - Manage backups in PX-Backup using different operations

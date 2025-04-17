@@ -12,7 +12,7 @@ The cluster module provides comprehensive management of PX-Backup clusters, incl
 
 ## Requirements
 
-* PX-Backup >= 2.8.3
+* PX-Backup >= 2.8.4
 * Stork >= 24.3.3
 * Python >= 3.9
 * The `requests` Python package
