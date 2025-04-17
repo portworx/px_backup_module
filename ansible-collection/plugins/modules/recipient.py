@@ -29,7 +29,7 @@ module: recipient
 
 short_description: Manage alert recipients in PX-Backup
 
-version_added: "2.8.3"
+version_added: "2.8.4"
 
 description: 
     - Manage alert recipients in PX-Backup using different operations

@@ -14,7 +14,7 @@ module: backup_schedule
 
 short_description: Manage backup Schedule in PX-Backup
 
-version_added: "2.8.3"
+version_added: "2.8.4"
 
 description: 
     - Manage backup Schedule in PX-Backup
