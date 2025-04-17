@@ -1,0 +1,80 @@
+---
+- name: Configure PX-Backup Schedules
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - org_id is defined
+          - schedule_deletes is defined
+        fail_msg: "Required variables must be defined"
+
+    # Validate backup configurations
+    - name: Validate schedule configurations
+      assert:
+        that: 
+          - "item.name is defined"
+          - "item.uid is defined"
+        fail_msg: "Each schedule configuration must include 'name' and 'uid'"
+      loop: "{{ schedule_deletes }}"
+      loop_control:
+        label: "{{ item.name }}"
+  
+  tasks:
+
+    - name: Debug passed variables
+      debug:
+        msg:
+          - "Schedules: {{ schedule_deletes | to_nice_yaml }}"
+
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+
+    - name: Delete Backup Schedules
+      block:
+        - name: Delete Backup Schedule
+          backup_schedule:
+            operation: DELETE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            org_id: "{{ org_id }}"
+            name: "{{ item.name }}"
+            uid: "{{ item.uid }}"
+          register: delete_result
+          loop: "{{ schedule_deletes }}"
+          loop_control:
+            label: "{{ item.name }}"
+
+        # Display successful deletes
+        - name: Display successful deletes
+          debug:
+            msg: "Successfully deleted backup '{{ item.item.name }}'"
+          loop: "{{ delete_result.results }}"
+          loop_control:
+            label: "{{ item.item.name }}"
+          when: not item.failed
+
+        # Display failures
+        - name: Display failed deletes
+          debug:
+            msg: "Failed to delete schedule '{{ item.item.name }}': {{ item.msg }}"
+          loop: "{{ delete_result.results }}"
+          loop_control:
+            label: "{{ item.item.name }}"
+          when: item.failed
+
+      rescue:
+        - name: Display error details
+          debug:
+            msg: "Failed to delete schedules: {{ 'One or more items failed' if delete_result.results is defined else delete_result.msg | default('Unknown error occurred') }}"
+          when: delete_result is defined
+
+        - name: Fail with error message
+          fail:
+            msg: "Failed to delete schedules. See above for details."

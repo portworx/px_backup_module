@@ -1081,11 +1081,11 @@ def run_module():
             elements='dict',
             required=False,
             options=dict(
-                name=dict(type='str', required=True),
-                namespace=dict(type='str', required=True),
-                group=dict(type='str', required=True),
-                kind=dict(type='str', required=True),
-                version=dict(type='str', required=True)
+                name=dict(type='str', required=False),
+                namespace=dict(type='str', required=False),
+                group=dict(type='str', required=False),
+                kind=dict(type='str', required=False),
+                version=dict(type='str', required=False)
             )
         ),
         backup_type=dict(
