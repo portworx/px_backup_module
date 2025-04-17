@@ -237,6 +237,10 @@ options:
         description: option to enable to keep the CR status of the resources in the backup schedule
         required: false
         type: bool
+    advanced_resource_label_selector:
+        description: Advanced label selector for resources (string format with operator support)
+        required: false
+        type: str
 
 '''
 
@@ -389,6 +393,9 @@ def backup_schedule_request_body(module):
     if module.params.get('labels'):
         backup_schedule_request['metadata']['labels'] = module.params['labels']
 
+    if module.params.get('advanced_resource_label_selector'):
+        backup_schedule_request['advanced_resource_label_selector'] = module.params['advanced_resource_label_selector']
+
     return backup_schedule_request
 
 def run_module():
@@ -464,6 +471,7 @@ def run_module():
         volume_snapshot_class_mapping=dict(type='dict', required=False),
         parallel_backup=dict(type='bool', required=False),
         keep_cr_status=dict(type='bool', required=False),
+        advanced_resource_label_selector=dict(type='str', required=False),
 
         validate_certs=dict(type='bool', default=True),
         label_selectors=dict(type='dict', required=False),

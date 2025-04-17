@@ -30,6 +30,7 @@
             org_id: "{{ org_id }}"
             name: "{{ item.name }}"
             uid: "{{ item.uid }}"
+            advanced_resource_label_selector: "{{ item.advanced_resource_label_selector  | default(omit) }}"
             # Optional update parameters
             labels: "{{ item.labels | default(omit) }}"
             ownership: "{{ item.ownership | default(omit) }}"
