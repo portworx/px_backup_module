@@ -22,6 +22,7 @@ backup_schedules_update:
       uid: "backup-loc-uid"
     labels:
       key: value
+    advanced_resource_label_selector: "env=prod"
 
 # Global update configuration
 backup_configs: true

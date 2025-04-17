@@ -35,6 +35,7 @@
         direct_kdmp: "{{ backup_schedules[0].direct_kdmp | default(omit) }}"
         validate_certs: "{{ backup_schedules[0].validate_certs | default(true) }}"
         labels: "{{ backup_schedules[0].labels | default(omit) }}"
+        advanced_resource_label_selector: "{{ backup_schedules[0].advanced_resource_label_selector }}"
       register: backup_result
 
   rescue:
