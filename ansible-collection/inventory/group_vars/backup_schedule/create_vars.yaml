@@ -40,4 +40,5 @@ backup_schedules:
       snapshot1: "class1"
       snapshot2: "class2"
     direct_kdmp: true
+    advanced_resource_label_selector: "env=prod"
 
