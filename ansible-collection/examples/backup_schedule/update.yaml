@@ -68,7 +68,6 @@
             pre_exec_rule_ref: "{{ item.pre_exec_rule_ref | default(omit) }}"
             post_exec_rule_ref: "{{ item.post_exec_rule_ref | default(omit) }}"
             labels: "{{ item.labels | default(omit) }}"
-            advanced_resource_label_selector: "{{ item.advanced_resource_label_selector  | default(omit) }}"
           register: update_result
           loop: "{{ backup_schedules_update }}"
           loop_control:

@@ -4,7 +4,6 @@
 backup_updates:
   - name: "ansible-bkp1"  # Use the actual backup name
     uid: "d2768c2f-ca68-4f70-8af8-0700ac98dff9"      # Use the actual backup UID
-    advanced_resource_label_selector: "env=prod"
 # Optional updates - only include fields you want to update
     labels:
       environment: "production"
