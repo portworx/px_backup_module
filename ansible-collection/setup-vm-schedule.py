@@ -893,7 +893,7 @@ def create_schedule_policy(policy_name, policy_time, dry_run=False):
         return None, None
 
 
-def create_vm_backup_schedule(vm, namespace, policy_name, policy_uid, backup_location_ref, cluster_ref, csi_driver_map,  dry_run=False):
+def create_vm_backup_schedule(vm, namespace, policy_name, policy_uid, backup_location_ref, cluster_ref, csi_driver_map, label_selector, dry_run=False):
     """
     Create a backup schedule for a single VM
     
@@ -953,6 +953,7 @@ def create_vm_backup_schedule(vm, namespace, policy_name, policy_uid, backup_loc
                 "backup_object_type": backup_object_type,
                 "skip_vm_auto_exec_rules": True,
                 "validate_certs": True,
+                "advanced_resource_label_selector": label_selector,
                 "labels": {
                     "vm-name": vm,
                     "vm-namespace": namespace,
@@ -1177,18 +1178,19 @@ def create_kubeconfig(cluster_file, dry_run=False):
         raise ValueError(f"Failed to process cluster file: {e}")
 
 
-def get_inventory(ns_list, kubeconfig_file, dry_run=False):
+def get_inventory(ns_list, kubeconfig_file, label_selector=None, dry_run=False):
     """
-    Get inventory of all VirtualMachine resources in the cluster
-    
+    Get inventory of all VirtualMachine resources in the cluster, filtered by label selectors
+
     Args:
         ns_list (list): List of namespaces to check
         kubeconfig_file (str): Path to the kubeconfig file
+        label_selector (str, optional): Kubernetes label selector string, e.g., "env=prod,tier!=frontend"
         dry_run (bool, optional): If True, don't make any changes but still get real data
-        
+
     Returns:
         dict: Dictionary mapping namespaces to lists of VM names
-        
+
     Raises:
         ValueError: If there's an error accessing the cluster
     """
@@ -1216,6 +1218,7 @@ def get_inventory(ns_list, kubeconfig_file, dry_run=False):
                     version=version,
                     plural=plural,
                     namespace=ns,
+                    label_selector=label_selector,
                 )
                 # Iterate over each VirtualMachine and add to the map
                 vm_list = []
@@ -1407,6 +1410,7 @@ def main():
     parser.add_argument("--output", type=str, default="vm_schedule_result.json", help="Output file for backup results")
     parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose logging")
     parser.add_argument('--csiDriver_map',"-d", type=str, help='Map input in the form csiDriver1:VSC1,csiDriver2:VSC2')
+    parser.add_argument("--label-selector", help="Kubernetes label selector string, e.g., 'env=prod,app!=myapp'")
 
     args = parser.parse_args()
 
@@ -1485,7 +1489,7 @@ def main():
                 # For dry run, just use some example namespaces
                 ns_list = ["default", "kube-system"]
                 
-        vm_map = get_inventory(ns_list, kubeconfig_file, dry_run=args.dry_run)
+        vm_map = get_inventory(ns_list, kubeconfig_file, args.label_selector , dry_run=args.dry_run)
         
         # Count total VMs
         total_vm_count = sum(len(vms) for vms in vm_map.values())
@@ -1544,6 +1548,7 @@ def main():
                 vm, namespace, policy_name, policy_uid, 
                 backup_location_ref, cluster_ref,
                 parse_input_map(args.csiDriver_map),
+                args.label_selector,
                 dry_run=args.dry_run,
             )
             
