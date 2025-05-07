@@ -387,7 +387,7 @@ def create_kubeconfig(cluster_file: str) -> Optional[str]:
         logging.error(f"Failed to process cluster file: {e}")
         exit(1)
 
-def get_vm_inventory(kubeconfig_file: str, ns_list: Optional[List[str]] = None):
+def get_vm_inventory(kubeconfig_file: str, ns_list: Optional[List[str]] = None, label_selector=None):
     # Load the provided kubeconfig file
     config.load_kube_config(kubeconfig_file)
     # Setup the cert
@@ -428,7 +428,8 @@ def get_vm_inventory(kubeconfig_file: str, ns_list: Optional[List[str]] = None):
             result = custom_api.list_cluster_custom_object(
                 group=group,
                 version=version,
-                plural=plural
+                plural=plural,
+                label_selector=label_selector,
             )
             # Iterate over each VirtualMachine and group by namespace
             for item in result.get("items", []):
@@ -1084,7 +1085,7 @@ def get_filtered_schedule_policies():
     return matched_policies
 
 
-def distribute_vms_schedules(new_vms_map, policy_dict, backup_location_ref, cluster_ref, csi_driver_map):
+def distribute_vms_schedules(new_vms_map, policy_dict, backup_location_ref, cluster_ref, csi_driver_map, label_selector=None):
     """
     Distributes newly created VMs among the given policies, where each policy first gets
     floor(total_vms / num_policies) VMs, then the leftover VMs are assigned one-by-one
@@ -1169,7 +1170,7 @@ def distribute_vms_schedules(new_vms_map, policy_dict, backup_location_ref, clus
         for namespace, vm_name in data["vms"]:
             success, backup_schedule_name = create_vm_backup_schedule(vm_name, namespace, p_name, data["policy_uid"],
                                                                       backup_location_ref, cluster_ref,
-                                                                      csi_driver_map)
+                                                                      csi_driver_map, label_selector)
             if success:
                 if namespace not in schedules_created:
                     schedules_created[namespace] = {}
@@ -1357,6 +1358,7 @@ def main():
     parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose logging")
     parser.add_argument("--dry-run", action="store_true", help="Dry run to list the vm list")
     parser.add_argument('--csiDriver_map', "-d", type=str, help='Map input in the form csiDriver1:VSC1,csiDriver2:VSC2')
+    parser.add_argument("--label-selector", help="Kubernetes label selector string, e.g., 'env=prod,app!=myapp'")
     
     args = parser.parse_args()
     
@@ -1395,7 +1397,7 @@ def main():
         else:
             logging.info(f"Namespaces to check: {ns_list}")
 
-        ns_vm_map = get_vm_inventory(kubeconfig_file, ns_list)
+        ns_vm_map = get_vm_inventory(kubeconfig_file, ns_list, args.label_selector)
         total_count = sum(len(v) for v in ns_vm_map.values())
         logging.info(f"Found {total_count} VMs in current inventory")
         
@@ -1442,7 +1444,8 @@ def main():
         }
         distribution_result, schedules_created = distribute_vms_schedules(new_vm_map, matched_policies,
                                                                           backup_location_ref, cluster_ref,
-                                                                          parse_input_map(args.csiDriver_map))
+                                                                          parse_input_map(args.csiDriver_map),
+                                                                          args.label_selector)
 
         generate_report(
             ns_vm_map,
