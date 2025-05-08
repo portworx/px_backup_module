@@ -410,6 +410,7 @@ def get_vm_inventory(kubeconfig_file: str, ns_list: Optional[List[str]] = None, 
                     version=version,
                     plural=plural,
                     namespace=ns,
+                    label_selector=label_selector,
                 )
                 # Iterate over each VirtualMachine and group by namespace
                 for item in result.get("items", []):
@@ -1085,7 +1086,7 @@ def get_filtered_schedule_policies():
     return matched_policies
 
 
-def distribute_vms_schedules(new_vms_map, policy_dict, backup_location_ref, cluster_ref, csi_driver_map, label_selector=None):
+def distribute_vms_schedules(new_vms_map, policy_dict, backup_location_ref, cluster_ref, csi_driver_map):
     """
     Distributes newly created VMs among the given policies, where each policy first gets
     floor(total_vms / num_policies) VMs, then the leftover VMs are assigned one-by-one
@@ -1170,7 +1171,7 @@ def distribute_vms_schedules(new_vms_map, policy_dict, backup_location_ref, clus
         for namespace, vm_name in data["vms"]:
             success, backup_schedule_name = create_vm_backup_schedule(vm_name, namespace, p_name, data["policy_uid"],
                                                                       backup_location_ref, cluster_ref,
-                                                                      csi_driver_map, label_selector)
+                                                                      csi_driver_map)
             if success:
                 if namespace not in schedules_created:
                     schedules_created[namespace] = {}
@@ -1444,8 +1445,7 @@ def main():
         }
         distribution_result, schedules_created = distribute_vms_schedules(new_vm_map, matched_policies,
                                                                           backup_location_ref, cluster_ref,
-                                                                          parse_input_map(args.csiDriver_map),
-                                                                          args.label_selector)
+                                                                          parse_input_map(args.csiDriver_map))
 
         generate_report(
             ns_vm_map,

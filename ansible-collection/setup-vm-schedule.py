@@ -30,7 +30,7 @@ from kubernetes import client, config
 LOG_FILE = "setup-vm-schedule.log"
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
+    format="%(asctime)s [%(levelname)s] [%(filename)s:%(lineno)d] %(message)s",
     handlers=[
         logging.FileHandler(LOG_FILE),
         logging.StreamHandler(),
@@ -893,13 +893,21 @@ def create_schedule_policy(policy_name, policy_time, dry_run=False):
         return None, None
 
 
-def create_vm_backup_schedule(vm, namespace, policy_name, policy_uid, backup_location_ref, cluster_ref, csi_driver_map, label_selector, dry_run=False):
+def sanitize_label_selector(selector):
     """
-    Create a backup schedule for a single VM
+    Sanitize a Kubernetes label selector to use in resource names
+    """
+    # Replace all special characters not allowed in DNS labels
+    return re.sub(r'[^a-zA-Z0-9_.-]', '-', selector.strip())
+
+
+def create_vm_backup_schedule(vm, namespace: list, policy_name, policy_uid, backup_location_ref, cluster_ref, csi_driver_map, label_selector, mode, dry_run=False):
+    """
+    Create a backup schedule for a single VM (or label selector)
     
     Args:
         vm (str): VM name
-        namespace (str): VM namespace
+        namespace (list): List of VM namespaces
         policy_name (str): Policy name
         policy_uid (str): Policy UID
         backup_location_ref (dict): Backup location reference
@@ -909,35 +917,51 @@ def create_vm_backup_schedule(vm, namespace, policy_name, policy_uid, backup_loc
     Returns:
         tuple: (success, backup_name) where success is a boolean indicating if the operation succeeded
     """
-    # Extract time from policy name
-    time_str = policy_name.replace("pxb-", "")
-    
-    # Create backup schedule name
-    backup_name = f"pxb-{namespace}-{vm}-{policy_name}"
-    
+    # Set up variables depending on mode
+    if mode != "label":
+        namespace_str = namespace[0]
+        namespace_list = [namespace_str]
+        backup_name = f"pxb-{namespace_str}-{vm}-{policy_name}"
+        include_resources = [{
+            "group": "kubevirt.io",
+            "kind": "VirtualMachine",
+            "version": "v1",
+            "name": vm,
+            "namespace": namespace_str
+        }]
+    else:
+        namespace_list = namespace
+        # Replace unsafe characters and encode label selector for use in backup name
+        sanitized_label_selector = sanitize_label_selector(label_selector)
+        backup_name = f"{policy_name}-{sanitized_label_selector}"
+        vm = ""  # Ensure vm is empty
+        include_resources = []
+
     if dry_run:
-        logging.debug(f"[DRY RUN] Would create backup schedule: {backup_name} for VM {vm} in namespace {namespace} using policy {policy_name}")
+        logging.debug(f"[DRY RUN] Would create backup schedule: {backup_name} for VM {vm} in namespaces {namespace_list} using policy {policy_name}")
         return True, backup_name
-    
+
     schedule_policy_ref = {
         "name": policy_name,
         "uid": policy_uid
     }
-    
-    vm_namespaces = [namespace]
-    include_resources = [{
-        "group": "kubevirt.io",
-        "kind": "VirtualMachine",
-        "version": "v1",
-        "name": vm,
-        "namespace": namespace
-    }]
+
+    vm_namespaces = namespace_list if mode == "label" else [namespace_list[0]]
 
     # Define backup config
     backup_object_type = {
         "type": "VirtualMachine"
     }
-    
+
+    # Construct labels dictionary
+    labels = {
+        "policy-name": policy_name,
+        "created": datetime.now().strftime("%Y-%m-%d")
+    }
+    if mode != "label":
+        labels["vm-name"] = vm
+        labels["vm-namespace"] = namespace_str
+
     playbook_data = [{
         "name": "Configure VM Backup Schedule",
         "hosts": "localhost",
@@ -954,12 +978,7 @@ def create_vm_backup_schedule(vm, namespace, policy_name, policy_uid, backup_loc
                 "skip_vm_auto_exec_rules": True,
                 "validate_certs": True,
                 "advanced_resource_label_selector": label_selector,
-                "labels": {
-                    "vm-name": vm,
-                    "vm-namespace": namespace,
-                    "policy-name": policy_name,
-                    "created": datetime.now().strftime("%Y-%m-%d")
-                }
+                "labels": labels
             }],
             "vm_namespaces": vm_namespaces,
             "include_resources": include_resources
@@ -974,11 +993,11 @@ def create_vm_backup_schedule(vm, namespace, policy_name, policy_uid, backup_loc
 
     # Save generated playbook
     timestamp = int(time.time())
-    playbook_file = f"create_backup_{namespace}_{vm}_{timestamp}.yaml"
+    playbook_file = f"create_backup_{vm}_{timestamp}.yaml"
     with open(playbook_file, "w") as f:
         yaml.safe_dump(playbook_data, f, default_flow_style=False)
 
-    logging.info(f"Creating backup schedule for VM: {vm} in namespace: {namespace} using policy: {policy_name}")
+    logging.info(f"Creating backup schedule for VM: {vm} in namespaces: {namespace_list} using policy: {policy_name}")
 
     # Invoke the Ansible playbook
     combined_vars = json.dumps({
@@ -996,7 +1015,7 @@ def create_vm_backup_schedule(vm, namespace, policy_name, policy_uid, backup_loc
     logging.debug(f"Command completed with return code: {result.returncode}")
     
     if result.returncode != 0:
-        logging.error(f"Failed to create backup schedule for VM: {vm} in namespace: {namespace}")
+        logging.error(f"Failed to create backup schedule for VM: {vm} in namespaces: {namespace_list}")
         return False, backup_name
 
     # Check for success in output
@@ -1005,11 +1024,11 @@ def create_vm_backup_schedule(vm, namespace, policy_name, policy_uid, backup_loc
     # Locate the "Create Backup Schedule" task output
     task_match = re.search(r"TASK \[Create Backup Schedule].*?\n(.*?)\nTASK ", stdout_text, re.DOTALL)
     if not task_match:
-        logging.error(f"Could not find 'Create Backup Schedule' task output for VM {vm} in namespace {namespace}.")
+        logging.error(f"Could not find 'Create Backup Schedule' task output for VM {vm} in namespaces {namespace_list}.")
         return False, backup_name
     
     # Success
-    logging.info(f"Created backup schedule for VM: {vm} in namespace: {namespace} - {backup_name}")
+    logging.info(f"Created backup schedule for VM: {vm} in namespaces: {namespace_list} - {backup_name}")
     return True, backup_name
 
 
@@ -1400,6 +1419,25 @@ def parse_input_map(map_str):
             result[key.strip()] = value.strip()
     return result
 
+def prompt_user_for_schedule_mode():
+    """
+    Prompt the user to choose between one VM per backupschedule or one label per backupschedule
+
+    Returns:
+        str: "vm" or "label"
+    """
+    while True:
+        print("\nLabel selector was provided. Choose how to create backup schedules:")
+        print("1. One VM per backup schedule")
+        print("2. One label selector per backup schedule")
+        choice = input("Enter 1 or 2: ").strip()
+        if choice == "1":
+            return "vm"
+        elif choice == "2":
+            return "label"
+        else:
+            print("Invalid choice. Please enter 1 or 2.")
+
 def main():
     parser = argparse.ArgumentParser(description="Create backup schedules for virtual machines")
     parser.add_argument("--cluster-name", required=True, help="Name of the cluster to use (required)")
@@ -1411,12 +1449,20 @@ def main():
     parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose logging")
     parser.add_argument('--csiDriver_map',"-d", type=str, help='Map input in the form csiDriver1:VSC1,csiDriver2:VSC2')
     parser.add_argument("--label-selector", help="Kubernetes label selector string, e.g., 'env=prod,app!=myapp'")
+    parser.add_argument("--use-label-mode", action="store_true", default=False, help="Use single label selector per backup schedule instead of per-VM scheduling"
+)
 
     args = parser.parse_args()
 
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
-    
+
+    if args.use_label_mode and not args.label_selector:
+        logging.error("--use-label-mode was specified but no --label-selector was provided.")
+        sys.exit("Error: --use-label-mode requires --label-selector to be set.")
+
+    mode = "label" if args.use_label_mode else "vm"
+
     # removing dry run option
     args.dry_run = False
     if args.dry_run:
@@ -1529,11 +1575,7 @@ def main():
         # Proceed with successful policy creation
         policies = policy_result['policies']
         logging.info(f"Created/Found {len(policies)} schedule policies")
-        
-        # Distribute VMs across policies
-        vm_assignments = distribute_vms_to_policies(vm_map, policies)
-        
-        # Create backup schedules
+
         results = {
             "total_vms": total_vm_count,
             "total_policies": len(policies),
@@ -1542,32 +1584,48 @@ def main():
             "successful_schedules": [],
             "failed_schedules": []
         }
-        
-        for vm, namespace, policy_name, policy_uid in vm_assignments:
+
+        if mode == "label":
+            policy_name, policy_uid = policies[0]
             success, backup_name = create_vm_backup_schedule(
-                vm, namespace, policy_name, policy_uid, 
-                backup_location_ref, cluster_ref,
-                parse_input_map(args.csiDriver_map),
-                args.label_selector,
-                dry_run=args.dry_run,
+                vm="",
+                namespace=ns_list,
+                policy_name=policy_name,
+                policy_uid=policy_uid,
+                backup_location_ref=backup_location_ref,
+                cluster_ref=cluster_ref,
+                csi_driver_map=parse_input_map(args.csiDriver_map),
+                label_selector=args.label_selector,
+                mode=mode,
+                dry_run=args.dry_run
             )
-            
-            if success:
-                results["success_count"] += 1
-                results["successful_schedules"].append({
+            result_entry = {
+                "vm": "", 
+                "namespace": "",
+                "backup_name": backup_name,
+                "policy_name": policy_name
+            }
+            results["success_count" if success else "failed_count"] += 1
+            key = "successful_schedules" if success else "failed_schedules"
+            results[key].append(result_entry)
+        else:
+            for vm, namespace, policy_name, policy_uid in distribute_vms_to_policies(vm_map, policies):
+                success, backup_name = create_vm_backup_schedule(
+                    vm, [namespace], policy_name, policy_uid,
+                    backup_location_ref, cluster_ref,
+                    parse_input_map(args.csiDriver_map),
+                    label_selector=None, mode="",
+                    dry_run=args.dry_run
+                )
+                result_entry = {
                     "vm": vm,
                     "namespace": namespace,
                     "backup_name": backup_name,
                     "policy_name": policy_name
-                })
-            else:
-                results["failed_count"] += 1
-                results["failed_schedules"].append({
-                    "vm": vm,
-                    "namespace": namespace,
-                    "backup_name": backup_name,
-                    "policy_name": policy_name
-                })
+                }
+                results["success_count" if success else "failed_count"] += 1
+                key = "successful_schedules" if success else "failed_schedules"
+                results[key].append(result_entry)
         
         # Save results to file
         with open(args.output, "w") as f:
