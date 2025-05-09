@@ -34,6 +34,7 @@
         direct_kdmp: "{{ backups[0].direct_kdmp | default(omit) }}"
         validate_certs: "{{ backups[0].validate_certs | default(true) }}"
         labels: "{{ backups[0].labels | default(omit) }}"
+        advanced_resource_label_selector: "{{ item.advanced_resource_label_selector }}"
       register: backup_result
 
   rescue:

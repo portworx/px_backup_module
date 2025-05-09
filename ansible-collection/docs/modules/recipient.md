@@ -13,7 +13,7 @@ The recipient module provides comprehensive management of alert recipients in PX
 
 ## Requirements
 
-* PX-Backup >= 2.8.3
+* PX-Backup >= 2.8.4
 * Stork >= 24.3.3
 * Python >= 3.9
 * The `requests` Python package

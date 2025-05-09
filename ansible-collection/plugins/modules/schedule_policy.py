@@ -28,7 +28,7 @@ module: schedule_policy
 
 short_description: Manage schedule policy in PX-Backup
 
-version_added: "2.8.3"
+version_added: "2.8.4"
 
 description: 
     - Manage schedule policy in PX-Backup
