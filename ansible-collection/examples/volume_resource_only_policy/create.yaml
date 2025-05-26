@@ -1,0 +1,176 @@
+---
+- name: Configure PX-Backup Volume Resource Only Policies
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/volume_resource_only_policy/create.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - volume_resource_only_policies is defined
+          - volume_resource_only_policies | length > 0
+        fail_msg: "Required variables must be defined"
+
+    - name: Display configuration summary
+      debug:
+        msg:
+          - "=== PX-Backup Volume Resource Only Policy Configuration ==="
+          - "API URL: {{ px_backup_api_url }}"
+          - "Organization ID: {{ org_id | default('default') }}"
+          - "Number of policies to create: {{ volume_resource_only_policies | length }}"
+          - "Policy names: {{ volume_resource_only_policies | map(attribute='name') | list | join(', ') }}"
+
+  tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+
+    - name: Create volume resource only policies
+      block:
+        - name: Create volume resource only policy
+          volume_resource_only_policy:
+            operation: CREATE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            name: "{{ item.name }}"
+            org_id: "{{ org_id | default('default') }}"
+            # Policy configuration
+            volume_types: "{{ item.volume_types | default(omit) }}"
+            csi_drivers: "{{ item.csi_drivers | default(omit) }}"
+            nfs_servers: "{{ item.nfs_servers | default(omit) }}"
+            # Optional metadata
+            labels: "{{ item.labels | default(omit) }}"
+            ownership: "{{ item.ownership | default(omit) }}"
+            validate_certs: "{{ item.validate_certs | default(true) }}"
+          loop: "{{ volume_resource_only_policies }}"
+          register: policy_result
+          loop_control:
+            label: "{{ item.name }}"
+
+        - name: Extract successful and failed results
+          set_fact:
+            successful_policies: "{{ policy_result.results | selectattr('changed', 'equalto', true) | list }}"
+            failed_policies: "{{ policy_result.results | selectattr('failed', 'defined') | selectattr('failed', 'equalto', true) | list }}"
+
+      rescue:
+        - name: Extract error details
+          set_fact:
+            failed_policies: "{{ policy_result.results | selectattr('failed', 'defined') | selectattr('failed', 'equalto', true) | list }}"
+          when: policy_result is defined and policy_result.results is defined
+
+        - name: Display detailed error information
+          debug:
+            msg:
+              - "=== POLICY CREATION FAILED ==="
+              - "Failed policy: {{ item.item.name }}"
+              - "Error message: {{ item.msg }}"
+              - "Ansible error: {{ item.ansible_loop_var | default('N/A') }}"
+              - "---"
+          loop: "{{ failed_policies }}"
+          loop_control:
+            label: "{{ item.item.name }}"
+          when: failed_policies is defined and failed_policies | length > 0
+
+        - name: Display summary of failures
+          debug:
+            msg:
+              - "=== FAILURE SUMMARY ==="
+              - "Total policies attempted: {{ volume_resource_only_policies | length }}"
+              - "Failed policies: {{ failed_policies | length }}"
+              - "Failed policy names: {{ failed_policies | map(attribute='item.name') | list | join(', ') }}"
+
+        - name: Fail with error message
+          fail:
+            msg: "Failed to create {{ failed_policies | length }} out of {{ volume_resource_only_policies | length }} volume resource only policies. See above for details."
+
+    - name: Display detailed success results
+      debug:
+        msg:
+          - "=== POLICY CREATION SUCCESS ==="
+          - "Policy name: {{ item.item.name }}"
+          - "Policy UID: {{ item.volume_resource_only_policy.metadata.uid | default('N/A') }}"
+          - "Volume types: {{ item.volume_resource_only_policy.volume_resource_only_policy_info.volume_types | default([]) | join(', ') }}"
+          - "CSI drivers: {{ item.volume_resource_only_policy.volume_resource_only_policy_info.csi_drivers | default([]) | join(', ') }}"
+          - "NFS servers: {{ item.volume_resource_only_policy.volume_resource_only_policy_info.nfs_servers | default([]) | join(', ') }}"
+          - "Labels: {{ item.volume_resource_only_policy.metadata.labels | default({}) | dict2items | map('join', '=') | join(', ') }}"
+          - "Owner: {{ item.volume_resource_only_policy.metadata.ownership.owner | default('N/A') }}"
+          - "---"
+      loop: "{{ successful_policies }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+      when: 
+        - successful_policies is defined 
+        - successful_policies | length > 0
+
+    - name: Display comprehensive summary
+      debug:
+        msg:
+          - "=== EXECUTION SUMMARY ==="
+          - "Total policies configured: {{ volume_resource_only_policies | length }}"
+          - "Successfully created: {{ successful_policies | length }}"
+          - "Failed to create: {{ failed_policies | default([]) | length }}"
+          - "Success rate: {{ ((successful_policies | length) / (volume_resource_only_policies | length) * 100) | round(1) }}%"
+          - ""
+          - "=== SUCCESSFUL POLICIES ==="
+          - "{{ successful_policies | map(attribute='item.name') | list | join(', ') if successful_policies | length > 0 else 'None' }}"
+          - ""
+          - "=== POLICY DETAILS ==="
+          - "{% for policy in successful_policies %}"
+          - "  • {{ policy.item.name }}: UID={{ policy.volume_resource_only_policy.metadata.uid | default('N/A') }}"
+          - "{% endfor %}"
+      when: 
+        - policy_result is defined 
+        - policy_result.results is defined
+
+    - name: Save policy creation report
+      copy:
+        content: |
+          # Volume Resource Only Policy Creation Report
+          Generated on: {{ ansible_date_time.iso8601 }}
+          
+          ## Configuration Summary
+          - API URL: {{ px_backup_api_url }}
+          - Organization: {{ org_id | default('default') }}
+          - Total Policies: {{ volume_resource_only_policies | length }}
+          
+          ## Results Summary
+          - Successfully Created: {{ successful_policies | length }}
+          - Failed: {{ failed_policies | default([]) | length }}
+          - Success Rate: {{ ((successful_policies | length) / (volume_resource_only_policies | length) * 100) | round(1) }}%
+          
+          ## Successfully Created Policies
+          {% for policy in successful_policies %}
+          ### {{ policy.item.name }}
+          - **UID**: {{ policy.volume_resource_only_policy.metadata.uid | default('N/A') }}
+          - **Volume Types**: {{ policy.volume_resource_only_policy.volume_resource_only_policy_info.volume_types | default([]) | join(', ') }}
+          - **CSI Drivers**: {{ policy.volume_resource_only_policy.volume_resource_only_policy_info.csi_drivers | default([]) | join(', ') }}
+          - **NFS Servers**: {{ policy.volume_resource_only_policy.volume_resource_only_policy_info.nfs_servers | default([]) | join(', ') }}
+          - **Labels**: {{ policy.volume_resource_only_policy.metadata.labels | default({}) | dict2items | map('join', '=') | join(', ') }}
+          - **Owner**: {{ policy.volume_resource_only_policy.metadata.ownership.owner | default('N/A') }}
+          
+          {% endfor %}
+          
+          {% if failed_policies | default([]) | length > 0 %}
+          ## Failed Policies
+          {% for policy in failed_policies %}
+          ### {{ policy.item.name }}
+          - **Error**: {{ policy.msg }}
+          
+          {% endfor %}
+          {% endif %}
+        dest: "/tmp/volume_resource_only_policy_creation_report_{{ ansible_date_time.epoch }}.md"
+      when: 
+        - policy_result is defined 
+        - policy_result.results is defined
+      tags: ['report']
+
+    - name: Display report location
+      debug:
+        msg: 
+          - "=== REPORT GENERATED ==="
+          - "Detailed report saved to: /tmp/volume_resource_only_policy_creation_report_{{ ansible_date_time.epoch }}.md"
+      tags: ['report']
