@@ -36,15 +36,15 @@ The module supports the following operations:
 ### Common Parameters
 
 
-| Parameter      | Type    | Required | Default | Description                                                                                  |
-| ---------------- | --------- | ---------- | --------- | ---------------------------------------------------------------------------------------------- |
-| api_url        | string  | yes      |         | PX-Backup API URL                                                                            |
-| token          | string  | yes      |         | Authentication token                                                                         |
-| name           | string  | varies   |         | Name of the backup (required for all operations except INSPECT_ALL)                          |
-| org_id         | string  | yes      |         | Organization ID                                                                              |
-| operation      | string  | yes      |         | Operation to perform                                                                         |
+| Parameter      | Type    | Required | Default | Description                                                                     |
+| ---------------- | --------- | ---------- | --------- | --------------------------------------------------------------------------------- |
+| api_url        | string  | yes      |         | PX-Backup API URL                                                               |
+| token          | string  | yes      |         | Authentication token                                                            |
+| name           | string  | varies   |         | Name of the backup (required for all operations except INSPECT_ALL)             |
+| org_id         | string  | yes      |         | Organization ID                                                                 |
+| operation      | string  | yes      |         | Operation to perform                                                            |
 | uid            | string  | varies   |         | Backup unique identifier (required for UPDATE, DELETE, and UPDATE_BACKUP_SHARE) |
-| validate_certs | boolean | no       | true    | Whether to validate SSL certificates                                                         |
+| validate_certs | boolean | no       | true    | Whether to validate SSL certificates                                            |
 
 ### Backup Configuration Parameters
 
@@ -69,6 +69,7 @@ The module supports the following operations:
 | parallel_backup                  | boolean    | no       | `false`  | option to enable parallel schedule backups                                     |
 | keep_cr_status                   | boolean    | no       | `false`  | option to enable to keep the CR status of the resources in the backup schedule |
 | advanced_resource_label_selector | string     | no       |          | Advanced label selector for resources (string format with operator support)    |
+| volume_resource_only_policy_ref  | dictionary | no       |          | Reference to Volume Resource Only policy                                       |
 
 #### backup_location_ref
 
@@ -108,6 +109,14 @@ The module supports the following operations:
 | ------------------ | -------- | ---------- | --------------------- |
 | cluster_ref.name | string | yes      | Name of the cluster |
 | cluster_ref.uid  | string | yes      | UID of the cluster  |
+
+#### volume_resource_only_policy_ref
+
+
+| Parameter                            | Type   | Required | Description                             |
+| -------------------------------------- | -------- | ---------- | ----------------------------------------- |
+| volume_resource_only_policy_ref.name | string | yes      | Name of the Volume Resource Only policy |
+| volume_resource_only_policy_ref.uid  | string | yes      | UID of the Volume Resource Only policy  |
 
 ### Resource Selection Parameters
 

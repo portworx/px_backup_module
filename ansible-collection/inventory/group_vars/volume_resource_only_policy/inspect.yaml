@@ -1,0 +1,58 @@
+# ansible-collection/inventory/group_vars/volume_resource_only_policy/inspect.yaml
+---
+# Inspection mode: 'ALL' to inspect all policies, 'SPECIFIC' to inspect only listed policies
+inspection_mode: "ALL"  # or "SPECIFIC"
+
+# Optional: Filter labels for INSPECT_ALL operation (only used when inspection_mode is 'ALL')
+filter_labels:
+  environment: "production"
+  # team: "storage"
+  # policy_type: "volume_skip"
+
+# Required when inspection_mode is 'SPECIFIC': List of specific policies to inspect
+policies_to_inspect:
+  - name: "skip-portworx-policy"
+    uid: "12345678-1234-1234-1234-123456789012"
+    validate_certs: true
+
+  - name: "skip-csi-drivers-policy" 
+    uid: "87654321-4321-4321-4321-210987654321"
+    validate_certs: true
+
+  - name: "skip-nfs-servers-policy"
+    uid: "11111111-2222-3333-4444-555555555555"
+    validate_certs: true
+
+  - name: "comprehensive-skip-policy"
+    uid: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+    validate_certs: false
+
+# Alternative configuration examples:
+
+# Example 1: Inspect all policies (no filters)
+# inspection_mode: "ALL"
+# filter_labels: {}
+
+# Example 2: Inspect all policies with specific labels
+# inspection_mode: "ALL"
+# filter_labels:
+#   environment: "production"
+#   team: "platform"
+
+# Example 3: Inspect specific policies by name and UID
+# inspection_mode: "SPECIFIC"
+# policies_to_inspect:
+#   - name: "my-policy-1"
+#     uid: "policy-uid-1"
+#   - name: "my-policy-2"
+#     uid: "policy-uid-2"
+
+# Example 4: Mixed validation settings
+# inspection_mode: "SPECIFIC"
+# policies_to_inspect:
+#   - name: "prod-policy"
+#     uid: "prod-policy-uid"
+#     validate_certs: true
+#   - name: "test-policy"
+#     uid: "test-policy-uid"
+#     validate_certs: false

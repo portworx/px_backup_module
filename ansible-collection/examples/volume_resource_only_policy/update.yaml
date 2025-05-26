@@ -1,0 +1,72 @@
+# ansible-collection/examples/volume_resource_only_policy/update.yaml
+---
+- name: Update PX-Backup Volume Resource Only Policy
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/volume_resource_only_policy/update.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - org_id is defined
+          - volume_resource_only_policy_updates is defined
+        fail_msg: "Required variables must be defined"
+
+  tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+    
+    - name: Update volume resource only policies
+      block:
+        - name: Update volume resource only policy
+          volume_resource_only_policy:
+            operation: UPDATE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            org_id: "{{ org_id }}"
+            name: "{{ item.name }}"
+            uid: "{{ item.uid }}"
+            # Optional update parameters
+            volume_types: "{{ item.volume_types | default(omit) }}"
+            csi_drivers: "{{ item.csi_drivers | default(omit) }}"
+            nfs_servers: "{{ item.nfs_servers | default(omit) }}"
+            labels: "{{ item.labels | default(omit) }}"
+            ownership: "{{ item.ownership | default(omit) }}"
+            validate_certs: "{{ item.validate_certs | default(true) }}"
+          register: policy_result
+          loop: "{{ volume_resource_only_policy_updates }}"
+          loop_control:
+            label: "{{ item.name }}"
+
+        # Display successful updates
+        - name: Display update results
+          debug:
+            msg: "Successfully updated volume resource only policy '{{ item.item.name }}'"
+          loop: "{{ policy_result.results }}"
+          loop_control:
+            label: "{{ item.item.name }}"
+          when: not item.failed
+
+        # Display failed updates
+        - name: Display failed updates
+          debug:
+            msg: "Failed to update volume resource only policy '{{ item.item.name }}': {{ item.msg }}"
+          loop: "{{ policy_result.results }}"
+          loop_control:
+            label: "{{ item.item.name }}"
+          when: item.failed
+          
+      rescue:
+        - name: Display error details
+          debug:
+            msg: "Failed to update volume resource only policy: {{ policy_result.msg if policy_result.msg is defined else 'Unknown error occurred' }}"
+          when: policy_result is defined
+
+        - name: Fail with error message
+          fail:
+            msg: "Failed to update volume resource only policies. See above for details."
