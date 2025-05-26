@@ -1,0 +1,10 @@
+# ansible-collection/inventory/group_vars/volume_resource_only_policy/enumerate.yaml
+---
+# Optional: Filter policies by labels (leave empty or comment out for no filtering)
+filter_labels:
+  environment: "production"
+  team: "storage"
+  policy_type: "volume_skip"
+
+# SSL certificate validation
+validate_certs: true
