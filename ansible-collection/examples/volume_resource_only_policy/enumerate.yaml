@@ -1,0 +1,44 @@
+---
+- name: Enumerate PX-Backup Volume Resource Only Policies
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/volume_resource_only_policy/enumerate.yaml"
+
+  vars:
+    # Set default display mode if not defined in vars files
+    _display_mode: "{{ display_mode | default('TABLE') }}"  # TABLE, DETAILED, JSON, SUMMARY
+    
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - _display_mode in ['TABLE', 'DETAILED', 'JSON', 'SUMMARY']
+        fail_msg: "Required variables must be defined. display_mode must be one of: TABLE, DETAILED, JSON, SUMMARY"
+
+    - name: Display enumeration configuration
+      debug:
+        msg:
+          - "=== PX-Backup Volume Resource Only Policy Enumeration ==="
+          - "API URL: {{ px_backup_api_url }}"
+          - "Organization ID: {{ org_id | default('default') }}"
+          - "Display Mode: {{ _display_mode }}"
+          - "{% if filter_labels is defined and filter_labels | length > 0 %}Label Filters: {{ filter_labels | dict2items | map('join', '=') | join(', ') }}{% endif %}"
+          - "Export to File: {{ export_to_file | default('false') }}"
+
+  tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+
+    - name: Enumerate volume resource only policies
+      volume_resource_only_policy:
+        operation: INSPECT_ALL
+        api_url: "{{ px_backup_api_url }}"
+        token: "{{ px_backup_token }}"
+        org_id: "{{ org_id | default('default') }}"
+        labels: "{{ filter_labels | default(omit) }}"
+        validate_certs: "{{ validate_certs | default(true) }}"
+      register: enumerate_result

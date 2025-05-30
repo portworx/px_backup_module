@@ -1,0 +1,93 @@
+---
+# Define volume resource only policies list
+volume_resource_only_policies:
+  # Policy to skip Portworx volumes
+  - name: "skip-portworx-policy"
+    volume_types:
+      - "portworx"
+    labels:
+      environment: "production"
+      team: "storage"
+      policy_type: "volume_skip"
+    ownership:
+      owner: "admin@company.com"
+      groups:
+        - id: "storage-admins"
+          access: "Admin"
+        - id: "platform-team"
+          access: "Write"
+      collaborators:
+        - id: "backup-operator@company.com"
+          access: "Read"
+
+  # Policy to skip specific CSI drivers
+  - name: "skip-csi-drivers-policy"
+    volume_types:
+      - "csi"
+    csi_drivers:
+      - "ebs.csi.aws.com"
+      - "disk.csi.azure.com"
+      - "pd.csi.storage.gke.io"
+    labels:
+      environment: "production"
+      team: "platform"
+      cloud_provider: "multi"
+    ownership:
+      owner: "platform-lead@company.com"
+      groups:
+        - id: "platform-team"
+          access: "Admin"
+
+  # Policy to skip NFS volumes from specific servers
+  - name: "skip-nfs-servers-policy"
+    volume_types:
+      - "nfs"
+    nfs_servers:
+      - "nfs1.company.com"
+      - "nfs2.company.com"
+      - "backup-nfs.company.com"
+    labels:
+      environment: "production"
+      team: "storage"
+      storage_type: "nfs"
+    ownership:
+      owner: "storage-admin@company.com"
+
+  # Comprehensive policy covering multiple volume types
+  - name: "comprehensive-skip-policy"
+    volume_types:
+      - "portworx"
+      - "csi"
+      - "nfs"
+    csi_drivers:
+      - "local-path"
+      - "hostpath"
+    nfs_servers:
+      - "temp-nfs.company.com"
+    labels:
+      environment: "development"
+      team: "devops"
+      scope: "comprehensive"
+    ownership:
+      owner: "devops-lead@company.com"
+      groups:
+        - id: "devops-team"
+          access: "Admin"
+        - id: "developers"
+          access: "Read"
+      collaborators:
+        - id: "qa-lead@company.com"
+          access: "Write"
+      public:
+        type: "Read"
+
+  # Simple policy for testing
+  - name: "test-skip-policy"
+    volume_types:
+      - "csi"
+    csi_drivers:
+      - "test.csi.driver.com"
+    labels:
+      environment: "test"
+      team: "qa"
+    validate_certs: false

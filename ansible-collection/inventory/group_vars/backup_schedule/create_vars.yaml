@@ -34,6 +34,7 @@ backup_schedules:
     cluster_ref:
       name: "demo-1"
       uid: "07dd2ef3-8261-4f75-acd5-64a3fc011172"
+    volume_resource_only_policies:
     backup_object_type:
       type: "VirtualMachine"
     volume_snapshot_class_mapping:
@@ -41,4 +42,7 @@ backup_schedules:
       snapshot2: "class2"
     direct_kdmp: true
     advanced_resource_label_selector: "env=prod"
+    volume_resource_only_policy_ref:
+      name: "volume-resource-only-policy"
+      uid: "volume-resource-only-policy-uid"
 

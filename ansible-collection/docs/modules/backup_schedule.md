@@ -48,15 +48,15 @@ The module supports the following operations:
 ### Schedule Configuration Parameters
 
 
-| Parameter                         | Type    | Required | Default  | Description                                                                    |
-| ----------------------------------- | --------- | ---------- | ---------- | -------------------------------------------------------------------------------- |
-| reclaim_policy                    | string  | no       |          | Policy for backup retention (`Invalid`, `Delete`, `Retain`)                    |
-| backup_type                       | string  | no       | `Normal` | Type of backup (`Invalid`, `Generic`, `Normal`)                                |
-| suspend                           | boolean | no       | `false`  | Whether to suspend the schedule                                                |
-| direct_kdmp                       | boolean | no       | `false`  | Enable direct KDMP backup                                                      |
-| skip_vm_auto_exec_rules           | boolean | no       | `false`  | Skip automatic execution rules for VMs                                         |
-| parallel_backup                   | boolean | no       | `false`  | option to enable parallel schedule backups                                     |
-| keep_cr_status                    | boolean | no       | `false`  | option to enable to keep the CR status of the resources in the backup schedule |
+| Parameter                        | Type    | Required | Default  | Description                                                                    |
+| ---------------------------------- | --------- | ---------- | ---------- | -------------------------------------------------------------------------------- |
+| reclaim_policy                   | string  | no       |          | Policy for backup retention (`Invalid`, `Delete`, `Retain`)                    |
+| backup_type                      | string  | no       | `Normal` | Type of backup (`Invalid`, `Generic`, `Normal`)                                |
+| suspend                          | boolean | no       | `false`  | Whether to suspend the schedule                                                |
+| direct_kdmp                      | boolean | no       | `false`  | Enable direct KDMP backup                                                      |
+| skip_vm_auto_exec_rules          | boolean | no       | `false`  | Skip automatic execution rules for VMs                                         |
+| parallel_backup                  | boolean | no       | `false`  | option to enable parallel schedule backups                                     |
+| keep_cr_status                   | boolean | no       | `false`  | option to enable to keep the CR status of the resources in the backup schedule |
 | advanced_resource_label_selector | string  | no       |          | Advanced label selector for resources (string format with operator support)    |
 
 ### Resource Selection Parameters
@@ -85,13 +85,14 @@ The module supports the following operations:
 ### Reference Parameters
 
 
-| Parameter           | Type | Required | Default | Description                      |
-| --------------------- | ------ | ---------- | --------- | ---------------------------------- |
-| schedule_policy_ref | dict | yes      |         | Reference to schedule policy     |
-| backup_location_ref | dict | yes      |         | Reference to backup location     |
-| cluster_ref         | dict | yes      |         | Reference to target cluster      |
-| pre_exec_rule_ref   | dict | no       |         | Reference to pre-execution rule  |
-| post_exec_rule_ref  | dict | no       |         | Reference to post-execution rule |
+| Parameter                       | Type | Required | Default | Description                              |
+| --------------------------------- | ------ | ---------- | --------- | ------------------------------------------ |
+| schedule_policy_ref             | dict | yes      |         | Reference to schedule policy             |
+| backup_location_ref             | dict | yes      |         | Reference to backup location             |
+| cluster_ref                     | dict | yes      |         | Reference to target cluster              |
+| pre_exec_rule_ref               | dict | no       |         | Reference to pre-execution rule          |
+| post_exec_rule_ref              | dict | no       |         | Reference to post-execution rule         |
+| volume_resource_only_policy_ref | dict | no       |         | Reference to Volume Resource Only policy |
 
 #### schedule_policy_ref
 
@@ -132,6 +133,14 @@ The module supports the following operations:
 | ------------------------- | -------- | ---------- | ---------------------------- |
 | post_exec_rule_ref.name | string | yes      | Name of the post exec rule |
 | post_exec_rule_ref.uid  | string | yes      | UID of the post exec rule  |
+
+#### volume_resource_only_policy_ref
+
+
+| Parameter                            | Type   | Required | Description                             |
+| -------------------------------------- | -------- | ---------- | ----------------------------------------- |
+| volume_resource_only_policy_ref.name | string | yes      | Name of the Volume Resource Only policy |
+| volume_resource_only_policy_ref.uid  | string | yes      | UID of the Volume Resource Only policy  |
 
 ### Backup Object Configuration
 

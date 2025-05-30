@@ -47,6 +47,7 @@
             validate_certs: "{{ item.validate_certs | default(true) }}"
             labels: "{{ item.labels | default(omit) }}"
             advanced_resource_label_selector: "{{ item.advanced_resource_label_selector  | default(omit) }}"
+            volume_resource_only_policy_ref: "{{ item.volume_resource_only_policy_ref | default(omit) }}"
           loop: "{{ backups }}"
           register: backup_result
           loop_control:

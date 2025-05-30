@@ -19,6 +19,8 @@ version_added: "2.8.4"
 description: 
     - Manage backup Schedule in PX-Backup
     - Supports create, update, delete, and list operations
+    - Supports enhanced filtering and sorting in 2.9.0+
+    - Provides VM-specific backup capabilities
 
 options:
     api_url:
@@ -116,8 +118,8 @@ options:
         required: false
         type: str
     backup_object_type:
-        description: Backup Object types
-        choices: ['Invalid', 'All', 'VirtualMachine']
+        description: Backup Object types (updated in 2.9.0)
+        choices: ['Invalid', 'NS', 'VM', 'All']
         type: dict
     volume_snapshot_class_mapping:
         description: Volume Snapshot Class Mapping
@@ -207,7 +209,7 @@ options:
                 type: str
             backup_object_type:
                 description: Backup type of the Backup Schedule
-                choices: ['Invalid', 'Read', 'Write', 'Admin']
+                choices: ['Invalid', 'NS', 'VM', 'All']
                 type: str
             status:
                 description: Status of the Backup Schedule
@@ -241,6 +243,65 @@ options:
         description: Advanced label selector for resources (string format with operator support)
         required: false
         type: str
+    # New in 2.9.0
+    volume_resource_only_policy_ref:
+        description: reference to Volume Resource Only policy ref
+        required: false
+        type: dict
+    policy_ref:
+        description: List of schedule policy references to filter by
+        type: list
+        elements: dict
+        required: false
+        options:
+            name:
+                description: Policy name
+                type: str
+                required: true
+            uid:
+                description: Policy UID
+                type: str
+                required: true
+    include_objects:
+        description: List of exact backup schedules to include (name + UID required)
+        type: list
+        elements: dict
+        required: false
+        options:
+            name:
+                description: Schedule name
+                type: str
+                required: true
+            uid:
+                description: Schedule UID
+                type: str
+                required: true
+    exclude_objects:
+        description: List of exact backup schedules to exclude (name + UID required)
+        type: list
+        elements: dict
+        required: false
+        options:
+            name:
+                description: Schedule name
+                type: str
+                required: true
+            uid:
+                description: Schedule UID
+                type: str
+                required: true
+    include_filter:
+        description: Substring or regex pattern to match backup schedules to include (e.g. "*" for All, "pxb-" or any valid regex)
+        type: str
+        required: false
+    exclude_filter:
+        description: Substring or regex pattern to match backup schedules to exclude (e.g. "*" for All, "pxb-" or any valid regex)
+        type: str
+        required: false
+
+requirements:
+    - python >= 3.9
+    - requests
 
 '''
 
@@ -266,42 +327,132 @@ def update_backup_schedule(module, client):
         module.fail_json(msg=f"Failed to update Backup Schedule: {str(e)}")
 
 def enumerate_backup_schedules(module, client):
-    """List all backup schedule"""
+    """List all backup schedules with support for both GET and POST methods"""
     backup_location_ref = module.params.get('backup_location_ref', {})
     cluster_ref = module.params.get('cluster_ref', {}) 
     enumerate_options = module.params.get('enumerate_options', {})
-    params ={}
+    
+    # Determine if we should use POST based on query complexity
+    use_post = (
+        module.params.get('policy_ref') or
+        module.params.get('include_objects') or 
+        module.params.get('exclude_objects') or
+        module.params.get('include_filter') or
+        module.params.get('exclude_filter')
+    )
+    
+    if use_post:
+        try:
+            # Build the request body for POST
+            request_body = {}
+            
+            # Add enumerate_options if provided
+            if enumerate_options:
+                request_body["enumerate_options"] = {}
+                if enumerate_options.get('max_objects'):
+                    request_body["enumerate_options"]["max_objects"] = enumerate_options.get('max_objects')
+                if enumerate_options.get('name_filter'):
+                    request_body["enumerate_options"]["name_filter"] = enumerate_options.get('name_filter')
+                if enumerate_options.get('cluster_name_filter'):
+                    request_body["enumerate_options"]["cluster_name_filter"] = enumerate_options.get('cluster_name_filter')
+                if enumerate_options.get('cluster_uid_filter'):
+                    request_body["enumerate_options"]["cluster_uid_filter"] = enumerate_options.get('cluster_uid_filter')
+                if enumerate_options.get('include_detailed_resources') is not None:
+                    request_body["enumerate_options"]["include_detailed_resources"] = enumerate_options.get('include_detailed_resources')
+                if enumerate_options.get('backup_object_type'):
+                    request_body["enumerate_options"]["backup_object_type"] = enumerate_options.get('backup_object_type')
+                if enumerate_options.get('owners'):
+                    request_body["enumerate_options"]["owners"] = enumerate_options.get('owners')
+                if enumerate_options.get('status'):
+                    request_body["enumerate_options"]["status"] = enumerate_options.get('status')
+                if enumerate_options.get('time_range'):
+                    request_body["enumerate_options"]["time_range"] = enumerate_options.get('time_range')
+            
+            # Add references if provided
+            if backup_location_ref:
+                request_body["backup_location_ref"] = backup_location_ref
+            
+            if cluster_ref:
+                request_body["cluster_ref"] = cluster_ref
+            
+            # Add 2.9.0 fields if provided
+            if module.params.get('volume_resource_only_policy_ref'):
+                request_body["volumeResourceOnlyPolicyRef"] = module.params.get('volume_resource_only_policy_ref')
 
-    if backup_location_ref:
-        params['backup_location_ref.name'] = backup_location_ref.get('name')
-        params['backup_location_ref.uid'] = backup_location_ref.get('uid')
+            if module.params.get('policy_ref'):
+                request_body["policy_ref"] = module.params.get('policy_ref')
+            
+            if module.params.get('include_objects'):
+                request_body["include_objects"] = module.params.get('include_objects')
+                
+            if module.params.get('exclude_objects'):
+                request_body["exclude_objects"] = module.params.get('exclude_objects')
+                
+            if module.params.get('include_filter'):
+                request_body["include_filter"] = module.params.get('include_filter')
+                
+            if module.params.get('exclude_filter'):
+                request_body["exclude_filter"] = module.params.get('exclude_filter')
+            
+            # Make POST request
+            response = client.make_request(
+                'POST',
+                f"v1/backupschedule/{module.params['org_id']}/enumerate",
+                data=request_body
+            )
+            
+            return response.get('backup_schedules', [])
+            
+        except Exception as e:
+            handle_request_exception(e, module, "enumerate backup schedules")
+    else:
+        # Use GET with query parameters for simpler queries
+        params = {}
 
-    if cluster_ref:
-        params['cluster_ref.name'] = cluster_ref.get('name')
-        params['cluster_ref.uid'] = cluster_ref.get('uid')
+        if backup_location_ref:
+            params['backup_location_ref.name'] = backup_location_ref.get('name')
+            params['backup_location_ref.uid'] = backup_location_ref.get('uid')
 
-    if enumerate_options:
-        time_range = enumerate_options.get("time_range", {})
-        if time_range:
-            params['enumerate_options.time_range.start_time']= time_range.get('start_time')
-            params['enumerate_options.time_range.end_time']= time_range.get('end_time')
+        if cluster_ref:
+            params['cluster_ref.name'] = cluster_ref.get('name')
+            params['cluster_ref.uid'] = cluster_ref.get('uid')
 
-        params['enumerate_options.backup_object_type']= enumerate_options.get('backup_object_type')
-        params['enumerate_options.max_objects']= enumerate_options.get('max_objects')
-        params['enumerate_options.name_filter']= enumerate_options.get('name_filter')
-        params['enumerate_options.cluster_name_filter']= enumerate_options.get('cluster_name_filter')
-        params['enumerate_options.object_index']= enumerate_options.get('object_index')
-        params['enumerate_options.include_detailed_resources']= enumerate_options.get('include_detailed_resources')
-        params['enumerate_options.cluster_uid_filter']= enumerate_options.get('cluster_uid_filter')
-        params['enumerate_options.owners']= enumerate_options.get('owners')
-        params['enumerate_options.status']= enumerate_options.get('status')
-        
-    try:
-        response = client.make_request('GET', f"v1/backupschedule/{module.params['org_id']}", params=params)
+        if module.params.get('volume_resource_only_policy_ref'):
+            params['volumeResourceOnlyPolicyRef.name'] = module.params.get('volume_resource_only_policy_ref').get('name')
+            params['volumeResourceOnlyPolicyRef.uid'] = module.params.get('volume_resource_only_policy_ref').get('uid')
 
-        return response.get('backup_schedules', [])
-    except Exception as e:
-        module.fail_json(msg=f"Failed to enumerate Backup Schedule: {str(e)}")
+        if enumerate_options:
+            time_range = enumerate_options.get("time_range", {})
+            if time_range:
+                params['enumerate_options.time_range.start_time']= time_range.get('start_time')
+                params['enumerate_options.time_range.end_time']= time_range.get('end_time')
+
+            params['enumerate_options.backup_object_type']= enumerate_options.get('backup_object_type')
+            params['enumerate_options.max_objects']= enumerate_options.get('max_objects')
+            params['enumerate_options.name_filter']= enumerate_options.get('name_filter')
+            params['enumerate_options.cluster_name_filter']= enumerate_options.get('cluster_name_filter')
+            params['enumerate_options.object_index']= enumerate_options.get('object_index')
+            params['enumerate_options.include_detailed_resources']= enumerate_options.get('include_detailed_resources')
+            params['enumerate_options.cluster_uid_filter']= enumerate_options.get('cluster_uid_filter')
+            params['enumerate_options.owners']= enumerate_options.get('owners')
+            params['enumerate_options.status']= enumerate_options.get('status')
+            
+        try:
+            response = client.make_request('GET', f"v1/backupschedule/{module.params['org_id']}", params=params)
+            return response.get('backup_schedules', [])
+        except Exception as e:
+            handle_request_exception(e, module, "enumerate backup schedules")
+
+def handle_request_exception(e, module, operation):
+    """Handle exceptions from API requests with consistent error formatting"""
+    error_msg = str(e)
+    if isinstance(e, requests.exceptions.RequestException) and hasattr(e, 'response'):
+        try:
+            error_detail = e.response.json()
+            error_msg = f"{error_msg}: {error_detail}"
+        except ValueError:
+            error_msg = f"{error_msg}: {e.response.text}"
+    module.fail_json(msg=f"Failed to {operation}: {error_msg}")
 
 def inspect_backup_schedules(module, client):
     """Get details of a specific backup schedule"""
@@ -319,18 +470,66 @@ def inspect_backup_schedules(module, client):
         module.fail_json(msg=f"Failed to inspect Backup Schedule: {str(e)}")
 
 def delete_backup_schedules(module, client):
-    """Delete a backup schedule"""
-    params = {
-        'uid': module.params.get('uid')
-    }
-    try:
-        response = client.make_request(
-            'DELETE',
-            f"v1/backupschedule/{module.params['org_id']}/{module.params['name']}"
-        )
-        return response, True
-    except Exception as e:
-        module.fail_json(msg=f"Failed to delete Backup Schedule: {str(e)}")
+    """Delete a backup schedule with support for 2.9.0 features"""
+    # For simple delete operations
+    if not (module.params.get('policy_ref') or module.params.get('include_objects') or 
+            module.params.get('exclude_objects') or module.params.get('include_filter') or 
+            module.params.get('exclude_filter')):
+        params = {
+            'uid': module.params.get('uid')
+        }
+        try:
+            response = client.make_request(
+                'DELETE',
+                f"v1/backupschedule/{module.params['org_id']}/{module.params['name']}",
+                params=params
+            )
+            return response, True
+        except Exception as e:
+            handle_request_exception(e, module, "delete backup schedule")
+    
+    # For complex delete operations, use POST endpoint
+    else:
+        try:
+            delete_request = {
+                "org_id": module.params['org_id'],
+                "name": module.params.get('name'),
+                "uid": module.params.get('uid')
+            }
+            
+            # Add 2.9.0 fields if provided
+            if module.params.get('backup_object_type'):
+                delete_request["backup_object_type"] = module.params['backup_object_type']
+                
+            if module.params.get('policy_ref'):
+                delete_request["policy_ref"] = module.params['policy_ref']
+                
+            if module.params.get('include_objects'):
+                delete_request["include_objects"] = module.params['include_objects']
+                
+            if module.params.get('exclude_objects'):
+                delete_request["exclude_objects"] = module.params['exclude_objects']
+                
+            if module.params.get('include_filter'):
+                delete_request["include_filter"] = module.params['include_filter']
+                
+            if module.params.get('exclude_filter'):
+                delete_request["exclude_filter"] = module.params['exclude_filter']
+                
+            if module.params.get('cluster_ref'):
+                delete_request["cluster_ref"] = module.params['cluster_ref']
+
+            if module.params.get('volume_resource_only_policy_ref'):
+                delete_request["volumeResourceOnlyPolicyRef"] = module.params['volume_resource_only_policy_ref']
+            
+            response = client.make_request(
+                'POST',
+                f"v1/backupschedule/{module.params['org_id']}/delete",
+                data=delete_request
+            )
+            return response, True
+        except Exception as e:
+            handle_request_exception(e, module, "delete backup schedule")
 
 def backup_schedule_request_body(module):
     """Build the backup schedule request object"""
@@ -354,6 +553,7 @@ def backup_schedule_request_body(module):
         "direct_kdmp": module.params['direct_kdmp'],
         "parallel_backup": module.params['parallel_backup'],
         "keep_cr_status": module.params['keep_cr_status'],
+        "volumeResourceOnlyPolicyRef": module.params['volume_resource_only_policy_ref'],
 
     }
 
@@ -364,6 +564,8 @@ def backup_schedule_request_body(module):
             backup_schedule_request['pre_exec_rule_ref'] = module.params['pre_exec_rule_ref']
         if module.params.get('post_exec_rule_ref'):
             backup_schedule_request['post_exec_rule_ref'] = module.params['post_exec_rule_ref']
+        if module.params.get('volume_resource_only_policy_ref'):
+            backup_schedule_request['volumeResourceOnlyPolicyRef'] = module.params['volume_resource_only_policy_ref']
         
 
     if module.params.get('pre_exec_rule_ref') and module.params.get('pre_exec_rule'):
@@ -377,7 +579,7 @@ def backup_schedule_request_body(module):
     
     backup_object_type= module.params.get('backup_object_type')
     if backup_object_type:
-        if backup_object_type.get("type") == 'VirtualMachine' and module.params.get('skip_vm_auto_exec_rules'):
+        if backup_object_type.get("type") == 'VM' and module.params.get('skip_vm_auto_exec_rules'):
             backup_schedule_request['skip_vm_auto_exec_rules'] = module.params['skip_vm_auto_exec_rules']
 
     if module.params.get('exclude_resource_types'):
@@ -397,6 +599,21 @@ def backup_schedule_request_body(module):
 
     if module.params.get('advanced_resource_label_selector'):
         backup_schedule_request['advanced_resource_label_selector'] = module.params['advanced_resource_label_selector']
+    
+    if module.params.get('policy_ref'):
+        backup_schedule_request['policy_ref'] = module.params['policy_ref']
+        
+    if module.params.get('include_objects'):
+        backup_schedule_request['include_objects'] = module.params['include_objects']
+        
+    if module.params.get('exclude_objects'):
+        backup_schedule_request['exclude_objects'] = module.params['exclude_objects']
+        
+    if module.params.get('include_filter'):
+        backup_schedule_request['include_filter'] = module.params['include_filter']
+        
+    if module.params.get('exclude_filter'):
+        backup_schedule_request['exclude_filter'] = module.params['exclude_filter']
 
     return backup_schedule_request
 
@@ -429,7 +646,7 @@ def run_module():
         backup_object_type=dict(
             type='dict',
             options=dict(
-                type=dict(type='str', choices=['Invalid', 'All', 'VirtualMachine']),
+                type=dict(type='str', choices=['Invalid', 'NS', 'VM', 'All']),
             ),
         ),
         cluster_ref=dict(
@@ -500,13 +717,50 @@ def run_module():
             object_index=dict(type='str'),
             include_detailed_resources=dict(type='bool'),
             cluster_uid_filter=dict(type='str'),
-            backup_object_type=dict(type='str',choices=['Invalid', 'All', 'VirtualMachine']),
+            backup_object_type=dict(type='str',choices=['Invalid', 'NS', 'VM', 'All']),
             status=dict(type='str'),
             time_range=dict(type='dict', options=dict(
                 start_time=dict(type='str'),
                 end_time=dict(type='str')
             ))
         )),
+        policy_ref=dict(
+            type='list',
+            elements='dict',
+            required=False,
+            options=dict(
+                name=dict(type='str', required=True),
+                uid=dict(type='str', required=True)
+            )
+        ),
+        include_objects=dict(
+            type='list',
+            elements='dict',
+            required=False,
+            options=dict(
+                name=dict(type='str', required=True),
+                uid=dict(type='str', required=True)
+            )
+        ),
+        exclude_objects=dict(
+            type='list',
+            elements='dict',
+            required=False,
+            options=dict(
+                name=dict(type='str', required=True),
+                uid=dict(type='str', required=True)
+            )
+        ),
+        volume_resource_only_policy_ref=dict(
+            type='dict',
+            required=False,
+            options=dict(
+                name=dict(type='str', required=True),
+                uid=dict(type='str', required=True)
+            )
+        ),
+        include_filter=dict(type='str', required=False),
+        exclude_filter=dict(type='str', required=False),
     )
 
     result = dict(

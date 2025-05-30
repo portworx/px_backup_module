@@ -1,0 +1,46 @@
+# ansible-collection/inventory/group_vars/volume_resource_only_policy/update.yaml
+---
+# Define volume resource only policies to update
+volume_resource_only_policy_updates:
+  # Example: Update volume types and CSI drivers
+  - name: "skip-portworx-policy"
+    uid: "policy-uid-123"
+    volume_types:
+      - "portworx"
+      - "csi"
+      - "nfs"
+    csi_drivers:
+      - "ebs.csi.aws.com"
+      - "disk.csi.azure.com"
+      - "pd.csi.storage.gke.io"
+    nfs_servers:
+      - "nfs1.example.com"
+      - "nfs2.example.com"
+    labels:
+      environment: "production"
+      team: "platform"
+      updated: "true"
+
+  # Example: Update only ownership
+  - name: "skip-csi-policy"
+    uid: "policy-uid-456"
+    ownership:
+      owner: "admin@example.com"
+      groups:
+        - id: "backup-admins"
+          access: "Admin"
+        - id: "platform-team"
+          access: "Write"
+      collaborators:
+        - id: "user1@example.com"
+          access: "Read"
+        - id: "user2@example.com"
+          access: "Write"
+
+  # Example: Update labels only
+  - name: "nfs-skip-policy"
+    uid: "policy-uid-789"
+    labels:
+      purpose: "skip-nfs-volumes"
+      last-updated: "2024-01-15"
+      version: "v2"
