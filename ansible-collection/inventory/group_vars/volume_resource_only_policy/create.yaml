@@ -1,7 +1,7 @@
 ---
 # Define volume resource only policies list
 volume_resource_only_policies:
-  # Policy to skip Portworx volumes
+  # Policy to skip backup of Portworx volumes
   - name: "skip-portworx-policy"
     volume_types:
       - "Portworx"
@@ -20,7 +20,7 @@ volume_resource_only_policies:
         - id: "backup-operator@company.com"
           access: "Read"
 
-  # Policy to skip specific CSI drivers
+  # Policy to skip backup of volumes provisioned by specific CSI drivers
   - name: "skip-csi-drivers-policy"
     volume_types:
       - "Csi"
