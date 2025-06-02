@@ -1,10 +1,10 @@
 ---
 # Define volume resource only policies list
 volume_resource_only_policies:
-  # Policy to skip Portworx volumes
+  # Policy to skip backup of Portworx volumes
   - name: "skip-portworx-policy"
     volume_types:
-      - "portworx"
+      - "Portworx"
     labels:
       environment: "production"
       team: "storage"
@@ -20,10 +20,10 @@ volume_resource_only_policies:
         - id: "backup-operator@company.com"
           access: "Read"
 
-  # Policy to skip specific CSI drivers
+  # Policy to skip backup of volumes provisioned by specific CSI drivers
   - name: "skip-csi-drivers-policy"
     volume_types:
-      - "csi"
+      - "Csi"
     csi_drivers:
       - "ebs.csi.aws.com"
       - "disk.csi.azure.com"
@@ -41,7 +41,7 @@ volume_resource_only_policies:
   # Policy to skip NFS volumes from specific servers
   - name: "skip-nfs-servers-policy"
     volume_types:
-      - "nfs"
+      - "Nfs"
     nfs_servers:
       - "nfs1.company.com"
       - "nfs2.company.com"
@@ -56,9 +56,9 @@ volume_resource_only_policies:
   # Comprehensive policy covering multiple volume types
   - name: "comprehensive-skip-policy"
     volume_types:
-      - "portworx"
-      - "csi"
-      - "nfs"
+      - "Portworx"
+      - "Csi"
+      - "Nfs"
     csi_drivers:
       - "local-path"
       - "hostpath"
@@ -84,7 +84,7 @@ volume_resource_only_policies:
   # Simple policy for testing
   - name: "test-skip-policy"
     volume_types:
-      - "csi"
+      - "Csi"
     csi_drivers:
       - "test.csi.driver.com"
     labels:
