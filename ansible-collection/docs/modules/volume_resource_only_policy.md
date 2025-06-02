@@ -61,9 +61,9 @@ The module supports the following operations:
 | Value    | Description                               |
 | ---------- | ------------------------------------------- |
 | Invalid  | Invalid volume type (not recommended)     |
-| portworx | Portworx volumes                          |
-| csi      | CSI (Container Storage Interface) volumes |
-| nfs      | NFS (Network File System) volumes         |
+| Portworx | Portworx volumes                          |
+| Csi      | CSI (Container Storage Interface) volumes |
+| Nfs      | NFS (Network File System) volumes         |
 
 ### Metadata Parameters
 
@@ -106,7 +106,7 @@ The module supports the following operations:
     name: "skip-portworx-data"
     org_id: "default"
     volume_types:
-      - "portworx"
+      - "Portworx"
 ```
 
 ### Advanced Configuration
@@ -121,8 +121,8 @@ The module supports the following operations:
     name: "skip-cloud-volumes"
     org_id: "default"
     volume_types:
-      - "portworx"
-      - "csi"
+      - "Portworx"
+      - "Csi"
     csi_drivers:
       - "ebs.csi.aws.com"
       - "disk.csi.azure.com"
@@ -145,7 +145,7 @@ The module supports the following operations:
     name: "skip-nfs-servers"
     org_id: "default"
     volume_types:
-      - "nfs"
+      - "Nfs"
     nfs_servers:
       - "nfs1.example.com"
       - "nfs2.example.com"
@@ -183,8 +183,8 @@ The module supports the following operations:
     org_id: "default"
     uid: "policy-uid-123"
     volume_types:
-      - "portworx"
-      - "csi"
+      - "Portworx"
+      - "Csi"
     csi_drivers:
       - "ebs.csi.aws.com"
 
@@ -255,9 +255,8 @@ volume_resource_only_policy:
           - id: "user@company.com"
             access: "Write"
     volume_resource_only_policy_info:
-      volume_types: ["portworx", "csi"]
+      volume_types: ["Portworx", "Csi"]
       csi_drivers: ["ebs.csi.aws.com", "disk.csi.azure.com"]
-      nfs_servers: ["nfs.example.com"]
 ```
 
 ### Multiple Policies Operations
@@ -275,7 +274,7 @@ volume_resource_only_policies:
         org_id: "default"
         uid: "123"
       volume_resource_only_policy_info:
-        volume_types: ["portworx"]
+        volume_types: ["Portworx"]
         csi_drivers: []
         nfs_servers: []
     - metadata:
@@ -283,7 +282,7 @@ volume_resource_only_policies:
         org_id: "default"
         uid: "456"
       volume_resource_only_policy_info:
-        volume_types: ["csi"]
+        volume_types: ["Csi"]
         csi_drivers: ["ebs.csi.aws.com"]
         nfs_servers: []
 ```
