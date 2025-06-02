@@ -28,9 +28,8 @@ import requests
 # Constants for enum mappings
 BACKUP_OBJECT_TYPE_MAP = {
     'Invalid': 0,
-    'NS': 1, 
-    'VM': 2,
-    'All': 3
+    'All': 1,
+    'VirtualMachine': 2
 }
 
 DOCUMENTATION = r'''
@@ -47,7 +46,6 @@ description:
     - Supports both Generic and Normal backup types
     - Provides both single backup and bulk inspection capabilities
     - Handles namespace and resource selection
-    - Enhanced sorting and filtering capabilities (2.9.0+)
 
 options:
     operation:
@@ -68,6 +66,8 @@ options:
             - INSPECT_ONE
             - INSPECT_ALL
             - UPDATE_BACKUP_SHARE
+            - GET_BACKUP_RESOURCE_DETAILS
+            - RETRY_BACKUP_RESOURCES
     api_url:
         description: PX-Backup API URL
         required: true
@@ -183,10 +183,14 @@ options:
         default: 'Normal'
         required: false
     backup_object_type:
-        description: Backup object type (updated in 2.9.0)
-        type: str
+        description: Backup object type
+        type: dict
         required: false
-        choices: ['Invalid', 'NS', 'VM', 'All']
+        suboptions:
+            type:
+                description: Type of backup object
+                type: str
+                choices: ['Invalid', 'All', 'VirtualMachine']
     ns_label_selectors:
         description: Label selectors for namespaces
         type: str
@@ -209,62 +213,147 @@ options:
         type: bool
         default: false
         required: false
-    backup_share:
-        description: Backup sharing configuration
-        type: dict
-        required: false
-        suboptions:
-            collaborators:
-                description: List of users to share with
-                type: list
-                elements: dict
-                suboptions:
-                    id:
-                        description: User ID
-                        type: str
-                        required: true
-                    access:
-                        description: Access level
-                        type: str
-                        choices: ['Invalid', 'View', 'Restorable', 'FullAccess']
-                        required: true
-            groups:
-                description: List of groups to share with
-                type: list
-                elements: dict
-                suboptions:
-                    id:
-                        description: Group ID
-                        type: str
-                        required: true
-                    access:
-                        description: Access level
-                        type: str
-                        choices: ['Invalid', 'View', 'Restorable', 'FullAccess']
-                        required: true
+backup_share:
+    description: Backup sharing configuration
+    type: dict
+    required: false
+    suboptions:
+        collaborators:
+            description: List of user access configurations
+            type: list
+            elements: dict
+            suboptions:
+                id:
+                    description: User identifier
+                    type: str
+                    required: true
+                access:
+                    description: Access level
+                    type: str
+                    choices: ['Invalid', 'View', 'Restorable', 'FullAccess']
+                    required: true
+        groups:
+            description: List of group access configurations
+            type: list
+            elements: dict
+            suboptions:
+                id:
+                    description: Group identifier
+                    type: str
+                    required: true
+                access:
+                    description: Access level
+                    type: str
+                    choices: ['Invalid', 'View', 'Restorable', 'FullAccess'] 
+                    required: true
     validate_certs:
         description: Verify SSL certificates
         type: bool
         default: true
     parallel_backup:
-        description: Option to enable parallel schedule backups
+        description: option to enable parallel schedule backups
         required: false
         type: bool
     keep_cr_status:
-        description: Option to keep the CR status of the resources in the backup schedule
+        description: option to enable to keep the CR status of the resources in the backup schedule
         required: false
         type: bool
     advanced_resource_label_selector:
         description: Advanced label selector for resources (string format with operator support)
         required: false
         type: str
-    # New in 2.9.0
-    volume_resource_only_policy_ref:
-        description: reference to Volume Resource Only policy ref
-        required: false
+    cloud_credential_ref:
+        description: Reference to cloud credentials for backup
         type: dict
+        required: false
+        suboptions:
+            name:
+                description: Name of the cloud credential
+                type: str
+            uid:
+                description: UID of the cloud credential
+                type: str
+    schedule_policy_ref:
+        description: List of schedule policy references to filter by
+        type: list
+        elements: dict
+        required: false
+        suboptions:
+            name:
+                description: Name of the schedule policy
+                type: str
+            uid:
+                description: UID of the schedule policy
+                type: str
+    backup_schedule_ref:
+        description: List of backup schedule references to filter by
+        type: list
+        elements: dict
+        required: false
+        suboptions:
+            name:
+                description: Name of the backup schedule
+                type: str
+            uid:
+                description: UID of the backup schedule
+                type: str
+    volume_resource_only_policy_ref:
+        description: Reference to Volume Resource Only policy
+        type: dict
+        required: false
+        suboptions:
+            name:
+                description: Name of the Volume Resource Only policy
+                type: str
+            uid:
+                description: UID of the Volume Resource Only policy
+                type: str
+    ownership:
+        description: Ownership and access control configuration
+        type: dict
+        required: false
+        suboptions:
+            owner:
+                description: Owner of the backup
+                type: str
+            groups:
+                description: List of group access configurations
+                type: list
+                elements: dict
+                suboptions:
+                    id:
+                        description: Group identifier
+                        type: str
+                    access:
+                        description: Access level
+                        type: str
+                        choices: ['Read', 'Write', 'Admin']
+            collaborators:
+                description: List of collaborator access configurations
+                type: list
+                elements: dict
+                suboptions:
+                    id:
+                        description: Collaborator identifier
+                        type: str
+                    access:
+                        description: Access level
+                        type: str
+                        choices: ['Read', 'Write', 'Admin']
+            public:
+                description: Public access configuration
+                type: dict
+                suboptions:
+                    type:
+                        description: Public access level
+                        type: str
+                        choices: ['Read', 'Write', 'Admin']
+    labels:
+        description: Labels to attach to the backup
+        type: dict
+        required: false
     sort_option:
-        description: Sorting options for backup listing
+        description: Sorting configuration for backup enumeration
         type: dict
         required: false
         suboptions:
@@ -278,67 +367,40 @@ options:
                 type: str
                 choices: ['Ascending', 'Descending']
                 default: 'Descending'
-    schedule_policy_ref:
-        description: Filter backups by schedule policy references
-        type: list
-        elements: dict
-        required: false
-        options:
-            name:
-                description: Policy name
-                type: str
-                required: true
-            uid:
-                description: Policy UID
-                type: str
-                required: true
-    backup_schedule_ref:
-        description: Filter backups by backup schedule references
-        type: list
-        elements: dict
-        required: false
-        options:
-            name:
-                description: Schedule name
-                type: str
-                required: true
-            uid:
-                description: Schedule UID
-                type: str
-                required: true
-    # Enumerate options
-    labels:
-        description: Filter by labels
-        type: dict
-        required: false
     max_objects:
         description: Maximum number of objects to return
         type: int
         required: false
+
     name_filter:
-        description: Filter by name (substring match)
+        description: Filter backups by name pattern
         type: str
         required: false
+
     cluster_name_filter:
-        description: Filter by cluster name
+        description: Filter backups by cluster name
         type: str
         required: false
+
+    cluster_uid_filter:
+        description: Filter backups by cluster UID
+        type: str
+        required: false
+
     include_detailed_resources:
-        description: Include detailed resource information
+        description: Include detailed resource information in response
         type: bool
         required: false
         default: false
-    cluster_uid_filter:
-        description: Filter by cluster UID
-        type: str
-        required: false
+
     owners:
-        description: Filter by owner
+        description: Filter backups by owner UIDs
         type: list
         elements: str
         required: false
+
     status:
-        description: Filter by status
+        description: Filter backups by status
         type: list
         elements: str
         required: false
@@ -369,7 +431,6 @@ EXAMPLES = r'''
       - "app2"
     backup_type: "Normal"
     advanced_resource_label_selector: "env=prod"
-
 # List all backups
 - name: List all backups
   backup:
@@ -377,28 +438,6 @@ EXAMPLES = r'''
     api_url: "https://px-backup.example.com"
     token: "{{ px_backup_token }}"
     org_id: "default"
-
-# List backups with sorting
-- name: List backups sorted by creation time in descending order
-  backup:
-    operation: INSPECT_ALL
-    api_url: "https://px-backup.example.com"
-    token: "{{ px_backup_token }}"
-    org_id: "default"
-    sort_option:
-      sort_by: "CreationTimestamp"
-      sort_order: "Descending"
-
-# List backups filtered by schedule policy
-- name: List backups created by a specific schedule policy
-  backup:
-    operation: INSPECT_ALL
-    api_url: "https://px-backup.example.com"
-    token: "{{ px_backup_token }}"
-    org_id: "default"
-    schedule_policy_ref:
-      - name: "daily-policy"
-        uid: "policy-uid-123"
 
 # Update backup sharing
 - name: Update backup sharing
@@ -410,14 +449,55 @@ EXAMPLES = r'''
     org_id: "default"
     uid: "backup-uid"
     backup_share:
-      collaborators:
-        - id: "user1@example.com"
-          access: "Restorable"
-        - id: "user2@example.com"
-          access: "View"
-      groups:
-        - id: "backup-admins"
-          access: "FullAccess"
+      collaborators: ["user1", "user2"]
+      groups: ["group1"]
+      access_type: "Read"
+# List backups with sorting
+- name: List backups sorted by creation time
+  backup:
+    operation: INSPECT_ALL
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    org_id: "default"
+    cluster_name_filter: "prod-cluster"
+    cluster_uid_filter: "cluster-uid"
+    sort_option:
+      sort_by: "CreationTimestamp"
+      sort_order: "Descending"
+
+# List backups filtered by schedule policy
+- name: List backups by schedule policy
+  backup:
+    operation: INSPECT_ALL
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    org_id: "default"
+    cluster_name_filter: "prod-cluster"
+    cluster_uid_filter: "cluster-uid"
+    schedule_policy_ref:
+      - name: "daily-policy"
+        uid: "policy-uid-123"
+
+# Get backup resource details
+- name: Get VM backup details
+  backup:
+    operation: GET_BACKUP_RESOURCE_DETAILS
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    name: "vm-backup"
+    org_id: "default"
+    uid: "backup-uid"
+
+# Retry failed backup
+- name: Retry failed VM backup
+  backup:
+    operation: RETRY_BACKUP_RESOURCES
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    name: "failed-backup"
+    org_id: "default"
+    uid: "backup-uid"
+    skip_vm_auto_exec_rules: true
 '''
 
 RETURN = r'''
@@ -547,6 +627,17 @@ class OperationResult:
     message: str = ""
     error: Optional[str] = None
 
+def handle_request_exception(e, module, operation):
+    """Handle exceptions from API requests with consistent error formatting"""
+    error_msg = str(e)
+    if isinstance(e, requests.exceptions.RequestException) and hasattr(e, 'response'):
+        try:
+            error_detail = e.response.json()
+            error_msg = f"{error_msg}: {error_detail}"
+        except ValueError:
+            error_msg = f"{error_msg}: {e.response.text}"
+    module.fail_json(msg=f"Failed to {operation}: {error_msg}")
+
 
 def validate_params(params: Dict[str, Any], operation: str, required_params: List[str]) -> None:
     """
@@ -600,6 +691,9 @@ def build_backup_request(params: Dict[str, Any]) -> Dict[str, Any]:
         if params.get('ownership'):
             request['metadata']['ownership'] = params['ownership']
 
+        if params.get('cloud_credential_ref'):
+            request['cloud_credential_ref'] = params['cloud_credential_ref']
+
         return request
 
     # For other operations, include additional fields
@@ -610,7 +704,6 @@ def build_backup_request(params: Dict[str, Any]) -> Dict[str, Any]:
         "label_selectors": params.get('label_selectors', {}),
         "include_resources": params.get('include_resources', []),
         "resource_types": params.get('resource_types', []),
-        "volume_resource_only_policy_ref": params.get('volume_resource_only_policy_ref', {}),
     })
 
     # Add backup type if provided
@@ -620,18 +713,18 @@ def build_backup_request(params: Dict[str, Any]) -> Dict[str, Any]:
             'Generic': 1,
             'Normal': 2
         }
-        request['backup_type'] = backup_type_map.get(params['backup_type'], 0)
+        request['backup_type'] = backup_type_map.get(params['backup_type'], 2)
 
-    # Map string enum values to integer values
+    # Add backup object type if provided
     if params.get('backup_object_type'):
-        # Use the global constant
-        type_value = BACKUP_OBJECT_TYPE_MAP.get(params['backup_object_type'], 0)
-        
-        # Format according to the proto definition (message with a 'type' field)
-        request['backup_object_type'] = {
-            "type": type_value
-        }
-    
+        backup_obj_type = params['backup_object_type']
+        if isinstance(backup_obj_type, dict) and 'type' in backup_obj_type:
+            type_value = BACKUP_OBJECT_TYPE_MAP.get(backup_obj_type['type'], 0)
+            request['backup_object_type'] = {"type": type_value}
+        else:
+            request['backup_object_type'] = {"type": 0}
+
+
     # Add optional fields if they exist
     optional_fields = [
         'cluster',
@@ -645,6 +738,9 @@ def build_backup_request(params: Dict[str, Any]) -> Dict[str, Any]:
         'parallel_backup',
         'keep_cr_status',
         'advanced_resource_label_selector',
+        'volume_resource_only_policy_ref',
+        'schedule_policy_ref',
+        'backup_schedule_ref',
     ]
 
     for field in optional_fields:
@@ -706,7 +802,6 @@ def create_backup(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict[s
         
         # Build request
         backup_request = build_backup_request(params)
-        logger.info(f"API REQUEST: {json.dumps(backup_request, indent=2)}")
         
         # Make API request
         response = client.make_request(
@@ -840,119 +935,113 @@ def enumerate_backups(module: AnsibleModule, client: PXBackupClient) -> List[Dic
     
     # Determine if we should use POST based on complex query parameters
     use_post = (
-        len(module.params.get('schedule_policy_ref', [])) > 0 or 
-        len(module.params.get('backup_schedule_ref', [])) > 0 or
+        module.params.get('schedule_policy_ref') or 
+        module.params.get('backup_schedule_ref') or
         module.params.get('sort_option') is not None
     )
     
-    # For POST method (more complex queries)
     if use_post:
-        try:
-            # Build the enumerate_options structure directly
-            enumerate_options = {
-                "max_objects": module.params.get('max_objects'),
-                "name_filter": module.params.get('name_filter'),
-                "cluster_name_filter": module.params.get('cluster_name_filter'),
-                "cluster_uid_filter": module.params.get('cluster_uid_filter'),
-                "include_detailed_resources": module.params.get('include_detailed_resources', False),
-                "labels": module.params.get('labels', {})
-            }
-            
-            # Add list fields only if they have values
-            if module.params.get('owners'):
-                enumerate_options["owners"] = module.params['owners']
-                
-            if module.params.get('status'):
-                enumerate_options["status"] = module.params['status']
-
-            # Add backup_object_type to enumerate_options if provided
-            if module.params.get('backup_object_type'):
-                type_value = BACKUP_OBJECT_TYPE_MAP.get(module.params['backup_object_type'], 0)
-                enumerate_options["backup_object_type"] = type_value
-                
-            # Add sorting options
-            if module.params.get('sort_option'):
-                sort_option = module.params['sort_option']
-                enumerate_options["sort_option"] = {
-                    "sortBy": {"type": sort_option.get('sort_by', 'CreationTimestamp')},
-                    "sortOrder": {"type": sort_option.get('sort_order', 'Descending')}
-                }
-            
-            # Add references if they exist
-            if module.params.get('schedule_policy_ref'):
-                enumerate_options["schedule_policy_ref"] = module.params['schedule_policy_ref']
-                
-            if module.params.get('backup_schedule_ref'):
-                enumerate_options["backup_schedule_ref"] = module.params['backup_schedule_ref']
-            
-            # Remove None values from enumerate_options
-            enumerate_options = {k: v for k, v in enumerate_options.items() if v is not None}
-            
-            # Make POST request
-            response = client.make_request(
-                'POST',
-                f"v1/backup/{module.params['org_id']}/enumerate",
-                data={"enumerate_options": enumerate_options}
-            )
-            
-            return response.get('backups', [])
-            
-        except Exception as e:
-            handle_request_exception(e, module, "enumerate backups")
-    
-    # For GET method (simpler queries)
-    else:
-        # Build query parameters
-        params = {}
-        
-        # Map module parameters to API query parameters
-        param_mapping = {
-            'max_objects': 'enumerate_options.max_objects',
-            'include_detailed_resources': 'enumerate_options.include_detailed_resources',
-            'name_filter': 'enumerate_options.name_filter',
-            'cluster_name_filter': 'enumerate_options.cluster_name_filter',
-            'cluster_uid_filter': 'enumerate_options.cluster_uid_filter',
-            'backup_object_type': 'enumerate_options.backup_object_type'
+        # Build enumerate_options for POST request
+        enumerate_options = {
+            "max_objects": module.params.get('max_objects'),
+            "name_filter": module.params.get('name_filter'),
+            "cluster_name_filter": module.params.get('cluster_name_filter'),
+            "cluster_uid_filter": module.params.get('cluster_uid_filter'),
+            "include_detailed_resources": module.params.get('include_detailed_resources', False),
+            "labels": module.params.get('labels', {}),
+            "owners": module.params.get('owners', []),
+            "status": module.params.get('status', [])
         }
         
-        # Add parameters from mapping if they exist
-        for param_name, api_param in param_mapping.items():
-            if module.params.get(param_name) is not None:
-                params[api_param] = module.params[param_name]
+        # Add backup_object_type if provided
+        if module.params.get('backup_object_type'):
+            backup_type_value = module.params['backup_object_type'].get('type')
+            if backup_type_value:
+                type_value = BACKUP_OBJECT_TYPE_MAP.get(backup_type_value, 0)
+                enumerate_options["backup_object_type"] = type_value
+                
+        # Add new 2.9.0 fields
+        if module.params.get('schedule_policy_ref'):
+            enumerate_options["schedule_policy_ref"] = module.params['schedule_policy_ref']
+            
+        if module.params.get('backup_schedule_ref'):
+            enumerate_options["backup_schedule_ref"] = module.params['backup_schedule_ref']
+            
+        if module.params.get('sort_option'):
+            sort_option = module.params['sort_option']
+            enumerate_options["sort_option"] = {
+                "sortBy": {"type": sort_option.get('sort_by', 'CreationTimestamp')},
+                "sortOrder": {"type": sort_option.get('sort_order', 'Descending')}
+            }
         
-        # Handle list parameters
+        # Remove None values
+        enumerate_options = {k: v for k, v in enumerate_options.items() if v is not None}
+        
+        # Make POST request
+        response = client.make_request(
+            'POST',
+            f"v1/backup/{module.params['org_id']}/enumerate",
+            data={"enumerate_options": enumerate_options}
+        )
+        
+        return response.get('backups', [])
+    else:
+
+        # Build query parameters
+        params = {
+            'enumerate_options.cluster_name_filter': module.params.get('cluster_name_filter'),
+            'enumerate_options.cluster_uid_filter': module.params.get('cluster_uid_filter')
+        }
+
+        # Add other parameters if they exist
+        if module.params.get('max_objects'):
+            params['enumerate_options.max_objects'] = module.params['max_objects']
+
+        if module.params.get('include_detailed_resources') is not None:
+            params['enumerate_options.include_detailed_resources'] = module.params['include_detailed_resources']
+
+        if module.params.get('name_filter'):
+            params['enumerate_options.name_filter'] = module.params['name_filter']
+
+        if module.params.get('labels'):
+            # For dictionary types, we might need to handle this differently
+            # depending on how the API expects labels
+            params['enumerate_options.labels'] = module.params['labels']
+
         if module.params.get('owners'):
             params['enumerate_options.owners'] = module.params['owners']
-            
+        
+        if params.get('backup_object_type'):
+            backup_type_value = params['backup_object_type'].get('type')
+            if backup_type_value:
+                type_value = BACKUP_OBJECT_TYPE_MAP.get(backup_type_value, 0)
+                params['backup_object_type'] = {"type": type_value}
+
         if module.params.get('status'):
             params['enumerate_options.status'] = module.params['status']
-            
-        # Handle dictionary parameters
-        if module.params.get('labels'):
-            params['enumerate_options.labels'] = module.params['labels']
-            
+
+        # Remove None values
+        params = {k: v for k, v in params.items() if v is not None}
+
+        logger.debug(f"Making request with params: {params}")
+
         try:
             response = client.make_request(
                 'GET',
                 f"v1/backup/{module.params['org_id']}",
                 params=params
             )
-            
-            return response.get('backups', [])
-            
-        except Exception as e:
-            handle_request_exception(e, module, "enumerate backups")
 
-def handle_request_exception(e: Exception, module: AnsibleModule, operation: str):
-    """Handle exceptions from API requests with consistent error formatting"""
-    error_msg = str(e)
-    if isinstance(e, requests.exceptions.RequestException) and hasattr(e, 'response'):
-        try:
-            error_detail = e.response.json()
-            error_msg = f"{error_msg}: {error_detail}"
-        except ValueError:
-            error_msg = f"{error_msg}: {e.response.text}"
-    module.fail_json(msg=f"Failed to {operation}: {error_msg}")
+            return response.get('backups', [])
+        except Exception as e:
+            error_msg = str(e)
+            if isinstance(e, requests.exceptions.RequestException) and hasattr(e, 'response'):
+                try:
+                    error_detail = e.response.json()
+                    error_msg = f"{error_msg}: {error_detail}"
+                except ValueError:
+                    error_msg = f"{error_msg}: {e.response.text}"
+            module.fail_json(msg=f"Failed to enumerate backups: {error_msg}")
 
 
 def inspect_backup(module: AnsibleModule, client: PXBackupClient) -> Dict[str, Any]:
@@ -970,7 +1059,7 @@ def inspect_backup(module: AnsibleModule, client: PXBackupClient) -> Dict[str, A
         )
         
         # Log response for debugging
-        logger.debug(f"API Response: {response}")
+        module.debug(f"API Response: {response}")
 
         if not response:
             module.fail_json(msg=f"No backup found with name {module.params['name']} and uid {module.params['uid']}")
@@ -1083,6 +1172,56 @@ def needs_update(current: Dict[str, Any], desired: Dict[str, Any]) -> bool:
     return False
 
 
+def get_backup_resource_details(module: AnsibleModule, client: PXBackupClient) -> Dict[str, Any]:
+    """Get detailed backup resource information for VirtualMachine backups"""
+    try:
+        params = {}
+        if module.params.get('uid'):
+            params['uid'] = module.params['uid']
+            
+        response = client.make_request(
+            'GET',
+            f"v1/backup/getbackupresourcedetails/{module.params['org_id']}/{module.params['name']}/{module.params['uid']}",
+            params=params
+        )
+        
+        return {
+            'backup': response.get('backup', {}),
+            'message': "Successfully retrieved backup resource details",
+            'changed': False
+        }
+        
+    except Exception as e:
+        handle_request_exception(e, module, "get backup resource details")
+
+
+def retry_backup_resources(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict[str, Any], bool]:
+    """Retry failed or partial success backup"""
+    try:
+        retry_request = {
+            "org_id": module.params['org_id'],
+            "name": module.params['name'],
+            "uid": module.params['uid']
+        }
+        
+        # Add optional fields
+        if module.params.get('include_resources'):
+            retry_request['include_resources'] = module.params['include_resources']
+            
+        if module.params.get('skip_vm_auto_exec_rules') is not None:
+            retry_request['skip_vm_auto_exec_rules'] = module.params['skip_vm_auto_exec_rules']
+            
+        response = client.make_request(
+            'PUT',
+            'v1/backup/retryBackupResources',
+            data=retry_request
+        )
+        
+        return response.get('backup', {}), True
+        
+    except Exception as e:
+        handle_request_exception(e, module, "retry backup resources")
+
 def handle_api_error(e: Exception, operation: str) -> str:
     """
     Handle API errors and format error message
@@ -1170,6 +1309,24 @@ def perform_operation(module: AnsibleModule, client: PXBackupClient, operation: 
                 data={'backup': backup},
                 message="Backup deleted successfully"
             )
+        
+        elif operation == 'GET_BACKUP_RESOURCE_DETAILS':
+            result = get_backup_resource_details(module, client)
+            return OperationResult(
+                success=True,
+                changed=False,
+                data=result,
+                message="Successfully retrieved backup resource details"
+            )
+            
+        elif operation == 'RETRY_BACKUP_RESOURCES':
+            backup, changed = retry_backup_resources(module, client)
+            return OperationResult(
+                success=True,
+                changed=changed,
+                data={'backup': backup},
+                message="Backup retry initiated successfully"
+            )
 
     except Exception as e:
         logger.exception(f"Operation {operation} failed")
@@ -1194,7 +1351,9 @@ def run_module():
                 'DELETE',
                 'INSPECT_ONE',
                 'INSPECT_ALL',
-                'UPDATE_BACKUP_SHARE'
+                'UPDATE_BACKUP_SHARE',
+                'GET_BACKUP_RESOURCE_DETAILS',
+                'RETRY_BACKUP_RESOURCES',
             ]
         ),
         name=dict(type='str', required=False),
@@ -1307,9 +1466,15 @@ def run_module():
             default='Normal'
         ),
         backup_object_type=dict(
-            type='str',
+            type='dict',
             required=False,
-            choices=['Invalid', 'NS', 'VM', 'All']
+            options=dict(
+                type=dict(
+                    type='str',
+                    required=True,
+                    choices=['Invalid', 'All', 'VirtualMachine']
+                )
+            )
         ),
         ns_label_selectors=dict(type='str', required=False),
         skip_vm_auto_exec_rules=dict(
@@ -1319,9 +1484,7 @@ def run_module():
         parallel_backup=dict(type='bool', required=False, default=False),
         keep_cr_status=dict(type='bool', required=False, default=False),
         advanced_resource_label_selector=dict(type='str', required=False),
-
-        # 2.9.0
-        volume_resource_only_policy_ref=dict(
+        cloud_credential_ref=dict(
             type='dict',
             required=False,
             options=dict(
@@ -1361,6 +1524,14 @@ def run_module():
             options=dict(
                 name=dict(type='str', required=True),
                 uid=dict(type='str', required=True)
+            )
+        ),
+        volume_resource_only_policy_ref=dict(
+            type='dict',
+            required=False,
+            options=dict(
+                name=dict(type='str'),
+                uid=dict(type='str')
             )
         ),
 
@@ -1417,11 +1588,15 @@ def run_module():
 
         'DELETE': ['name', 'uid'],
 
-        'INSPECT_ONE': ['name'],
+        'INSPECT_ONE': ['name', 'uid'],
 
         'INSPECT_ALL': ['cluster_name_filter', 'cluster_uid_filter', 'org_id'],
 
-        'UPDATE_BACKUP_SHARE': ['name', 'uid', 'backup_share']
+        'UPDATE_BACKUP_SHARE': ['name', 'uid', 'backup_share'],
+
+        'GET_BACKUP_RESOURCE_DETAILS': ['name', 'uid'],
+
+        'RETRY_BACKUP_RESOURCES': ['name', 'uid']  
     }
 
     module = AnsibleModule(
@@ -1435,12 +1610,17 @@ def run_module():
 
             ('operation', 'DELETE', ['name', 'uid']),
 
-            ('operation', 'INSPECT_ONE', ['name']),
+            ('operation', 'INSPECT_ONE', ['name', 'uid']),
             
             ('operation', 'INSPECT_ALL', ['cluster_name_filter', 'cluster_uid_filter', 'org_id']),
 
             ('operation', 'UPDATE_BACKUP_SHARE',
-             ['name', 'uid', 'backup_share'])
+             
+             ['name', 'uid', 'backup_share']),
+
+            ('operation', 'GET_BACKUP_RESOURCE_DETAILS', ['name', 'uid']),
+
+            ('operation', 'RETRY_BACKUP_RESOURCES', ['name', 'uid'])  
         ]
     )
 
