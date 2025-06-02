@@ -28,9 +28,9 @@ import requests
 # Constants for enum mappings
 VOLUME_TYPE_MAP = {
     'Invalid': 0,
-    'portworx': 1,
-    'csi': 2,
-    'nfs': 3
+    'Portworx': 1,
+    'Csi': 2,
+    'Nfs': 3
 }
 
 DOCUMENTATION = r'''
@@ -96,7 +96,7 @@ options:
         type: list
         elements: str
         required: false
-        choices: ['Invalid', 'portworx', 'csi', 'nfs']
+        choices: ['Invalid', 'Portworx', 'Csi', 'Nfs']
     csi_drivers:
         description: List of CSI drivers that need to be used to skip the backing up of volume data
         type: list
@@ -180,8 +180,8 @@ EXAMPLES = r'''
     name: "skip-portworx-policy"
     org_id: "default"
     volume_types:
-      - "portworx"
-      - "csi"
+      - "Portworx"
+      - "Csi"
     csi_drivers:
       - "ebs.csi.aws.com"
       - "disk.csi.azure.com"
@@ -257,7 +257,7 @@ volume_resource_only_policy:
             }
         },
         "volume_resource_only_policy_info": {
-            "volume_types": ["portworx", "csi"],
+            "volume_types": ["Portworx", "Csi"],
             "csi_drivers": ["ebs.csi.aws.com", "disk.csi.azure.com"],
             "nfs_servers": ["nfs.example.com"]
         }
@@ -273,7 +273,7 @@ volume_resource_only_policies:
                 "org_id": "default"
             },
             "volume_resource_only_policy_info": {
-                "volume_types": ["portworx"],
+                "volume_types": ["Portworx"],
                 "csi_drivers": [],
                 "nfs_servers": []
             }
@@ -633,7 +633,7 @@ def run_module():
             type='list',
             elements='str',
             required=False,
-            choices=['Invalid', 'portworx', 'csi', 'nfs']
+            choices=['Invalid', 'Portworx', 'Csi', 'Nfs']
         ),
         csi_drivers=dict(type='list', elements='str', required=False),
         nfs_servers=dict(type='list', elements='str', required=False),
