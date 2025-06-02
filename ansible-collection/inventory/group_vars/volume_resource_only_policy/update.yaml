@@ -6,9 +6,9 @@ volume_resource_only_policy_updates:
   - name: "skip-portworx-policy"
     uid: "policy-uid-123"
     volume_types:
-      - "portworx"
-      - "csi"
-      - "nfs"
+      - "Portworx"
+      - "Csi"
+      - "Nfs"
     csi_drivers:
       - "ebs.csi.aws.com"
       - "disk.csi.azure.com"
