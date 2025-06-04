@@ -457,15 +457,11 @@ def update_ownership(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dic
 
 def enumerate_volume_resource_only_policies(module: AnsibleModule, client: PXBackupClient) -> List[Dict[str, Any]]:
     """List all volume resource only policies"""
-    params = {
-        'labels': module.params.get('labels', {})
-    }
     
     try:
         response = client.make_request(
             'GET', 
             f"v1/volumeresourceonlypolicy/{module.params['org_id']}", 
-            params=params
         )
         return response.get('volume_resource_only_policies', [])
     except Exception as e:
