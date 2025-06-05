@@ -1,12 +1,10 @@
 ---
 - name: Inspect PX-Backup Volume Resource Only Policies
   hosts: localhost
-  gather_facts: false
-
+  gather_facts: true
   vars_files:
     - "{{ inventory_dir }}/group_vars/common/all.yaml"
     - "{{ inventory_dir }}/group_vars/volume_resource_only_policy/inspect.yaml"
-
   vars:
     # Set default operation mode
     inspection_mode: "{{ inspection_mode | default('ALL') }}"  # ALL or SPECIFIC
@@ -18,7 +16,6 @@
           - px_backup_api_url is defined
           - (inspection_mode == 'ALL') or (policies_to_inspect is defined and policies_to_inspect | length > 0)
         fail_msg: "Required variables must be defined. For SPECIFIC mode, policies_to_inspect must be provided."
-
     - name: Display inspection configuration
       debug:
         msg:
@@ -27,11 +24,9 @@
           - "Organization ID: {{ org_id | default('default') }}"
           - "Inspection Mode: {{ inspection_mode }}"
           - "{% if inspection_mode == 'SPECIFIC' %}Policies to inspect: {{ policies_to_inspect | map(attribute='name') | list | join(', ') }}{% endif %}"
-
   tasks:
     - name: Login and fetch Px-Backup token
       include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
-
     # Block for inspecting all policies
     - name: Inspect all volume resource only policies
       block:
@@ -44,47 +39,41 @@
             labels: "{{ filter_labels | default(omit) }}"
             validate_certs: "{{ validate_certs | default(true) }}"
           register: all_policies_result
-
         - name: Display all policies summary
           debug:
             msg:
               - "=== ALL POLICIES SUMMARY ==="
               - "Total policies found: {{ all_policies_result.volume_resource_only_policies | length }}"
               - "Policy names: {{ all_policies_result.volume_resource_only_policies | map(attribute='metadata.name') | list | join(', ') }}"
-
-        - name: Display detailed information for all policies
-          debug:
-            msg:
-              - "=== POLICY DETAILS: {{ item.metadata.name }} ==="
-              - "UID: {{ item.metadata.uid | default('N/A') }}"
-              - "Organization: {{ item.metadata.org_id | default('N/A') }}"
-              - "Owner: {{ item.metadata.ownership.owner | default('N/A') }}"
-              - "Created: {{ item.metadata.create_time | default('N/A') }}"
-              - "Modified: {{ item.metadata.modify_time | default('N/A') }}"
-              - ""
-              - "=== POLICY CONFIGURATION ==="
-              - "Volume Types: {{ item.volume_resource_only_policy_info.volume_types | default([]) | join(', ') }}"
-              - "CSI Drivers: {{ item.volume_resource_only_policy_info.csi_drivers | default([]) | join(', ') }}"
-              - "NFS Servers: {{ item.volume_resource_only_policy_info.nfs_servers | default([]) | join(', ') }}"
-              - ""
-              - "=== METADATA ==="
-              - "Labels: {{ item.metadata.labels | default({}) | dict2items | map('join', '=') | join(', ') }}"
-              - "{% if item.metadata.ownership.groups is defined and item.metadata.ownership.groups | length > 0 %}"
-              - "Groups: {{ item.metadata.ownership.groups | map(attribute='id') | join(', ') }}"
-              - "{% endif %}"
-              - "{% if item.metadata.ownership.collaborators is defined and item.metadata.ownership.collaborators | length > 0 %}"
-              - "Collaborators: {{ item.metadata.ownership.collaborators | map(attribute='id') | join(', ') }}"
-              - "{% endif %}"
-              - "{% if item.metadata.ownership.public is defined %}"
-              - "Public Access: {{ item.metadata.ownership.public.type | default('None') }}"
-              - "{% endif %}"
-              - "{{ '=' * 50 }}"
-          loop: "{{ all_policies_result.volume_resource_only_policies }}"
-          loop_control:
-            label: "{{ item.metadata.name }}"
-
+    - name: Display detailed information for all policies
+      debug:
+        msg: >
+          === POLICY DETAILS: {{ item.metadata.name }} ===
+          UID: {{ item.metadata.uid | default('N/A') }}
+          Organization: {{ item.metadata.org_id | default('N/A') }}
+          Owner: {{ item.metadata.ownership.owner | default('N/A') }}
+          Created: {{ item.metadata.create_time | default('N/A') }}
+          Modified: {{ item.metadata.modify_time | default('N/A') }}
+          === POLICY CONFIGURATION ===
+          Volume Types: {{ item.volume_resource_only_policy_info.volume_types | default([]) | join(', ') }}
+          CSI Drivers: {{ item.volume_resource_only_policy_info.csi_drivers | default([]) | join(', ') }}
+          NFS Servers: {{ item.volume_resource_only_policy_info.nfs_servers | default([]) | join(', ') }}
+          === METADATA ===
+          Labels: {{ item.metadata.labels | default({}) | dict2items | map('join', '=') | join(', ') }}
+          {% if item.metadata.ownership.groups is defined and item.metadata.ownership.groups | length > 0 %}
+          Groups: {{ item.metadata.ownership.groups | map(attribute='id') | join(', ') }}
+          {% endif %}
+          {% if item.metadata.ownership.collaborators is defined and item.metadata.ownership.collaborators | length > 0 %}
+          Collaborators: {{ item.metadata.ownership.collaborators | map(attribute='id') | join(', ') }}
+          {% endif %}
+          {% if item.metadata.ownership.public is defined %}
+          Public Access: {{ item.metadata.ownership.public.type | default('None') }}
+          {% endif %}
+          {{ '=' * 50 }}
+      loop: "{{ all_policies_result.volume_resource_only_policies }}"
+      loop_control:
+        label: "{{ item.metadata.name }}"
       when: inspection_mode == 'ALL'
-
     # Block for inspecting specific policies
     - name: Inspect specific volume resource only policies
       block:
@@ -101,12 +90,10 @@
           register: specific_policies_result
           loop_control:
             label: "{{ item.name }}"
-
         - name: Extract successful inspections
           set_fact:
-            successful_inspections: "{{ specific_policies_result.results | selectattr('failed', 'undefined') | list }}"
+            successful_inspections: "{{ specific_policies_result.results | selectattr('failed', 'equalto', false) | list }}"
             failed_inspections: "{{ specific_policies_result.results | selectattr('failed', 'defined') | selectattr('failed', 'equalto', true) | list }}"
-
         - name: Display inspection errors
           debug:
             msg:
@@ -117,7 +104,6 @@
           loop_control:
             label: "{{ item.item.name }}"
           when: failed_inspections | length > 0
-
         - name: Display specific policies summary
           debug:
             msg:
@@ -127,41 +113,41 @@
               - "Failed inspections: {{ failed_inspections | length }}"
               - "{% if successful_inspections | length > 0 %}Successfully inspected: {{ successful_inspections | map(attribute='item.name') | list | join(', ') }}{% endif %}"
               - "{% if failed_inspections | length > 0 %}Failed inspections: {{ failed_inspections | map(attribute='item.name') | list | join(', ') }}{% endif %}"
-
         - name: Display detailed information for specific policies
           debug:
             msg:
-              - "=== POLICY DETAILS: {{ item.volume_resource_only_policy.metadata.name }} ==="
-              - "UID: {{ item.volume_resource_only_policy.metadata.uid | default('N/A') }}"
-              - "Organization: {{ item.volume_resource_only_policy.metadata.org_id | default('N/A') }}"
-              - "Owner: {{ item.volume_resource_only_policy.metadata.ownership.owner | default('N/A') }}"
-              - "Created: {{ item.volume_resource_only_policy.metadata.create_time | default('N/A') }}"
-              - "Modified: {{ item.volume_resource_only_policy.metadata.modify_time | default('N/A') }}"
+              - "=== POLICY DETAILS: {{ item.volume_resource_only_policy.volume_resource_only_policy.metadata.name }} ==="
+              - "UID: {{ item.volume_resource_only_policy.volume_resource_only_policy.metadata.uid | default('N/A') }}"
+              - "Organization: {{ item.volume_resource_only_policy.volume_resource_only_policy.metadata.org_id | default('N/A') }}"
+              - "Owner: {{ item.volume_resource_only_policy.volume_resource_only_policy.metadata.ownership.owner | default('N/A') }}"
+              - "Created: {{ item.volume_resource_only_policy.volume_resource_only_policy.metadata.create_time | default('N/A') }}"
+              - "Modified: {{ item.volume_resource_only_policy.volume_resource_only_policy.metadata.modify_time | default('N/A') }}"
               - ""
               - "=== POLICY CONFIGURATION ==="
-              - "Volume Types: {{ item.volume_resource_only_policy.volume_resource_only_policy_info.volume_types | default([]) | join(', ') }}"
-              - "CSI Drivers: {{ item.volume_resource_only_policy.volume_resource_only_policy_info.csi_drivers | default([]) | join(', ') }}"
-              - "NFS Servers: {{ item.volume_resource_only_policy.volume_resource_only_policy_info.nfs_servers | default([]) | join(', ') }}"
+              - "Volume Types: {{ item.volume_resource_only_policy.volume_resource_only_policy.volume_resource_only_policy_info.volume_types | default([]) | join(', ') }}"
+              - "CSI Drivers: {{ item.volume_resource_only_policy.volume_resource_only_policy.volume_resource_only_policy_info.csi_drivers | default([]) | join(', ') }}"
+              - "NFS Servers: {{ item.volume_resource_only_policy.volume_resource_only_policy.volume_resource_only_policy_info.nfs_servers | default([]) | join(', ') }}"
               - ""
-              - "=== METADATA ==="
-              - "Labels: {{ item.volume_resource_only_policy.metadata.labels | default({}) | dict2items | map('join', '=') | join(', ') }}"
-              - "{% if item.volume_resource_only_policy.metadata.ownership.groups is defined and item.volume_resource_only_policy.metadata.ownership.groups | length > 0 %}"
-              - "Groups: {{ item.volume_resource_only_policy.metadata.ownership.groups | map(attribute='id') | join(', ') }}"
-              - "{% endif %}"
-              - "{% if item.volume_resource_only_policy.metadata.ownership.collaborators is defined and item.volume_resource_only_policy.metadata.ownership.collaborators | length > 0 %}"
-              - "Collaborators: {{ item.volume_resource_only_policy.metadata.ownership.collaborators | map(attribute='id') | join(', ') }}"
-              - "{% endif %}"
-              - "{% if item.volume_resource_only_policy.metadata.ownership.public is defined %}"
-              - "Public Access: {{ item.volume_resource_only_policy.metadata.ownership.public.type | default('None') }}"
-              - "{% endif %}"
+              - >-
+                Labels: {{
+                  item.volume_resource_only_policy.volume_resource_only_policy.metadata.labels
+                  | default({}) | dict2items | map('join', '=') | join(', ')
+                }}
+              - >-
+                {{ 'Groups: ' ~ (item.volume_resource_only_policy.volume_resource_only_policy.metadata.ownership.groups | map(attribute='id') | join(', '))
+                  if item.volume_resource_only_policy.volume_resource_only_policy.metadata.ownership.groups is defined and item.volume_resource_only_policy.volume_resource_only_policy.metadata.ownership.groups | length > 0 else '' }}
+              - >-
+                {{ 'Collaborators: ' ~ (item.volume_resource_only_policy.volume_resource_only_policy.metadata.ownership.collaborators | map(attribute='id') | join(', '))
+                  if item.volume_resource_only_policy.volume_resource_only_policy.metadata.ownership.collaborators is defined and item.volume_resource_only_policy.volume_resource_only_policy.metadata.ownership.collaborators | length > 0 else '' }}
+              - >-
+                {{ 'Public Access: ' ~ item.volume_resource_only_policy.volume_resource_only_policy.metadata.ownership.public.type
+                  if item.volume_resource_only_policy.volume_resource_only_policy.metadata.ownership.public is defined and item.volume_resource_only_policy.volume_resource_only_policy.metadata.ownership.public.type is defined else 'Public Access: None' }}
               - "{{ '=' * 50 }}"
           loop: "{{ successful_inspections }}"
           loop_control:
-            label: "{{ item.volume_resource_only_policy.metadata.name }}"
+            label: "{{ item.volume_resource_only_policy.volume_resource_only_policy.metadata.name }}"
           when: successful_inspections | length > 0
-
       when: inspection_mode == 'SPECIFIC'
-
     # Generate comprehensive report
     - name: Generate inspection report
       block:
@@ -172,7 +158,6 @@
             report_successful: "{{ all_policies_result.volume_resource_only_policies | length }}"
             report_failed: 0
           when: inspection_mode == 'ALL'
-
         - name: Set report data for SPECIFIC mode
           set_fact:
             report_policies: "{{ successful_inspections | map(attribute='volume_resource_only_policy') | list }}"
@@ -180,7 +165,9 @@
             report_successful: "{{ successful_inspections | length }}"
             report_failed: "{{ failed_inspections | length }}"
           when: inspection_mode == 'SPECIFIC'
-
+        - name: Ensure ansible_date_time is available
+          setup:
+            filter: ansible_date_time
         - name: Create inspection report
           copy:
             content: |
@@ -194,27 +181,28 @@
               - **Total Policies**: {{ report_total }}
               - **Successfully Inspected**: {{ report_successful }}
               - **Failed Inspections**: {{ report_failed }}
-              - **Success Rate**: {{ (report_successful / report_total * 100) | round(1) }}%
+              - **Success Rate**: {{ ((report_successful | float) / (report_total | float) * 100) | round(1) }}
               
               ## Policy Details
               
               {% for policy in report_policies %}
-              ### {{ policy.metadata.name }}
-              
+              ### {% if inspection_mode == 'ALL' %}{{ policy.metadata.name }}{% else %}{{ policy.volume_resource_only_policy.metadata.name }}{% endif %}
+
               **Basic Information:**
-              - **UID**: `{{ policy.metadata.uid | default('N/A') }}`
-              - **Organization**: `{{ policy.metadata.org_id | default('N/A') }}`
-              - **Owner**: `{{ policy.metadata.ownership.owner | default('N/A') }}`
-              - **Created**: `{{ policy.metadata.create_time | default('N/A') }}`
-              - **Modified**: `{{ policy.metadata.modify_time | default('N/A') }}`
-              
+              - **UID**: `{% if inspection_mode == 'ALL' %}{{ policy.metadata.uid | default('N/A') }}{% else %}{{ policy.volume_resource_only_policy.metadata.uid | default('N/A') }}{% endif %}`
+              - **Organization**: `{% if inspection_mode == 'ALL' %}{{ policy.metadata.org_id | default('N/A') }}{% else %}{{ policy.volume_resource_only_policy.metadata.org_id | default('N/A') }}{% endif %}`
+              - **Owner**: `{% if inspection_mode == 'ALL' %}{{ policy.metadata.ownership.owner | default('N/A') }}{% else %}{{ policy.volume_resource_only_policy.metadata.ownership.owner | default('N/A') }}{% endif %}`
+              - **Created**: `{% if inspection_mode == 'ALL' %}{{ policy.metadata.create_time | default('N/A') }}{% else %}{{ policy.volume_resource_only_policy.metadata.create_time | default('N/A') }}{% endif %}`
+              - **Modified**: `{% if inspection_mode == 'ALL' %}{{ policy.metadata.modify_time | default('N/A') }}{% else %}{{ policy.volume_resource_only_policy.metadata.modify_time | default('N/A') }}{% endif %}`
+
               **Policy Configuration:**
-              - **Volume Types**: `{{ policy.volume_resource_only_policy_info.volume_types | default([]) | join(', ') }}`
-              - **CSI Drivers**: `{{ policy.volume_resource_only_policy_info.csi_drivers | default([]) | join(', ') }}`
-              - **NFS Servers**: `{{ policy.volume_resource_only_policy_info.nfs_servers | default([]) | join(', ') }}`
-              
+              - **Volume Types**: `{% if inspection_mode == 'ALL' %}{{ policy.volume_resource_only_policy_info.volume_types | default([]) | join(', ') }}{% else %}{{ policy.volume_resource_only_policy.volume_resource_only_policy_info.volume_types | default([]) | join(', ') }}{% endif %}`
+              - **CSI Drivers**: `{% if inspection_mode == 'ALL' %}{{ policy.volume_resource_only_policy_info.csi_drivers | default([]) | join(', ') }}{% else %}{{ policy.volume_resource_only_policy.volume_resource_only_policy_info.csi_drivers | default([]) | join(', ') }}{% endif %}`
+              - **NFS Servers**: `{% if inspection_mode == 'ALL' %}{{ policy.volume_resource_only_policy_info.nfs_servers | default([]) | join(', ') }}{% else %}{{ policy.volume_resource_only_policy.volume_resource_only_policy_info.nfs_servers | default([]) | join(', ') }}{% endif %}`
+
               **Metadata:**
-              - **Labels**: `{{ policy.metadata.labels | default({}) | dict2items | map('join', '=') | join(', ') }}`
+              - **Labels**: `{% if inspection_mode == 'ALL' %}{{ policy.metadata.labels | default({}) | dict2items | map('join', '=') | join(', ') }}{% else %}{{ policy.volume_resource_only_policy.metadata.labels | default({}) | dict2items | map('join', '=') | join(', ') }}{% endif %}`
+              {% if inspection_mode == 'ALL' -%}
               {% if policy.metadata.ownership.groups is defined and policy.metadata.ownership.groups | length > 0 -%}
               - **Groups**: `{{ policy.metadata.ownership.groups | map(attribute='id') | join(', ') }}`
               {% endif -%}
@@ -223,6 +211,17 @@
               {% endif -%}
               {% if policy.metadata.ownership.public is defined -%}
               - **Public Access**: `{{ policy.metadata.ownership.public.type | default('None') }}`
+              {% endif -%}
+              {% else -%}
+              {% if policy.volume_resource_only_policy.metadata.ownership.groups is defined and policy.volume_resource_only_policy.metadata.ownership.groups | length > 0 -%}
+              - **Groups**: `{{ policy.volume_resource_only_policy.metadata.ownership.groups | map(attribute='id') | join(', ') }}`
+              {% endif -%}
+              {% if policy.volume_resource_only_policy.metadata.ownership.collaborators is defined and policy.volume_resource_only_policy.metadata.ownership.collaborators | length > 0 -%}
+              - **Collaborators**: `{{ policy.volume_resource_only_policy.metadata.ownership.collaborators | map(attribute='id') | join(', ') }}`
+              {% endif -%}
+              {% if policy.volume_resource_only_policy.metadata.ownership.public is defined -%}
+              - **Public Access**: `{{ policy.volume_resource_only_policy.metadata.ownership.public.type | default('None') }}`
+              {% endif -%}
               {% endif %}
               
               ---
@@ -246,34 +245,49 @@
               | Total Policies | {{ report_total }} |
               | Successfully Inspected | {{ report_successful }} |
               | Failed Inspections | {{ report_failed }} |
-              | Success Rate | {{ (report_successful / report_total * 100) | round(1) }}% |
+              | Success Rate | {{ ((report_successful | float) / (report_total | float) * 100) | round(1) }} |
               
               {% if report_policies | length > 0 %}
               ## Policy Configuration Analysis
               
               {% set volume_type_counts = {} %}
               {% for policy in report_policies %}
+              {% if inspection_mode == 'ALL' -%}
               {% for vol_type in policy.volume_resource_only_policy_info.volume_types | default([]) %}
               {% set _ = volume_type_counts.update({vol_type: volume_type_counts.get(vol_type, 0) + 1}) %}
               {% endfor %}
+              {% else -%}
+              {% for vol_type in policy.volume_resource_only_policy.volume_resource_only_policy_info.volume_types | default([]) %}
+              {% set _ = volume_type_counts.update({vol_type: volume_type_counts.get(vol_type, 0) + 1}) %}
               {% endfor %}
-              
+              {% endif -%}
+              {% endfor %}
+
               **Volume Types Usage:**
               {% for vol_type, count in volume_type_counts.items() %}
               - `{{ vol_type }}`: {{ count }} policies
               {% endfor %}
-              
+
+              {% if inspection_mode == 'ALL' -%}
               **Policies with CSI Drivers:** {{ report_policies | selectattr('volume_resource_only_policy_info.csi_drivers', 'defined') | selectattr('volume_resource_only_policy_info.csi_drivers', '!=', []) | list | length }}
-              
+
               **Policies with NFS Servers:** {{ report_policies | selectattr('volume_resource_only_policy_info.nfs_servers', 'defined') | selectattr('volume_resource_only_policy_info.nfs_servers', '!=', []) | list | length }}
-              
+
               **Policies with Labels:** {{ report_policies | selectattr('metadata.labels', 'defined') | selectattr('metadata.labels', '!=', {}) | list | length }}
-              
+
               **Policies with Ownership:** {{ report_policies | selectattr('metadata.ownership.owner', 'defined') | list | length }}
+              {% else -%}
+              **Policies with CSI Drivers:** {{ report_policies | selectattr('volume_resource_only_policy.volume_resource_only_policy_info.csi_drivers', 'defined') | selectattr('volume_resource_only_policy.volume_resource_only_policy_info.csi_drivers', '!=', []) | list | length }}
+
+              **Policies with NFS Servers:** {{ report_policies | selectattr('volume_resource_only_policy.volume_resource_only_policy_info.nfs_servers', 'defined') | selectattr('volume_resource_only_policy.volume_resource_only_policy_info.nfs_servers', '!=', []) | list | length }}
+
+              **Policies with Labels:** {{ report_policies | selectattr('volume_resource_only_policy.metadata.labels', 'defined') | selectattr('volume_resource_only_policy.metadata.labels', '!=', {}) | list | length }}
+
+              **Policies with Ownership:** {{ report_policies | selectattr('volume_resource_only_policy.metadata.ownership.owner', 'defined') | list | length }}
+              {% endif %}
               {% endif %}
             dest: "/tmp/volume_resource_only_policy_inspection_report_{{ ansible_date_time.epoch }}.md"
           tags: ['report']
-
         - name: Display report location
           debug:
             msg: 
@@ -281,7 +295,6 @@
               - "Detailed report saved to: /tmp/volume_resource_only_policy_inspection_report_{{ ansible_date_time.epoch }}.md"
               - "Report includes comprehensive policy details and statistics"
           tags: ['report']
-
     - name: Display final summary
       debug:
         msg:
@@ -290,5 +303,5 @@
           - "Total Policies: {{ report_total }}"
           - "Successfully Inspected: {{ report_successful }}"
           - "Failed Inspections: {{ report_failed }}"
-          - "Success Rate: {{ (report_successful / report_total * 100) | round(1) }}%"
+          - "Success Rate: {{ ((report_successful | float) / (report_total | float) * 100) | round(1) }} %"
           - "=== EXECUTION COMPLETED ==="
