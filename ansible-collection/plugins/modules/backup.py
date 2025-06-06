@@ -943,7 +943,7 @@ def enumerate_backups(module: AnsibleModule, client: PXBackupClient) -> List[Dic
     if use_post:
         # Build enumerate_options for POST request
         enumerate_options = {
-            "max_objects": module.params.get('max_objects'),
+            "max_objects": str(module.params.get('max_objects')),
             "name_filter": module.params.get('name_filter'),
             "cluster_name_filter": module.params.get('cluster_name_filter'),
             "cluster_uid_filter": module.params.get('cluster_uid_filter'),
@@ -955,10 +955,7 @@ def enumerate_backups(module: AnsibleModule, client: PXBackupClient) -> List[Dic
         
         # Add backup_object_type if provided
         if module.params.get('backup_object_type'):
-            backup_type_value = module.params['backup_object_type'].get('type')
-            if backup_type_value:
-                type_value = BACKUP_OBJECT_TYPE_MAP.get(backup_type_value, 0)
-                enumerate_options["backup_object_type"] = type_value
+            enumerate_options['backup_object_type'] = module.params['backup_object_type'].get('type')
                 
         # Add new 2.9.0 fields
         if module.params.get('schedule_policy_ref'):
@@ -995,7 +992,7 @@ def enumerate_backups(module: AnsibleModule, client: PXBackupClient) -> List[Dic
 
         # Add other parameters if they exist
         if module.params.get('max_objects'):
-            params['enumerate_options.max_objects'] = module.params['max_objects']
+            params['enumerate_options.max_objects'] = str(module.params['max_objects'])
 
         if module.params.get('include_detailed_resources') is not None:
             params['enumerate_options.include_detailed_resources'] = module.params['include_detailed_resources']
@@ -1011,11 +1008,8 @@ def enumerate_backups(module: AnsibleModule, client: PXBackupClient) -> List[Dic
         if module.params.get('owners'):
             params['enumerate_options.owners'] = module.params['owners']
         
-        if params.get('backup_object_type'):
-            backup_type_value = params['backup_object_type'].get('type')
-            if backup_type_value:
-                type_value = BACKUP_OBJECT_TYPE_MAP.get(backup_type_value, 0)
-                params['backup_object_type'] = {"type": type_value}
+        if module.params.get('backup_object_type'):
+            params['backup_object_type'] = module.params['backup_object_type'].get('type')
 
         if module.params.get('status'):
             params['enumerate_options.status'] = module.params['status']
@@ -1590,7 +1584,7 @@ def run_module():
 
         'INSPECT_ONE': ['name', 'uid'],
 
-        'INSPECT_ALL': ['cluster_name_filter', 'cluster_uid_filter', 'org_id'],
+        'INSPECT_ALL': ['org_id'],
 
         'UPDATE_BACKUP_SHARE': ['name', 'uid', 'backup_share'],
 
@@ -1612,7 +1606,7 @@ def run_module():
 
             ('operation', 'INSPECT_ONE', ['name', 'uid']),
             
-            ('operation', 'INSPECT_ALL', ['cluster_name_filter', 'cluster_uid_filter', 'org_id']),
+            ('operation', 'INSPECT_ALL', ['org_id']),
 
             ('operation', 'UPDATE_BACKUP_SHARE',
              
