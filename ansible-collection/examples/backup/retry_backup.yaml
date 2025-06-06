@@ -1,0 +1,67 @@
+# ansible-collection/examples/backup/retry_backup.yaml
+---
+- name: Retry PX-Backup VM Backups
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/backup/retry_backup.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - org_id is defined
+        fail_msg: "Required variables must be defined"
+
+  tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+    - name: Retry VM backups
+      block:
+        - name: Retry of VM backups
+          backup:
+            operation: RETRY_BACKUP_RESOURCES
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            org_id: "{{ org_id }}"
+            name: "{{ name }}"
+            uid: "{{ uid }}"
+            # Optional parameters
+            include_resources: "{{ include_resources | default([]) }}"
+            skip_vm_auto_exec_rules: "{{ skip_vm_auto_exec_rules | default(false) }}"
+            validate_certs: "{{ validate_certs | default(true) }}"
+          register: backup_result
+
+        - name: Print VM backup retry details
+          debug:
+            msg: |
+              Backup Retry Initiated:
+              - Backup Name: {{ backup_result.backup.metadata.name }}
+              - UID: {{ backup_result.backup.metadata.uid }}
+              - Org ID: {{ backup_result.backup.metadata.org_id }}
+              - Created At: {{ backup_result.backup.metadata.create_time }}
+              - Last Updated At: {{ backup_result.backup.metadata.last_update_time }}
+              - Cluster: {{ backup_result.backup.backup_info.cluster }}
+              - Backup Location: {{ backup_result.backup.backup_info.backup_location_ref.name }}
+              - Backup Type: {{ backup_result.backup.backup_info.backup_type.type }}
+              - Status: {{ backup_result.backup.backup_info.status.status }}
+              - Retry Parent Name: {{ backup_result.backup.backup_info.retry_parent.name }}
+              - Retry Parent UID: {{ backup_result.backup.backup_info.retry_parent.uid }}
+              - Included VMs:
+                {% for vm in backup_result.backup.backup_info.include_resources %}
+                  * VM Name: {{ vm.name }}
+                    Namespace: {{ vm.namespace }}
+                {% endfor %}
+                
+      rescue:
+        - name: Display error details
+          debug:
+            msg: "Failed to retry backups: {{ backup_result.msg if backup_result.msg is defined else 'Unknown error occurred' }}"
+          when: backup_result is defined
+
+        - name: Fail with error message
+          fail:
+            msg: "Failed to enumerate backups. See above for details."
