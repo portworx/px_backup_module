@@ -38,8 +38,19 @@ volume_resource_only_policy_updates:
           access: "Write"
 
   # Example: Update labels only
-  - name: "nfs-skip-policy"
-    uid: "policy-uid-789"
+  - name: "skip-portworx-policy"
+    uid: "policy-uid-123"
+    volume_types:
+      - "Portworx"
+      - "Csi"
+      - "Nfs"
+    csi_drivers:
+      - "ebs.csi.aws.com"
+      - "disk.csi.azure.com"
+      - "pd.csi.storage.gke.io"
+    nfs_servers:
+      - "nfs1.example.com"
+      - "nfs2.example.com"
     labels:
       purpose: "skip-nfs-volumes"
       last-updated: "2024-01-15"
