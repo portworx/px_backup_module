@@ -1,0 +1,5 @@
+# ansible-collection/inventory/group_vars/backup/get_backup_resource_detail.yaml
+
+name: "vm-bkp-1"
+uid: "vm-bkp-uid"
+

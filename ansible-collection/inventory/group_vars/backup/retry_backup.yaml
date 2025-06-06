@@ -1,0 +1,17 @@
+# ansible-collection/inventory/group_vars/backup/retry_backup.yaml
+
+name: "vm-bkp-fail"
+uid: "vm-bkp-uid"
+
+# Operation parameters
+include_resources:
+  - name: vm2
+    namespace: ns2
+    group: kubevirt.io
+    kind: VirtualMachine
+    version: v1
+
+skip_vm_auto_exec_rules: true
+validate_certs: true
+
+
