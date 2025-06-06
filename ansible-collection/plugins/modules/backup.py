@@ -850,7 +850,7 @@ def enumerate_backups(module: AnsibleModule, client: PXBackupClient) -> List[Dic
         try:
             # Build the enumerate_options structure directly
             enumerate_options = {
-                "max_objects": module.params.get('max_objects'),
+                "max_objects": str(module.params.get('max_objects')),
                 "name_filter": module.params.get('name_filter'),
                 "cluster_name_filter": module.params.get('cluster_name_filter'),
                 "cluster_uid_filter": module.params.get('cluster_uid_filter'),
@@ -867,8 +867,8 @@ def enumerate_backups(module: AnsibleModule, client: PXBackupClient) -> List[Dic
 
             # Add backup_object_type to enumerate_options if provided
             if module.params.get('backup_object_type'):
-                type_value = BACKUP_OBJECT_TYPE_MAP.get(module.params['backup_object_type'], 0)
-                enumerate_options["backup_object_type"] = type_value
+                enumerate_options['backup_object_type'] = module.params['backup_object_type'].get('type')
+
                 
             # Add sorting options
             if module.params.get('sort_option'):
@@ -919,11 +919,17 @@ def enumerate_backups(module: AnsibleModule, client: PXBackupClient) -> List[Dic
         for param_name, api_param in param_mapping.items():
             if module.params.get(param_name) is not None:
                 params[api_param] = module.params[param_name]
+
+        if module.params.get('max_objects'):
+            params['enumerate_options.max_objects'] = str(module.params['max_objects'])
         
         # Handle list parameters
         if module.params.get('owners'):
             params['enumerate_options.owners'] = module.params['owners']
-            
+        
+        if params.get('backup_object_type'):
+            params['backup_object_type'] = module.params['backup_object_type'].get('type')
+
         if module.params.get('status'):
             params['enumerate_options.status'] = module.params['status']
             
@@ -1419,7 +1425,7 @@ def run_module():
 
         'INSPECT_ONE': ['name'],
 
-        'INSPECT_ALL': ['cluster_name_filter', 'cluster_uid_filter', 'org_id'],
+        'INSPECT_ALL': ['org_id'],
 
         'UPDATE_BACKUP_SHARE': ['name', 'uid', 'backup_share']
     }
@@ -1437,7 +1443,7 @@ def run_module():
 
             ('operation', 'INSPECT_ONE', ['name']),
             
-            ('operation', 'INSPECT_ALL', ['cluster_name_filter', 'cluster_uid_filter', 'org_id']),
+            ('operation', 'INSPECT_ALL', ['org_id']),
 
             ('operation', 'UPDATE_BACKUP_SHARE',
              ['name', 'uid', 'backup_share'])
