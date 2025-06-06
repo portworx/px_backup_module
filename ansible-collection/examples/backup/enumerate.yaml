@@ -37,6 +37,9 @@
             owners: "{{ owners | default(omit) }}"
             backup_object_type: "{{ backup_object_type | default(omit) }}"
             status: "{{ status | default(omit) }}"
+            sort_option: "{{ sort_option | default(omit) }}"
+            schedule_policy_ref: "{{ schedule_policy_ref | default(omit) }}"
+            backup_schedule_ref: "{{ backup_schedule_ref | default(omit) }}"
             validate_certs: "{{ validate_certs | default(true) }}"
           register: backup_result
 
@@ -61,13 +64,15 @@
                 Status: {{ backup.backup_info.status.status }}
                 Status Reason: {{ backup.backup_info.status.reason }}
                 Namespaces: {{ backup.backup_info.namespaces | join(', ') }}
-                Backup Type: {{ backup.backup_info.backup_type.type }}
+                Backup Type: {{ backup.backup_info.backup_type }}
                 Stage: {{ backup.backup_info.stage }}
                 Volumes:
                 {% if backup.backup_info.volumes is defined %}
                 {% for volume in backup.backup_info.volumes %}
                   * PVC: {{ volume.pvc }} ({{ volume.namespace }})
                     Status: {{ volume.status.status }}
+                    Driver: {{ volume.driver_name }}
+                    Backup Mode: {{ volume.backup_mode.type }}
                 {% endfor %}
                 {% else %}
                   No volumes in this backup
