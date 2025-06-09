@@ -1,0 +1,53 @@
+---
+- name: Enumerate PX-Backup Schedules using POST Request
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/backup_schedule/enumerate_post_request.yaml"
+  
+  tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+    
+    - name: Enumerate Backup Schedules with Advanced Filtering
+      block:
+        - name: Enumerate backup schedules using POST request
+          backup_schedule:
+            operation: INSPECT_ALL_POST_REQUEST
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            org_id: "{{ org_id | default('default') }}"
+            validate_certs: "{{ validate_certs | default(true) }}"
+            # Reference filters
+            backup_location_ref: "{{ backup_location_ref | default(omit) }}"
+            cluster_ref: "{{ cluster_ref | default(omit) }}"
+            volume_resource_only_policy_ref: "{{ volume_resource_only_policy_ref | default(omit) }}"
+            # Advanced filters (2.9.0+)
+            policy_ref: "{{ policy_ref | default(omit) }}"
+            include_objects: "{{ include_objects | default(omit) }}"
+            exclude_objects: "{{ exclude_objects | default(omit) }}"
+            include_filter: "{{ include_filter | default(omit) }}"
+            exclude_filter: "{{ exclude_filter | default(omit) }}"
+            # Enumerate options
+            enumerate_options: "{{ enumerate_options | default(omit) }}"
+          register: backup_schedules_result
+
+        - name: Display total count of backup schedules found
+          debug:
+            msg: "Found {{ backup_schedules_result.backup_schedules | length }} backup schedules"
+
+        - name: Display backup schedule summaries
+          debug:
+            msg: |
+              Schedule: {{ item.metadata.name }}
+              UID: {{ item.metadata.uid }}
+              Status: {{ item.backup_schedule_info.status.status | default('Unknown') }}
+              Cluster: {{ item.backup_schedule_info.cluster_ref.name | default('N/A') }}
+              Namespaces: {{ item.backup_schedule_info.namespaces | default([]) | join(', ') }}
+              Suspended: {{ item.backup_schedule_info.suspend | default(false) }}
+          loop: "{{ backup_schedules_result.backup_schedules }}"
+          loop_control:
+            label: "{{ item.metadata.name }}"
+          when: backup_schedules_result.backup_schedules is defined

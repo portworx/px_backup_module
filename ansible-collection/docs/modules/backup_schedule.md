@@ -9,10 +9,13 @@ The backup schedule module enables management of automated backup schedules in P
 * Support for multiple backup types and configurations
 * Comprehensive resource selection and filtering
 * Flexible scheduling policies and retention controls
+* Enhanced filtering and sorting in 2.9.0+
+* VM-specific backup capabilities
+* Cluster scope support (2.9.0+)
 
 ## Requirements
 
-* PX-Backup >= 2.8.4
+* PX-Backup >= 2.9.0
 * Stork >= 24.3.3
 * Python >= 3.9
 * The `requests` Python package
@@ -22,28 +25,31 @@ The backup schedule module enables management of automated backup schedules in P
 The module supports the following operations:
 
 
-| Operation   | Description                               |
-| ------------- | ------------------------------------------- |
-| CREATE      | Create a new backup schedule              |
-| UPDATE      | Modify existing backup schedule           |
-| DELETE      | Remove a backup schedule                  |
-| INSPECT_ONE | Get details of a specific backup schedule |
-| INSPECT_ALL | List all backup schedules                 |
+| Operation                | Description                                           |
+| -------------------------- | ------------------------------------------------------- |
+| CREATE                   | Create a new backup schedule                          |
+| UPDATE                   | Modify existing backup schedule                       |
+| DELETE                   | Remove a backup schedule                              |
+| INSPECT_ONE              | Get details of a specific backup schedule             |
+| INSPECT_ALL              | List all backup schedules (GET method)                |
+| INSPECT_ALL_POST_REQUEST | List all backup schedules using POST request (2.9.0+) |
 
 ## Parameters
 
 ### Common Parameters
 
 
-| Parameter | Type   | Required | Default | Description                                    |
-| ----------- | -------- | ---------- | --------- | ------------------------------------------------ |
-| api_url   | string | yes      |         | PX-Backup API URL                              |
-| token     | string | yes      |         | Authentication token                           |
-| operation | string | yes      |         | Operation to perform                           |
-| name      | string | yes      |         | Name of the backup schedule                    |
-| org_id    | string | yes      |         | Organization ID                                |
-| uid       | string | varies   |         | Unique identifier (required for update/delete) |
-| owner     | string | no       |         | Owner name or uid                              |
+| Parameter      | Type    | Required | Default | Description                                    |
+| ---------------- | --------- | ---------- | --------- | ------------------------------------------------ |
+| api_url        | string  | yes      |         | PX-Backup API URL                              |
+| token          | string  | yes      |         | Authentication token                           |
+| operation      | string  | yes      |         | Operation to perform                           |
+| name           | string  | yes      |         | Name of the backup schedule                    |
+| org_id         | string  | yes      |         | Organization ID                                |
+| uid            | string  | varies   |         | Unique identifier (required for update/delete) |
+| owner          | string  | no       |         | Owner name or uid                              |
+| validate_certs | boolean | no       | true    | Verify SSL certificates                        |
+| labels         | dict    | no       |         | Labels to attach to the Backup Schedule        |
 
 ### Schedule Configuration Parameters
 
@@ -145,11 +151,11 @@ The module supports the following operations:
 ### Backup Object Configuration
 
 
-| Parameter                     | Type   | Required | Default | Description                                                      |
-| ------------------------------- | -------- | ---------- | --------- | ------------------------------------------------------------------ |
-| backup_object_type            | dict   | no       |         | Backup object configuration (`Invalid`, `All`, `VirtualMachine`) |
-| volume_snapshot_class_mapping | dict   | no       |         | Volume snapshot class mappings                                   |
-| csi_snapshot_class_name       | string | no       |         | CSI snapshot class name                                          |
+| Parameter                     | Type   | Required | Default | Description                                                |
+| ------------------------------- | -------- | ---------- | --------- | ------------------------------------------------------------ |
+| backup_object_type            | dict   | no       |         | Backup object configuration                                |
+| backup_object_type.type       | string | no       |         | Type of backup object (`Invalid`, `All`, `VirtualMachine`) |
+| volume_snapshot_class_mapping | dict   | no       |         | Volume snapshot class mappings                             |
 
 ### Ownership Parameters
 
@@ -169,20 +175,89 @@ The module supports the following operations:
 | id        | string | yes      |                          | Group or collaborator identifier |
 | access    | string | yes      | 'Read', 'Write', 'Admin' | Access level                     |
 
+### Enhanced Filtering and Bulk Operations (2.9.0+)
+
+
+| Parameter       | Type   | Required | Default | Description                                                     |
+| ----------------- | -------- | ---------- | --------- | ----------------------------------------------------------------- |
+| policy_ref      | list   | no       |         | List of schedule policy references to filter by                 |
+| include_objects | list   | no       |         | List of exact backup schedules to include (name + UID required) |
+| exclude_objects | list   | no       |         | List of exact backup schedules to exclude (name + UID required) |
+| include_filter  | string | no       |         | Substring or regex pattern to match backup schedules to include |
+| exclude_filter  | string | no       |         | Substring or regex pattern to match backup schedules to exclude |
+
+#### policy_ref Entry Format
+
+
+| Parameter | Type   | Required | Description |
+| ----------- | -------- | ---------- | ------------- |
+| name      | string | yes      | Policy name |
+| uid       | string | yes      | Policy UID  |
+
+#### include_objects / exclude_objects Entry Format
+
+
+| Parameter | Type   | Required | Description   |
+| ----------- | -------- | ---------- | --------------- |
+| name      | string | yes      | Schedule name |
+| uid       | string | yes      | Schedule UID  |
+
+### Cluster Scope Configuration (2.9.0+)
+
+
+| Parameter                  | Type    | Required | Default | Description                                |
+| ---------------------------- | --------- | ---------- | --------- | -------------------------------------------- |
+| cluster_scope              | dict    | no       |         | Cluster scope configuration for operations |
+| cluster_scope.cluster_refs | list    | no       |         | List of cluster references                 |
+| cluster_scope.all_clusters | boolean | no       |         | Apply operation to all clusters            |
+
+#### cluster_scope.cluster_refs Entry Format
+
+
+| Parameter | Type   | Required | Description         |
+| ----------- | -------- | ---------- | --------------------- |
+| name      | string | yes      | Name of the cluster |
+| uid       | string | yes      | Cluster UID         |
+
 ### Enumeration Options
 
 
-| Parameter                               | Type   | Required | Default | Description                                 |
-| ----------------------------------------- | -------- | ---------- | --------- | --------------------------------------------- |
-| enumerate_options.max_objects           | string | no       |         | Maximum objects to return                   |
-| enumerate_options.name_filter           | string | no       |         | Filter by name                              |
-| enumerate_options.status                | string | no       |         | Filter based on the object status           |
-| enumerate_options.cluster_name_filter   | string | no       |         | Filter by cluster name                      |
-| enumerate_options.object_index          | string | no       |         | index from where object fetch has to happen |
-| enumerate_options.owners                | string | no       |         | Filter by owners                            |
-| enumerate_options.time_range            | dict   | no       |         | Time range filter                           |
-| enumerate_options.time_range.start_time | string | no       |         | Time range filter start time                |
-| enumerate_options.time_range.end_time   | string | no       |         | Time range filter end time                  |
+| Parameter                                    | Type    | Required | Default | Description                                                |
+| ---------------------------------------------- | --------- | ---------- | --------- | ------------------------------------------------------------ |
+| enumerate_options.labels                     | dict    | no       |         | Label selectors for filtering                              |
+| enumerate_options.max_objects                | string  | no       |         | Maximum objects to return                                  |
+| enumerate_options.name_filter                | string  | no       |         | Filter by name                                             |
+| enumerate_options.status                     | list    | no       |         | Filter based on the object status (list of status strings) |
+| enumerate_options.cluster_name_filter        | string  | no       |         | Filter by cluster name                                     |
+| enumerate_options.object_index               | string  | no       |         | index from where object fetch has to happen                |
+| enumerate_options.owners                     | list    | no       |         | Filter by owners (list of owner IDs)                       |
+| enumerate_options.backup_object_type         | string  | no       |         | Filter based on backup object type                         |
+| enumerate_options.include_detailed_resources | boolean | no       |         | Include detailed resource information                      |
+| enumerate_options.cluster_uid_filter         | string  | no       |         | Filter by cluster UID                                      |
+| enumerate_options.time_range                 | dict    | no       |         | Time range filter                                          |
+| enumerate_options.time_range.start_time      | string  | no       |         | Time range filter start time                               |
+| enumerate_options.time_range.end_time        | string  | no       |         | Time range filter end time                                 |
+| enumerate_options.schedule_policy_ref        | list    | no       |         | Filter by schedule policy references                       |
+| enumerate_options.backup_schedule_ref        | list    | no       |         | Filter by backup schedule references                       |
+| enumerate_options.sort_option                | dict    | no       |         | Sorting options for results                                |
+
+#### enumerate_options.schedule_policy_ref / backup_schedule_ref Entry Format
+
+
+| Parameter | Type   | Required | Description          |
+| ----------- | -------- | ---------- | ---------------------- |
+| name      | string | no       | Policy/Schedule name |
+| uid       | string | no       | Policy/Schedule UID  |
+
+#### enumerate_options.sort_option Format
+
+
+| Parameter      | Type   | Required | Description                                                                                          |
+| ---------------- | -------- | ---------- | ------------------------------------------------------------------------------------------------------ |
+| sortBy         | dict   | no       | Field to sort by                                                                                     |
+| sortBy.type    | string | no       | Sort field type (`Invalid`, `CreationTimestamp`, `Name`, `ClusterName`, `Size`, `RestoreBackupName`) |
+| sortOrder      | dict   | no       | Sort order                                                                                           |
+| sortOrder.type | string | no       | Sort order type (`Invalid`, `Ascending`, `Descending`)                                               |
 
 ## Return Values
 
@@ -239,6 +314,11 @@ The module implements comprehensive error handling:
    - Resource selection limits
    - Cloud provider dependencies
    - Storage requirements
+5. **Version Considerations**
+
+   - Features marked with (2.9.0+) require PX-Backup version 2.9.0 or later
+   - Use INSPECT_ALL_POST_REQUEST for advanced filtering capabilities
+   - Cluster scope operations are available in 2.9.0+
 
 ## Troubleshooting
 
@@ -260,3 +340,9 @@ The module implements comprehensive error handling:
    - Check location access
    - Verify namespace existence
    - Review label selectors
+4. **Filtering Issues**
+
+   - Use INSPECT_ALL_POST_REQUEST for complex filters
+   - Verify filter syntax for include_filter/exclude_filter
+   - Check enumerate_options structure
+   - Validate sort options

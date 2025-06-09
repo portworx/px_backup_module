@@ -1,0 +1,167 @@
+---
+# INSPECT_ALL_POST_REQUEST variables with comprehensive filtering examples
+
+# Example 1: Basic filtering by backup location and cluster
+backup_location_ref:
+  name: "aws-s3-primary"
+  uid: "b8c9d0e1-f234-5678-9012-bcdef2345678"
+
+cluster_ref:
+  name: "prod-cluster-east"
+  uid: "c9d0e1f2-3456-7890-1234-cdef34567890"
+
+# Example 2: Filter by volume resource only policy
+volume_resource_only_policy_ref:
+  name: "skip-nfs-volumes"
+  uid: "f2345678-9012-3456-7890-f67890123456"
+
+# Example 3: Filter by multiple schedule policies (2.9.0+)
+policy_ref:
+  - name: "daily-midnight-retain30"
+    uid: "a7b8c9d0-e1f2-3456-7890-abcdef123456"
+  - name: "hourly-retain24"
+    uid: "d4e5f678-9012-3456-7890-456789012345"
+  - name: "weekly-sunday-retain8"
+    uid: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+
+# Example 4: Include specific backup schedules by name and UID
+include_objects:
+  - name: "prod-app-daily-backup"
+    uid: "e2f3a4b5-c6d7-8901-2345-678901234567"
+  - name: "critical-db-hourly"
+    uid: "f3a4b5c6-d7e8-9012-3456-789012345678"
+  - name: "vm-backup-weekly"
+    uid: "a4b5c6d7-e8f9-0123-4567-890123456789"
+
+# Example 5: Exclude specific backup schedules
+exclude_objects:
+  - name: "test-backup-schedule"
+    uid: "b5c6d7e8-f9a0-1234-5678-901234567890"
+  - name: "dev-namespace-backup"
+    uid: "c6d7e8f9-a0b1-2345-6789-012345678901"
+
+# Example 6: Include/Exclude filters using patterns
+# Include all production backup schedules
+include_filter: "prod-*"
+# Or use a regex pattern
+# include_filter: "^(prod|production)-.*backup$"
+
+# Exclude all test or development schedules
+exclude_filter: "test-*|dev-*"
+
+# Example 7: Comprehensive enumerate options
+enumerate_options:
+  # Label filters
+  labels:
+    team: "platform"
+    environment: "production"
+    backup-tier: "critical"
+  
+  # Pagination and limits
+  max_objects: "100"
+  object_index: "0"
+  
+  # Name filtering
+  name_filter: "prod"
+  
+  # Cluster filtering
+  cluster_name_filter: "prod-cluster"
+  cluster_uid_filter: "c9d0e1f2-3456-7890-1234-cdef34567890"
+  
+  # Include detailed resource information
+  include_detailed_resources: true
+  
+  # Filter by owners (list of user IDs)
+  owners:
+    - "platform-team"
+    - "john.doe@company.com"
+    - "sre-team"
+  
+  # Filter by backup object type
+  backup_object_type: "All"  # Options: "All", "VirtualMachine"
+  
+  # Filter by status (list of status strings)
+  status:
+    - "Success"
+    - "InProgress"
+    - "Failed"
+    - "PartialSuccess"
+  
+  # Time range filter
+  time_range:
+    start_time: "2024-01-01T00:00:00Z"
+    end_time: "2024-12-31T23:59:59Z"
+  
+  # Filter by schedule policy references
+  schedule_policy_ref:
+    - name: "daily-midnight-retain30"
+      uid: "a7b8c9d0-e1f2-3456-7890-abcdef123456"
+    - name: "hourly-retain24"
+      uid: "d4e5f678-9012-3456-7890-456789012345"
+  
+  # Filter by backup schedule references
+  backup_schedule_ref:
+    - name: "parent-schedule-1"
+      uid: "d7e8f9a0-b1c2-3456-7890-123456789012"
+    - name: "parent-schedule-2"
+      uid: "e8f9a0b1-c2d3-4567-8901-234567890123"
+  
+  # Sorting options
+  sort_option:
+    sortBy:
+      type: "CreationTimestamp"  # Options: Invalid, CreationTimestamp, Name, ClusterName, Size, RestoreBackupName
+    sortOrder:
+      type: "Descending"  # Options: Invalid, Ascending, Descending
+
+# Alternative Examples for Different Use Cases:
+
+# Example A: Find all failed backup schedules in the last 7 days
+# enumerate_options:
+#   status:
+#     - "Failed"
+#   time_range:
+#     start_time: "2024-11-28T00:00:00Z"
+#     end_time: "2024-12-05T23:59:59Z"
+#   sort_option:
+#     sortBy:
+#       type: "CreationTimestamp"
+#     sortOrder:
+#       type: "Descending"
+
+# Example B: Find all VM backup schedules sorted by name
+# enumerate_options:
+#   backup_object_type: "VirtualMachine"
+#   sort_option:
+#     sortBy:
+#       type: "Name"
+#     sortOrder:
+#       type: "Ascending"
+
+# Example C: Find schedules by multiple clusters with specific labels
+# cluster_ref:
+#   name: "prod-cluster-*"
+# enumerate_options:
+#   labels:
+#     compliance: "pci-dss"
+#     backup-window: "off-peak"
+#   cluster_name_filter: "prod"
+#   max_objects: "50"
+
+# Example D: Complex filtering with multiple criteria
+# policy_ref:
+#   - name: "critical-backup-policy"
+#     uid: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+# enumerate_options:
+#   labels:
+#     sla: "premium"
+#   owners:
+#     - "platform-team"
+#   status:
+#     - "Success"
+#     - "PartialSuccess"
+#   include_detailed_resources: true
+#   sort_option:
+#     sortBy:
+#       type: "CreationTimestamp"
+#     sortOrder:
+#       type: "Descending"
