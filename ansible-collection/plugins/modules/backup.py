@@ -719,7 +719,7 @@ def build_backup_request(params: Dict[str, Any]) -> Dict[str, Any]:
     if params.get('backup_object_type'):
         backup_obj_type = params['backup_object_type']
         if isinstance(backup_obj_type, dict) and 'type' in backup_obj_type:
-            type_value = BACKUP_OBJECT_TYPE_MAP.get(backup_obj_type['type'], 0)
+            type_value = BACKUP_OBJECT_TYPE_MAP.get(backup_obj_type['type'], 1)
             request['backup_object_type'] = {"type": type_value}
         else:
             request['backup_object_type'] = {"type": 0}
