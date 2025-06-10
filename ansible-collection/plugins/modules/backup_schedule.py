@@ -7,13 +7,6 @@ from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.purepx.px_backup.plugins.module_utils.px_backup.api import PXBackupClient
 import requests
 
-# Constants for enum mappings
-BACKUP_OBJECT_TYPE_MAP = {
-    'Invalid': 0,
-    'All': 1,
-    'VirtualMachine': 2
-}
-
 
 DOCUMENTATION = r'''
 ---
@@ -186,7 +179,7 @@ options:
         suboptions:
             type:
                 description: Type of backup object
-                choices: ['Invalid', 'All', 'VirtualMachine']
+                choices: ['Invalid', 'NS', 'VM', 'All']
                 type: str
     volume_snapshot_class_mapping:
         description: Volume Snapshot Class Mapping
@@ -288,7 +281,7 @@ options:
                 type: list
                 elements: str
             backup_object_type:
-                description: filter based on the object status
+                description: filter to use Backup Object Type on object
                 type: str
             status:
                 description: filter to use policy name and uid. Any object that contains the filter will be returned.
@@ -669,12 +662,7 @@ def delete_backup_schedules(module, client):
             
             # Add 2.9.0 fields if provided
             if module.params.get('backup_object_type'):
-                backup_obj_type = module.params.get('backup_object_type')
-                if isinstance(backup_obj_type, dict) and 'type' in backup_obj_type:
-                    type_value = BACKUP_OBJECT_TYPE_MAP.get(backup_obj_type['type'], 2)
-                    delete_request["backup_object_type"] = {"type": type_value}
-                else:
-                    delete_request["backup_object_type"] = {"type": 2}
+                delete_request["backup_object_type"] = module.params['backup_object_type']
                 
             if module.params.get('policy_ref'):
                 delete_request["policy_ref"] = module.params['policy_ref']
@@ -728,7 +716,6 @@ def backup_schedule_request_body(module):
         "include_resources": module.params['include_resources'], 
         "csi_snapshot_class_name": module.params['csi_snapshot_class_name'],
         "resource_types": module.params['resource_types'],
-        "schedule_policy_ref": module.params['schedule_policy_ref'],
         "backup_location_ref": module.params['backup_location_ref'],
         "backup_type": module.params['backup_type'],
         "ns_label_selectors": module.params['ns_label_selectors'],
@@ -747,20 +734,16 @@ def backup_schedule_request_body(module):
         backup_schedule_request['cluster'] = module.params['cluster']
 
     if module.params['backup_object_type']:
-        backup_obj_type = module.params['backup_object_type']
-        if isinstance(backup_obj_type, dict) and 'type' in backup_obj_type:
-            type_value = BACKUP_OBJECT_TYPE_MAP.get(backup_obj_type['type'], 2)
-            backup_schedule_request["backup_object_type"] = {"type": type_value}
-        else:
-            backup_schedule_request["backup_object_type"] = {"type": 2}
+        backup_schedule_request["backup_object_type"] = module.params['backup_object_type']
+
 
     if module.params.get('operation') == "UPDATE":
         # Add suspend field for update operation
         if module.params.get('suspend') is not None:
             backup_schedule_request['suspend'] = module.params['suspend']
-            
-        backup_schedule_request['cluster'] = module.params['cluster_ref'].get('name') if module.params.get('cluster_ref') else module.params.get('cluster')
-        backup_schedule_request['schedule_policy'] = module.params['schedule_policy_ref'].get('name') if module.params.get('schedule_policy_ref') else module.params.get('schedule_policy')
+        
+        if module.params.get('schedule_policy_ref'):
+            backup_schedule_request['schedule_policy_ref'] = module.params['schedule_policy_ref']
         
         if module.params.get('pre_exec_rule_ref'):
             backup_schedule_request['pre_exec_rule_ref'] = module.params['pre_exec_rule_ref']
@@ -788,10 +771,8 @@ def backup_schedule_request_body(module):
         backup_schedule_request['post_exec_rule_ref'] = module.params['post_exec_rule_ref']
         backup_schedule_request['post_exec_rule'] = module.params['post_exec_rule']
     
-    backup_object_type = module.params.get('backup_object_type')
-    if backup_object_type:
-        if backup_object_type.get("type") in ['VirtualMachine'] and module.params.get('skip_vm_auto_exec_rules'):
-            backup_schedule_request['skip_vm_auto_exec_rules'] = module.params['skip_vm_auto_exec_rules']
+    if module.params.get('skip_vm_auto_exec_rules'):
+        backup_schedule_request['skip_vm_auto_exec_rules'] = module.params['skip_vm_auto_exec_rules']
 
     if module.params.get('exclude_resource_types'):
         backup_schedule_request['exclude_resource_types'] = module.params['exclude_resource_types']
@@ -851,9 +832,10 @@ def run_module():
                 version=dict(type='str')
             )),
         backup_object_type=dict(
+            required=False,
             type='dict',
             options=dict(
-                type=dict(type='str', choices=['Invalid', 'All', 'VirtualMachine']),
+                type=dict(type='str', choices=['Invalid', 'NS', 'VM', 'All'], required=True),
             ),
         ),
         cluster_ref=dict(
