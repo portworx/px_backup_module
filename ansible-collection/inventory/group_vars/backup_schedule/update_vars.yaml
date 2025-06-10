@@ -2,12 +2,13 @@
 # Backup schedules to update
 
 backup_schedules_update:
-  - name: "bs-1"
-    uid: "bs-1-uid"
+  # List of backup schedules to update
+  - name: "sched-bkp-1"
+    uid: "uid-1"
     suspend: false
     cluster_ref:
-      name: "cluster-1"
-      uid: "cluster-1-uid"
+      name: "self-cluster"
+      uid: "cluster-uid"
     pre_exec_rule_ref:
       name: "pre-rule"
       uid: "pre-rule-uid"
@@ -22,6 +23,21 @@ backup_schedules_update:
       uid: "backup-loc-uid"
     labels:
       key: value
+
+  # OR Bulk update schedules
+  - backup_object_type: 
+      type: "VM"  # Can be "All" or "VM" or "NS"
+    policy_ref: 
+      - name: "policy-1"
+        uid: "policy-uid-1"
+      - name: "policy-2"
+        uid: "policy-uid-2"
+    cluster_scope: 
+      all_clusters: true
+    include_filter: "*"
+    exclude_objects:
+      - name: "sched-bkp-2"
+        uid: "uid-2"
 
 # Global update configuration
 backup_configs: true

@@ -5,6 +5,7 @@
 
   vars_files:
     - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/backup_schedule/delete_vars.yaml"
 
   pre_tasks:
     - name: Validate required variables
@@ -14,17 +15,6 @@
           - org_id is defined
           - schedule_deletes is defined
         fail_msg: "Required variables must be defined"
-
-    # Validate backup configurations
-    - name: Validate schedule configurations
-      assert:
-        that: 
-          - "item.name is defined"
-          - "item.uid is defined"
-        fail_msg: "Each schedule configuration must include 'name' and 'uid'"
-      loop: "{{ schedule_deletes }}"
-      loop_control:
-        label: "{{ item.name }}"
   
   tasks:
 
@@ -44,29 +34,29 @@
             api_url: "{{ px_backup_api_url }}"
             token: "{{ px_backup_token }}"
             org_id: "{{ org_id }}"
-            name: "{{ item.name }}"
-            uid: "{{ item.uid }}"
+            name: "{{ item.name | default(omit) }}"
+            uid: "{{ item.uid | default(omit) }}"
+            backup_object_type: "{{ item.backup_object_type | default(omit) }}"
+            exclude_objects: "{{ item.exclude_objects | default(omit) }}"
+            include_objects: "{{ item.include_objects | default(omit) }}"
+            include_filter: "{{ item.include_filter | default(omit) }}"
+            exclude_filter: "{{ item.exclude_filter | default(omit) }}"
+            cluster_scope: "{{ item.cluster_scope | default(omit) }}"
           register: delete_result
           loop: "{{ schedule_deletes }}"
-          loop_control:
-            label: "{{ item.name }}"
 
         # Display successful deletes
         - name: Display successful deletes
           debug:
-            msg: "Successfully deleted backup '{{ item.item.name }}'"
+            msg: "Successfully deleted backup '{{ item.item }}'"
           loop: "{{ delete_result.results }}"
-          loop_control:
-            label: "{{ item.item.name }}"
           when: not item.failed
 
         # Display failures
         - name: Display failed deletes
           debug:
-            msg: "Failed to delete schedule '{{ item.item.name }}': {{ item.msg }}"
+            msg: "Failed to delete schedule '{{ item.item }}': {{ item.msg }}"
           loop: "{{ delete_result.results }}"
-          loop_control:
-            label: "{{ item.item.name }}"
           when: item.failed
 
       rescue:
