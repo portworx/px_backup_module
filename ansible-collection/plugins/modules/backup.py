@@ -38,7 +38,7 @@ module: backup
 
 short_description: Manage backups in PX-Backup
 
-version_added: "2.8.4"
+version_added: "2.9.0"
 
 description:
     - Manage backups in PX-Backup using different operations
@@ -213,39 +213,39 @@ options:
         type: bool
         default: false
         required: false
-backup_share:
-    description: Backup sharing configuration
-    type: dict
-    required: false
-    suboptions:
-        collaborators:
-            description: List of user access configurations
-            type: list
-            elements: dict
-            suboptions:
-                id:
-                    description: User identifier
-                    type: str
-                    required: true
-                access:
-                    description: Access level
-                    type: str
-                    choices: ['Invalid', 'View', 'Restorable', 'FullAccess']
-                    required: true
-        groups:
-            description: List of group access configurations
-            type: list
-            elements: dict
-            suboptions:
-                id:
-                    description: Group identifier
-                    type: str
-                    required: true
-                access:
-                    description: Access level
-                    type: str
-                    choices: ['Invalid', 'View', 'Restorable', 'FullAccess'] 
-                    required: true
+    backup_share:
+        description: Backup sharing configuration
+        type: dict
+        required: false
+        suboptions:
+            collaborators:
+                description: List of user access configurations
+                type: list
+                elements: dict
+                suboptions:
+                    id:
+                        description: User identifier
+                        type: str
+                        required: true
+                    access:
+                        description: Access level
+                        type: str
+                        choices: ['Invalid', 'View', 'Restorable', 'FullAccess']
+                        required: true
+            groups:
+                description: List of group access configurations
+                type: list
+                elements: dict
+                suboptions:
+                    id:
+                        description: Group identifier
+                        type: str
+                        required: true
+                    access:
+                        description: Access level
+                        type: str
+                        choices: ['Invalid', 'View', 'Restorable', 'FullAccess'] 
+                        required: true
     validate_certs:
         description: Verify SSL certificates
         type: bool

@@ -16,7 +16,7 @@ The backup schedule module enables management of automated backup schedules in P
 ## Requirements
 
 * PX-Backup >= 2.9.0
-* Stork >= 24.3.3
+* Stork >= 25.3.0
 * Python >= 3.9
 * The `requests` Python package
 
@@ -61,8 +61,8 @@ The module supports the following operations:
 | suspend                          | boolean | no       | `false`  | Whether to suspend the schedule                                                |
 | direct_kdmp                      | boolean | no       | `false`  | Enable direct KDMP backup                                                      |
 | skip_vm_auto_exec_rules          | boolean | no       | `false`  | Skip automatic execution rules for VMs                                         |
-| parallel_backup                  | boolean | no       | `false`  | option to enable parallel schedule backups                                     |
-| keep_cr_status                   | boolean | no       | `false`  | option to enable to keep the CR status of the resources in the backup schedule |
+| parallel_backup                  | boolean | no       | `false`  | Option to enable parallel schedule backups                                     |
+| keep_cr_status                   | boolean | no       | `false`  | Option to enable to keep the CR status of the resources in the backup schedule |
 | advanced_resource_label_selector | string  | no       |          | Advanced label selector for resources (string format with operator support)    |
 
 ### Resource Selection Parameters
@@ -151,11 +151,11 @@ The module supports the following operations:
 ### Backup Object Configuration
 
 
-| Parameter                     | Type   | Required | Default | Description                                                |
-| ------------------------------- | -------- | ---------- | --------- | ------------------------------------------------------------ |
-| backup_object_type            | dict   | no       |         | Backup object configuration                                |
-| backup_object_type.type       | string | no       |         | Type of backup object (`Invalid`, `All`, `VirtualMachine`) |
-| volume_snapshot_class_mapping | dict   | no       |         | Volume snapshot class mappings                             |
+| Parameter                     | Type   | Required | Default | Description                                          |
+| ------------------------------- | -------- | ---------- | --------- | ------------------------------------------------------ |
+| backup_object_type            | dict   | no       |         | Backup object configuration                          |
+| backup_object_type.type       | string | no       |         | Type of backup object (`Invalid`, `NS`, `VM`, `All`) |
+| volume_snapshot_class_mapping | dict   | no       |         | Volume snapshot class mappings                       |
 
 ### Ownership Parameters
 
@@ -229,7 +229,7 @@ The module supports the following operations:
 | enumerate_options.name_filter                | string  | no       |         | Filter by name                                             |
 | enumerate_options.status                     | list    | no       |         | Filter based on the object status (list of status strings) |
 | enumerate_options.cluster_name_filter        | string  | no       |         | Filter by cluster name                                     |
-| enumerate_options.object_index               | string  | no       |         | index from where object fetch has to happen                |
+| enumerate_options.object_index               | string  | no       |         | Index from where object fetch has to happen                |
 | enumerate_options.owners                     | list    | no       |         | Filter by owners (list of owner IDs)                       |
 | enumerate_options.backup_object_type         | string  | no       |         | Filter based on backup object type                         |
 | enumerate_options.include_detailed_resources | boolean | no       |         | Include detailed resource information                      |
@@ -259,27 +259,181 @@ The module supports the following operations:
 | sortOrder      | dict   | no       | Sort order                                                                                           |
 | sortOrder.type | string | no       | Sort order type (`Invalid`, `Ascending`, `Descending`)                                               |
 
+### Deprecated Parameters
+
+The following parameters are deprecated but maintained for backward compatibility:
+
+
+| Parameter               | Type   | Description             | Replacement                   |
+| ------------------------- | -------- | ------------------------- | ------------------------------- |
+| pre_exec_rule           | string | Pre exec Rule name      | pre_exec_rule_ref             |
+| post_exec_rule          | string | Post exec Rule name     | post_exec_rule_ref            |
+| csi_snapshot_class_name | string | CSI Snapshot Class Name | volume_snapshot_class_mapping |
+
 ## Return Values
 
 
-| Name             | Type    | Description                                            |
-| ------------------ | --------- | -------------------------------------------------------- |
-| changed          | boolean | Whether any change was made                            |
-| backup_schedule  | dict    | Details of the backup schedule (for single operations) |
-| backup_schedules | list    | List of backup schedules (for INSPECT_ALL)             |
-| message          | string  | Operation result message                               |
+| Name             | Type   | Description                                            |
+| ------------------ | -------- | -------------------------------------------------------- |
+| backup_schedule  | dict   | Details of the backup schedule (for single operations) |
+| backup_schedules | list   | List of backup schedules (for INSPECT_ALL)             |
+| message          | string | Operation result message                               |
+
+## Examples
+
+### Create Basic Backup Schedule
+
+```yaml
+- name: Create backup schedule
+  backup_schedule:
+    operation: CREATE
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    name: "daily-backup"
+    org_id: "default"
+    namespaces:
+      - "production"
+      - "staging"
+    schedule_policy_ref:
+      name: "daily-policy"
+      uid: "policy-123"
+    backup_location_ref:
+      name: "s3-backup-location"
+      uid: "location-456"
+    cluster_ref:
+      name: "prod-cluster"
+      uid: "cluster-789"
+    reclaim_policy: "Retain"
+```
+
+### Create VM Backup Schedule with Execution Rules
+
+```yaml
+- name: Create VM backup schedule
+  backup_schedule:
+    operation: CREATE
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    name: "vm-backup-schedule"
+    org_id: "default"
+    backup_object_type:
+      type: "VM"
+    schedule_policy_ref:
+      name: "weekly-policy"
+      uid: "policy-456"
+    backup_location_ref:
+      name: "azure-backup-location"
+      uid: "location-789"
+    cluster_ref:
+      name: "vm-cluster"
+      uid: "cluster-123"
+    pre_exec_rule_ref:
+      name: "vm-shutdown"
+      uid: "rule-123"
+    post_exec_rule_ref:
+      name: "vm-startup"
+      uid: "rule-456"
+    skip_vm_auto_exec_rules: false
+    parallel_backup: true
+```
+
+### Update Backup Schedule
+
+```yaml
+- name: Update backup schedule
+  backup_schedule:
+    operation: UPDATE
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    name: "daily-backup"
+    org_id: "default"
+    uid: "schedule-uid-123"
+    suspend: true
+    reclaim_policy: "Delete"
+```
+
+### List All Backup Schedules with Filtering
+
+```yaml
+- name: List backup schedules with filters
+  backup_schedule:
+    operation: INSPECT_ALL_POST_REQUEST
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    org_id: "default"
+    enumerate_options:
+      name_filter: "prod-*"
+      cluster_name_filter: "production"
+      max_objects: "50"
+      include_detailed_resources: true
+      sort_option:
+        sortBy:
+          type: "CreationTimestamp"
+        sortOrder:
+          type: "Descending"
+```
+
+### Advanced Filtering (2.9.0+)
+
+```yaml
+- name: List schedules with advanced filtering
+  backup_schedule:
+    operation: INSPECT_ALL_POST_REQUEST
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    org_id: "default"
+    policy_ref:
+      - name: "daily-policy"
+        uid: "policy-123"
+      - name: "weekly-policy"
+        uid: "policy-456"
+    include_filter: "prod-*"
+    cluster_scope:
+      cluster_refs:
+        - name: "prod-cluster-1"
+          uid: "cluster-123"
+        - name: "prod-cluster-2"
+          uid: "cluster-456"
+```
+
+### Delete Multiple Schedules (2.9.0+)
+
+```yaml
+- name: Delete backup schedules with pattern
+  backup_schedule:
+    operation: DELETE
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    org_id: "default"
+    exclude_filter: "test-*"
+    cluster_scope:
+      all_clusters: true
+```
+
+### Inspect Specific Schedule
+
+```yaml
+- name: Get backup schedule details
+  backup_schedule:
+    operation: INSPECT_ONE
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    name: "daily-backup"
+    org_id: "default"
+    uid: "schedule-uid-123"
+```
 
 ## Error Handling
 
 The module implements comprehensive error handling:
 
-1. Validation Checks
+1. **Validation Checks**
 
    - Required parameter validation
    - Format validation
    - Reference validation
    - Permission checks
-2. Common Error Scenarios
+2. **Common Error Scenarios**
 
    - Invalid configurations
    - Missing references

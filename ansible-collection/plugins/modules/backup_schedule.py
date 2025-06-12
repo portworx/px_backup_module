@@ -14,7 +14,7 @@ module: backup_schedule
 
 short_description: Manage backup Schedule in PX-Backup
 
-version_added: "2.8.4"
+version_added: "2.9.0"
 
 description: 
     - Manage backup Schedule in PX-Backup
@@ -193,10 +193,6 @@ options:
         description: KDMP enable
         required: false
         type: bool
-    cloud_credential:
-        description: Cloud credential name (deprecated)
-        required: false
-        type: str
     validate_certs:
         description: Verify SSL certificates
         type: bool
@@ -356,15 +352,12 @@ options:
         description: Advanced label selector for resources (string format with operator support)
         required: false
         type: str
-    delete_backups:
-        description: Delete associated backups when deleting schedule (deprecated)
-        required: false
-        type: bool
     # New in 2.9.0
     volume_resource_only_policy_ref:
         description: reference to Volume Resource Only policy ref
         required: false
         type: dict
+        version_added: '2.9.0'
         suboptions:
             name:
                 description: Volume Resource Only policy name
@@ -377,6 +370,7 @@ options:
         type: list
         elements: dict
         required: false
+        version_added: '2.9.0'
         suboptions:
             name:
                 description: Policy name
@@ -391,6 +385,7 @@ options:
         type: list
         elements: dict
         required: false
+        version_added: '2.9.0'
         suboptions:
             name:
                 description: Schedule name
@@ -405,6 +400,7 @@ options:
         type: list
         elements: dict
         required: false
+        version_added: '2.9.0'
         suboptions:
             name:
                 description: Schedule name
@@ -418,10 +414,12 @@ options:
         description: Substring or regex pattern to match backup schedules to include (e.g. "*" for All, "pxb-" or any valid regex)
         type: str
         required: false
+        version_added: '2.9.0'
     exclude_filter:
         description: Substring or regex pattern to match backup schedules to exclude (e.g. "*" for All, "pxb-" or any valid regex)
         type: str
         required: false
+        version_added: '2.9.0'
     cluster_scope:
         description: Cluster scope configuration for operations (new in 2.9.0)
         type: dict
