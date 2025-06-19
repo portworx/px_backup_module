@@ -1,5 +1,2 @@
 # ansible-collection/inventory/group_vars/volume_resource_only_policy/enumerate.yaml
 ---
-
-# SSL certificate validation
-validate_certs: true

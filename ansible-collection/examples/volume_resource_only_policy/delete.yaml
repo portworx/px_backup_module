@@ -42,36 +42,7 @@
             org_id: "{{ org_id }}"
             name: "{{ item.name }}"
             uid: "{{ item.uid }}"
-            validate_certs: "{{ item.validate_certs | default(true) }}"
           register: delete_result
           loop: "{{ volume_resource_only_policy_deletes }}"
           loop_control:
             label: "{{ item.name }}"
-
-        # Display successful deletes
-        - name: Display successful deletes
-          debug:
-            msg: "Successfully deleted volume resource only policy '{{ item.item.name }}'"
-          loop: "{{ delete_result.results }}"
-          loop_control:
-            label: "{{ item.item.name }}"
-          when: not item.failed
-
-        # Display failures
-        - name: Display failed deletes
-          debug:
-            msg: "Failed to delete volume resource only policy '{{ item.item.name }}': {{ item.msg }}"
-          loop: "{{ delete_result.results }}"
-          loop_control:
-            label: "{{ item.item.name }}"
-          when: item.failed
-
-      rescue:
-        - name: Display error details
-          debug:
-            msg: "Failed to delete volume resource only policies: {{ 'One or more items failed' if delete_result.results is defined else delete_result.msg | default('Unknown error occurred') }}"
-          when: delete_result is defined
-
-        - name: Fail with error message
-          fail:
-            msg: "Failed to delete volume resource only policies. See above for details."
