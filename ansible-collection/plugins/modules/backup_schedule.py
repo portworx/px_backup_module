@@ -723,6 +723,17 @@ def backup_schedule_request_body(module):
         "keep_cr_status": module.params['keep_cr_status'],
     }
 
+    # Add Object References
+    if module.params.get('schedule_policy_ref'):
+        backup_schedule_request['schedule_policy_ref'] = module.params['schedule_policy_ref']
+    
+    if module.params.get('pre_exec_rule_ref'):
+        backup_schedule_request['pre_exec_rule_ref'] = module.params['pre_exec_rule_ref']
+    if module.params.get('post_exec_rule_ref'):
+        backup_schedule_request['post_exec_rule_ref'] = module.params['post_exec_rule_ref']
+    if module.params.get('policy_ref'):
+        backup_schedule_request['policy_ref'] = module.params['policy_ref']
+
     # Handle deprecated fields
     if module.params.get('schedule_policy'):
         backup_schedule_request['schedule_policy'] = module.params['schedule_policy']
@@ -739,17 +750,7 @@ def backup_schedule_request_body(module):
         # Add suspend field for update operation
         if module.params.get('suspend') is not None:
             backup_schedule_request['suspend'] = module.params['suspend']
-        
-        if module.params.get('schedule_policy_ref'):
-            backup_schedule_request['schedule_policy_ref'] = module.params['schedule_policy_ref']
-        
-        if module.params.get('pre_exec_rule_ref'):
-            backup_schedule_request['pre_exec_rule_ref'] = module.params['pre_exec_rule_ref']
-        if module.params.get('post_exec_rule_ref'):
-            backup_schedule_request['post_exec_rule_ref'] = module.params['post_exec_rule_ref']
-        if module.params.get('policy_ref'):
-            backup_schedule_request['policy_ref'] = module.params['policy_ref']
-        
+                
         if module.params.get('cluster_scope'):
             cluster_scope = module.params['cluster_scope']
             backup_schedule_request["cluster_scope"] = {}
@@ -813,7 +814,7 @@ def run_module():
         org_id=dict(type='str', required=True),
         uid=dict(type='str', required=False),
         owner=dict(type='str', required=False),
-        reclaim_policy=dict(type='str', choices=['Invalid', 'Delete', 'Retain']),
+        reclaim_policy=dict(type='str', choices=['Invalid', 'Delete', 'Retain'], required=True),
         pre_exec_rule=dict(type='str', required=False),
         post_exec_rule=dict(type='str', required=False),
         csi_snapshot_class_name=dict(type='str', required=False),
