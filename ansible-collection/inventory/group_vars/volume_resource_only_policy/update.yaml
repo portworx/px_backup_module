@@ -3,8 +3,8 @@
 # Define volume resource only policies to update
 volume_resource_only_policy_updates:
   # Example: Update volume types and CSI drivers
-  - name: "skip-portworx-policy"
-    uid: "policy-uid-123"
+  - name: "comprehensive-skip-policy"
+    uid: "7e6f3039-dfcb-448b-bc9d-c22d79a3814e"
     volume_types:
       - "Portworx"
       - "Csi"
@@ -22,8 +22,8 @@ volume_resource_only_policy_updates:
       updated: "true"
 
   # Example: Update only ownership
-  - name: "skip-csi-policy"
-    uid: "policy-uid-456"
+  - name: "skip-csi-drivers-policy"
+    uid: "61faca55-936a-45a0-bd13-04d480983ae8"
     ownership:
       owner: "admin@example.com"
       groups:
@@ -36,22 +36,3 @@ volume_resource_only_policy_updates:
           access: "Read"
         - id: "user2@example.com"
           access: "Write"
-
-  # Example: Update labels only
-  - name: "skip-portworx-policy"
-    uid: "policy-uid-123"
-    volume_types:
-      - "Portworx"
-      - "Csi"
-      - "Nfs"
-    csi_drivers:
-      - "ebs.csi.aws.com"
-      - "disk.csi.azure.com"
-      - "pd.csi.storage.gke.io"
-    nfs_servers:
-      - "nfs1.example.com"
-      - "nfs2.example.com"
-    labels:
-      purpose: "skip-nfs-volumes"
-      last-updated: "2024-01-15"
-      version: "v2"

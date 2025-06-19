@@ -6,28 +6,13 @@
   vars_files:
     - "{{ inventory_dir }}/group_vars/common/all.yaml"
     - "{{ inventory_dir }}/group_vars/volume_resource_only_policy/enumerate.yaml"
-
-  vars:
-    # Set default display mode if not defined in vars files
-    _display_mode: "{{ display_mode | default('TABLE') }}"  # TABLE, DETAILED, JSON, SUMMARY
     
   pre_tasks:
     - name: Validate required variables
       assert:
         that:
           - px_backup_api_url is defined
-          - _display_mode in ['TABLE', 'DETAILED', 'JSON', 'SUMMARY']
-        fail_msg: "Required variables must be defined. display_mode must be one of: TABLE, DETAILED, JSON, SUMMARY"
-
-    - name: Display enumeration configuration
-      debug:
-        msg:
-          - "=== PX-Backup Volume Resource Only Policy Enumeration ==="
-          - "API URL: {{ px_backup_api_url }}"
-          - "Organization ID: {{ org_id | default('default') }}"
-          - "Display Mode: {{ _display_mode }}"
-          - "{% if filter_labels is defined and filter_labels | length > 0 %}Label Filters: {{ filter_labels | dict2items | map('join', '=') | join(', ') }}{% endif %}"
-          - "Export to File: {{ export_to_file | default('false') }}"
+        fail_msg: "Required variables must be defined."
 
   tasks:
     - name: Login and fetch Px-Backup token
@@ -39,57 +24,5 @@
         api_url: "{{ px_backup_api_url }}"
         token: "{{ px_backup_token }}"
         org_id: "{{ org_id | default('default') }}"
-        labels: "{{ filter_labels | default(omit) }}"
-        validate_certs: "{{ validate_certs | default(true) }}"
+        labels: "{{ labels | default(omit) }}"
       register: enumerate_result
-
-    - name: Display all policies summary
-      debug:
-        msg:
-          - "=== ALL POLICIES SUMMARY ==="
-          - "Total policies found: {{ enumerate_result.volume_resource_only_policies | length }}"
-          - "Policy names: {{ enumerate_result.volume_resource_only_policies | map(attribute='metadata.name') | list | join(', ') }}"
-
-    - name: Initialize list for policy messages
-      set_fact:
-        all_policy_messages: []
-
-    - name: Append detailed policy message to list
-      set_fact:
-        all_policy_messages: "{{ all_policy_messages + [msg] }}"
-      vars:
-        msg: >-
-          === POLICY DETAILS: {{ item.metadata.name }} ===
-          UID: {{ item.metadata.uid | default('N/A') }}
-          Organization: {{ item.metadata.org_id | default('N/A') }}
-          Owner: {{ item.metadata.ownership.owner | default('N/A') }}
-          Created: {{ item.metadata.create_time | default('N/A') }}
-          Modified: {{ item.metadata.modify_time | default('N/A') }}
-
-          === POLICY CONFIGURATION ===
-          Volume Types: {{ item.volume_resource_only_policy_info.volume_types | default([]) | join(', ') }}
-          CSI Drivers: {{ item.volume_resource_only_policy_info.csi_drivers | default([]) | join(', ') }}
-          NFS Servers: {{ item.volume_resource_only_policy_info.nfs_servers | default([]) | join(', ') }}
-
-          === METADATA ===
-          Labels: {{
-            (item.metadata.labels | dict2items | map('join', '=') | join(', '))
-            if item.metadata.labels is defined else 'None'
-          }}
-          {% if item.metadata.ownership.groups is defined and item.metadata.ownership.groups | length > 0 %}
-          Groups: {{ item.metadata.ownership.groups | map(attribute='id') | join(', ') }}
-          {% endif %}
-          {% if item.metadata.ownership.collaborators is defined and item.metadata.ownership.collaborators | length > 0 %}
-          Collaborators: {{ item.metadata.ownership.collaborators | map(attribute='id') | join(', ') }}
-          {% endif %}
-          {% if item.metadata.ownership.public is defined %}
-          Public Access: {{ item.metadata.ownership.public.type | default('None') }}
-          {% endif %}
-          {{ '=' * 50 }}
-      loop: "{{ enumerate_result.volume_resource_only_policies }}"
-      loop_control:
-        label: "{{ item.metadata.name }}"
-
-    - name: Display detailed information for all policies
-      debug:
-        msg: "{{ all_policy_messages }}"

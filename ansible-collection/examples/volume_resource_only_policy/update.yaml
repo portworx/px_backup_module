@@ -60,19 +60,3 @@
           loop_control:
             label: "{{ item.name }} (ownership update)"
           when: volume_resource_only_policy_updates | selectattr('ownership', 'defined') | list | length > 0
-        
-        - name: Display update results
-          debug:
-            msg: 
-              - "General updates: {{ policy_result.results | default([]) | length }} policies updated"
-              - "Ownership updates: {{ ownership_result.results | default([]) | length }} policies updated"
-          
-      rescue:
-        - name: Display error details
-          debug:
-            msg: "Failed to update volume resource only policy: {{ policy_result.msg if policy_result.msg is defined else 'Unknown error occurred' }}"
-          when: policy_result is defined
-
-        - name: Fail with error message
-          fail:
-            msg: "Failed to update volume resource only policies. See above for details."

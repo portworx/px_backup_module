@@ -5,9 +5,7 @@ volume_resource_only_policy_deletes:
   # Example: Delete portworx skip policy
   - name: "skip-portworx-policy"
     uid: "policy-uid-123"
-    validate_certs: true
 
   # Example: Delete CSI skip policy
   - name: "skip-csi-policy"
     uid: "policy-uid-456"
-    validate_certs: true
