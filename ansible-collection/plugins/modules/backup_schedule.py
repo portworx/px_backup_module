@@ -814,7 +814,7 @@ def run_module():
         org_id=dict(type='str', required=True),
         uid=dict(type='str', required=False),
         owner=dict(type='str', required=False),
-        reclaim_policy=dict(type='str', choices=['Invalid', 'Delete', 'Retain'], required=True),
+        reclaim_policy=dict(type='str', choices=['Invalid', 'Delete', 'Retain'], required=False),
         pre_exec_rule=dict(type='str', required=False),
         post_exec_rule=dict(type='str', required=False),
         csi_snapshot_class_name=dict(type='str', required=False),
