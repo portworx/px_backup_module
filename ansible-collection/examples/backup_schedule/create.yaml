@@ -43,7 +43,6 @@
             labels: "{{ item.labels | default(omit) }}"
             advanced_resource_label_selector: "{{ item.advanced_resource_label_selector  | default(omit) }}"
             volume_resource_only_policy_ref: "{{ item.volume_resource_only_policy_ref | default(omit) }}"
-            suspend: "{{ item.suspend | default(omit) }}"
             parallel_backup: "{{ item.parallel_backup | default(omit) }}"
             keep_cr_status: "{{ item.keep_cr_status | default(omit) }}"
             ownership: "{{ item.ownership | default(omit) }}"
