@@ -44,27 +44,3 @@
             cluster_scope: "{{ item.cluster_scope | default(omit) }}"
           register: delete_result
           loop: "{{ schedule_deletes }}"
-
-        # Display successful deletes
-        - name: Display successful deletes
-          debug:
-            msg: "Successfully deleted backup '{{ item.item }}'"
-          loop: "{{ delete_result.results }}"
-          when: not item.failed
-
-        # Display failures
-        - name: Display failed deletes
-          debug:
-            msg: "Failed to delete schedule '{{ item.item }}': {{ item.msg }}"
-          loop: "{{ delete_result.results }}"
-          when: item.failed
-
-      rescue:
-        - name: Display error details
-          debug:
-            msg: "Failed to delete schedules: {{ 'One or more items failed' if delete_result.results is defined else delete_result.msg | default('Unknown error occurred') }}"
-          when: delete_result is defined
-
-        - name: Fail with error message
-          fail:
-            msg: "Failed to delete schedules. See above for details."
