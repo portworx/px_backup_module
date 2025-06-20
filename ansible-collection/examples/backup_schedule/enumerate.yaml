@@ -31,19 +31,3 @@
           backup_object_type: "{{ enumerate_options.backup_object_type | default(omit) }}"
       register: backup_schedule_result
 
-    - name: Display backup schedule list summary
-      debug:
-        msg: 
-          - "Total backup schedules found: {{ backup_schedule_result.backups | length }}"
-          - "Clusters with backup schedules: {{ backup_schedule_result.backups | map(attribute='backup_info.cluster') | unique | sort | list }}"
-
-      rescue:
-        - name: Display error details
-          debug:
-            msg: "Failed to enumerate backup schedules: {{ backup_schedule_result.msg if backup_schedule_result.msg is defined else 'Unknown error occurred' }}"
-          when: backup_schedule_result is defined
-
-        - name: Fail with error message
-          fail:
-            msg: "Failed to enumerate backup schedules. See above for details."
-

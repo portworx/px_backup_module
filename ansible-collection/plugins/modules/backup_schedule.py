@@ -628,18 +628,30 @@ def inspect_backup_schedules(module, client):
 
 def delete_backup_schedules(module, client):
     """Delete a backup schedule with support for 2.9.0 features"""
-    # For simple delete operations - now uses the updated endpoint
-    if not (module.params.get('policy_ref') or module.params.get('include_objects') or 
-            module.params.get('exclude_objects') or module.params.get('include_filter') or 
-            module.params.get('exclude_filter') or module.params.get('cluster_scope')):
-        params = {
-            'uid': module.params.get('uid')
+    
+    # Get all module parameters
+    params = module.params
+    
+    # Check if only the basic required parameters are provided
+    # (org_id, name, uid are always required, so we check for additional parameters)
+    additional_params = [
+        'policy_ref', 'include_objects', 'exclude_objects', 'include_filter', 
+        'exclude_filter', 'cluster_scope', 'delete_backups', 'backup_object_type',
+        'cluster_ref', 'volume_resource_only_policy_ref'
+    ]
+    
+    has_additional_params = any(params.get(param) is not None for param in additional_params)
+    
+    # For simple delete operations - use DELETE endpoint
+    if not has_additional_params:
+        request_params = {
+            'uid': params.get('uid')
         }
         try:
             response = client.make_request(
                 'DELETE',
-                f"v1/backupschedule/{module.params['org_id']}/{module.params['name']}",
-                params=params
+                f"v1/backupschedule/{params['org_id']}/{params['name']}/{params['uid']}",
+                params=request_params
             )
             return response, True
         except Exception as e:
@@ -649,43 +661,43 @@ def delete_backup_schedules(module, client):
     else:
         try:
             delete_request = {
-                "org_id": module.params['org_id'],
-                "name": module.params.get('name'),
-                "uid": module.params.get('uid')
+                "org_id": params['org_id'],
+                "name": params.get('name'),
+                "uid": params.get('uid')
             }
             
             # Add deprecated delete_backups field if provided
-            if module.params.get('delete_backups') is not None:
-                delete_request["delete_backups"] = module.params['delete_backups']
+            if params.get('delete_backups') is not None:
+                delete_request["delete_backups"] = params['delete_backups']
             
             # Add 2.9.0 fields if provided
-            if module.params.get('backup_object_type'):
-                delete_request["backup_object_type"] = module.params['backup_object_type']
+            if params.get('backup_object_type'):
+                delete_request["backup_object_type"] = params['backup_object_type']
                 
-            if module.params.get('policy_ref'):
-                delete_request["policy_ref"] = module.params['policy_ref']
+            if params.get('policy_ref'):
+                delete_request["policy_ref"] = params['policy_ref']
                 
-            if module.params.get('include_objects'):
-                delete_request["include_objects"] = module.params['include_objects']
+            if params.get('include_objects'):
+                delete_request["include_objects"] = params['include_objects']
                 
-            if module.params.get('exclude_objects'):
-                delete_request["exclude_objects"] = module.params['exclude_objects']
+            if params.get('exclude_objects'):
+                delete_request["exclude_objects"] = params['exclude_objects']
                 
-            if module.params.get('include_filter'):
-                delete_request["include_filter"] = module.params['include_filter']
+            if params.get('include_filter'):
+                delete_request["include_filter"] = params['include_filter']
                 
-            if module.params.get('exclude_filter'):
-                delete_request["exclude_filter"] = module.params['exclude_filter']
+            if params.get('exclude_filter'):
+                delete_request["exclude_filter"] = params['exclude_filter']
                 
-            if module.params.get('cluster_ref'):
-                delete_request["cluster_ref"] = module.params['cluster_ref']
+            if params.get('cluster_ref'):
+                delete_request["cluster_ref"] = params['cluster_ref']
 
-            if module.params.get('volume_resource_only_policy_ref'):
-                delete_request["volume_resource_only_policy_ref"] = module.params['volume_resource_only_policy_ref']
+            if params.get('volume_resource_only_policy_ref'):
+                delete_request["volume_resource_only_policy_ref"] = params['volume_resource_only_policy_ref']
             
             # Add cluster_scope support (new in 2.9.0)
-            if module.params.get('cluster_scope'):
-                cluster_scope = module.params['cluster_scope']
+            if params.get('cluster_scope'):
+                cluster_scope = params['cluster_scope']
                 delete_request["cluster_scope"] = {}
                 if cluster_scope.get('cluster_refs'):
                     delete_request["cluster_scope"]["cluster_refs"] = {"refs": cluster_scope['cluster_refs']}
@@ -694,7 +706,7 @@ def delete_backup_schedules(module, client):
             
             response = client.make_request(
                 'POST',
-                f"v1/backupschedule/{module.params['org_id']}/delete",
+                f"v1/backupschedule/{params['org_id']}/delete",
                 data=delete_request
             )
             return response, True
@@ -1005,12 +1017,6 @@ def run_module():
     module = AnsibleModule(
         argument_spec=module_args,
         supports_check_mode=True,
-        # Mutual exclusion for cluster scope and filtering
-        mutually_exclusive=[
-            ['cluster_scope.cluster_refs', 'cluster_scope.all_clusters'],
-            ['include_objects', 'include_filter'],
-            ['exclude_objects', 'exclude_filter']
-        ]
     )
 
     if module.check_mode:
