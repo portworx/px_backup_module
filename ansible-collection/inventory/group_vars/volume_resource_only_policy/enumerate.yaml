@@ -1,2 +1,11 @@
 # ansible-collection/inventory/group_vars/volume_resource_only_policy/enumerate.yaml
 ---
+# labels: 
+enumerate_options:
+  generic_enumerate_options:
+    max_objects: 10
+    name_filter: "nfs-filter"
+    object_index: 1
+    labels: 
+      purpose: "nfs-volume-exclusion"
+ 

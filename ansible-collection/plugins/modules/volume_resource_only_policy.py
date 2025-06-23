@@ -115,6 +115,49 @@ options:
         description: Labels to attach to the volume resource only policy
         required: false
         type: dict
+    enumerate_options:
+        description: 
+            - Options for controlling enumeration behavior when listing volume resource only policies
+            - Used with INSPECT_ALL operation to filter and limit results
+            - All suboptions are optional and can be combined for advanced filtering
+        type: dict
+        required: false
+        version_added: '2.9.0'
+        suboptions:
+            generic_enumerate_options:
+                description: Common enumeration options for filtering and pagination
+                type: dict
+                required: false
+                suboptions:
+                    labels:
+                        description: 
+                            - Key-value pairs for filtering policies by labels
+                            - Only policies matching all specified labels will be returned
+                            - Example: {"environment": "production", "team": "backend"}
+                        type: dict
+                        required: false
+                    max_objects:
+                        description: 
+                            - Maximum number of policies to return in the response
+                            - Useful for pagination and limiting large result sets
+                            - Must be a positive integer
+                        type: int
+                        required: false
+                    name_filter:
+                        description: 
+                            - Filter policies by name using substring matching
+                            - Returns policies whose names contain the specified filter string
+                            - Case-sensitive matching
+                            - Example: "prod" will match "prod-policy" and "my-prod-backup"
+                        type: str
+                        required: false
+                    object_index:
+                        description: 
+                            - Starting index for pagination when retrieving policies
+                            - Used with max_objects for pagination through large result sets
+                            - Zero-based indexing (0 = first policy)
+                        type: int
+                        required: false
     ownership:
         description: Ownership configuration for the volume resource only policy
         required: false
@@ -186,7 +229,7 @@ EXAMPLES = r'''
       - "ebs.csi.aws.com"
       - "disk.csi.azure.com"
     labels:
-      environment: production
+      environment: "production"
       team: platform
 
 # List all volume resource only policies
@@ -457,11 +500,41 @@ def update_ownership(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dic
 
 def enumerate_volume_resource_only_policies(module: AnsibleModule, client: PXBackupClient) -> List[Dict[str, Any]]:
     """List all volume resource only policies"""
+    params = {}
+    
+    # Handle top-level labels if provided
+    if module.params.get('labels'):
+        labels = module.params['labels']
+        # Pass labels as individual query parameters
+        for key, value in labels.items():
+            params[f'labels[{key}]'] = value
+    
+    enumerate_options = module.params.get('enumerate_options')
+    if enumerate_options and enumerate_options.get('generic_enumerate_options'):
+        generic_opts = enumerate_options['generic_enumerate_options']
+        
+        # Handle nested labels in enumerate_options
+        if generic_opts.get('labels'):
+            labels = generic_opts['labels']
+            # Pass each label as a separate parameter with proper formatting
+            for key, value in labels.items():
+                params[f'enumerate_options.generic_enumerate_options.labels[{key}]'] = value
+        
+        # Handle other fields
+        if generic_opts.get('max_objects') is not None:
+            params['enumerate_options.generic_enumerate_options.max_objects'] = generic_opts['max_objects']
+        
+        if generic_opts.get('name_filter'):
+            params['enumerate_options.generic_enumerate_options.name_filter'] = generic_opts['name_filter']
+        
+        if generic_opts.get('object_index') is not None:
+            params['enumerate_options.generic_enumerate_options.object_index'] = generic_opts['object_index']
     
     try:
         response = client.make_request(
             'GET', 
             f"v1/volumeresourceonlypolicy/{module.params['org_id']}", 
+            params=params
         )
         return response.get('volume_resource_only_policies', [])
     except Exception as e:
@@ -635,6 +708,22 @@ def run_module():
         nfs_servers=dict(type='list', elements='str', required=False),
         validate_certs=dict(type='bool', default=True),
         labels=dict(type='dict', required=False),
+        enumerate_options=dict(
+            type='dict',
+            required=False,
+            options=dict(
+                generic_enumerate_options=dict(
+                    type='dict',
+                    required=False,
+                    options=dict(
+                        labels=dict(type='dict', required=False),
+                        max_objects=dict(type='int', required=False),
+                        name_filter=dict(type='str', required=False),
+                        object_index=dict(type='int', required=False)
+                    )
+                )
+            )
+        ),
         ownership=dict(
             type='dict',
             required=False,
