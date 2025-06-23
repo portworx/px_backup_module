@@ -9,6 +9,7 @@ The volume_resource_only_policy module provides comprehensive management of PX-B
 * Manage CSI driver-specific exclusions
 * Control NFS server-specific backup exclusions
 * Handle policy ownership and access control
+* List and filter policies with advanced enumeration options
 
 ## Requirements
 
@@ -20,7 +21,6 @@ The volume_resource_only_policy module provides comprehensive management of PX-B
 ## Operations
 
 The module supports the following operations:
-
 
 | Operation        | Description                              |
 | ------------------ | ------------------------------------------ |
@@ -35,7 +35,6 @@ The module supports the following operations:
 
 ### Common Parameters
 
-
 | Parameter      | Type    | Required | Default | Description                                                                               |
 | ---------------- | --------- | ---------- | --------- | ------------------------------------------------------------------------------------------- |
 | api_url        | string  | yes      |         | PX-Backup API URL                                                                         |
@@ -48,7 +47,6 @@ The module supports the following operations:
 
 ### Policy Configuration Parameters
 
-
 | Parameter    | Type | Required | Default | Description                                                             |
 | -------------- | ------ | ---------- | --------- | ------------------------------------------------------------------------- |
 | volume_types | list | no       |         | List of volume types to skip for volume data backup                     |
@@ -56,7 +54,6 @@ The module supports the following operations:
 | nfs_servers  | list | no       |         | List of NFS servers that should skip volume data backup for NFS volumes |
 
 #### volume_types Values
-
 
 | Value    | Description                               |
 | ---------- | ------------------------------------------- |
@@ -67,14 +64,32 @@ The module supports the following operations:
 
 ### Metadata Parameters
 
-
 | Parameter | Type       | Required | Description                    |
 | ----------- | ------------ | ---------- | -------------------------------- |
-| labels    | dictionary | no       | Labels to attach to the policy |
 | ownership | dictionary | no       | Ownership and access control   |
 
-### Ownership Configuration
+### Enumeration Parameters
 
+| Parameter        | Type       | Required | Description                                              |
+| ------------------ | ------------ | ---------- | ---------------------------------------------------------- |
+| enumerate_options | dictionary | no       | Options for controlling enumeration behavior (INSPECT_ALL only) |
+
+#### enumerate_options Structure
+
+| Parameter                              | Type       | Required | Description                                                                          |
+| ---------------------------------------- | ------------ | ---------- | -------------------------------------------------------------------------------------- |
+| enumerate_options.generic_enumerate_options | dictionary | no       | Common enumeration options for filtering and pagination                              |
+
+#### generic_enumerate_options Structure
+
+| Parameter                                          | Type       | Required | Description                                                                    |
+| ---------------------------------------------------- | ------------ | ---------- | -------------------------------------------------------------------------------- |
+| generic_enumerate_options.labels                   | dictionary | no       | Key-value pairs for filtering policies by labels                               |
+| generic_enumerate_options.max_objects              | integer    | no       | Maximum number of policies to return (useful for pagination)                  |
+| generic_enumerate_options.name_filter              | string     | no       | Filter policies by name using substring matching (case-sensitive)             |
+| generic_enumerate_options.object_index             | integer    | no       | Starting index for pagination (zero-based, used with max_objects)             |
+
+### Ownership Configuration
 
 | Parameter               | Type       | Required | Description                                |
 | ------------------------- | ------------ | ---------- | -------------------------------------------- |
@@ -85,7 +100,6 @@ The module supports the following operations:
 | ownership.public        | dictionary | no       | Public access configuration                |
 
 #### Ownership Access Configuration
-
 
 | Parameter | Type   | Required | Choices                  | Description                      |
 | ----------- | -------- | ---------- | -------------------------- | ---------------------------------- |
@@ -128,9 +142,9 @@ The module supports the following operations:
       - "disk.csi.azure.com"
       - "pd.csi.storage.gke.io"
     labels:
-      environment: production
-      team: platform
-      created_by: ansible
+      environment: "production"
+      team: "platform"
+      created_by: "ansible"
 ```
 
 ### NFS Configuration
@@ -197,6 +211,57 @@ The module supports the following operations:
     name: "skip-portworx-data"
     org_id: "default"
     uid: "policy-uid-123"
+```
+
+### Enumeration with Filtering
+
+```yaml
+# List policies with basic filtering
+- name: List volume resource only policies with label filtering
+  volume_resource_only_policy:
+    operation: INSPECT_ALL
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    org_id: "default"
+
+# List policies with advanced enumeration options
+- name: List policies with pagination and filtering
+  volume_resource_only_policy:
+    operation: INSPECT_ALL
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    org_id: "default"
+    enumerate_options:
+      generic_enumerate_options:
+        max_objects: 10
+        name_filter: "prod"
+        object_index: 0
+        labels:
+          environment: "production"
+
+# List policies with name filtering
+- name: Find policies by name pattern
+  volume_resource_only_policy:
+    operation: INSPECT_ALL
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    org_id: "default"
+    enumerate_options:
+      generic_enumerate_options:
+        name_filter: "skip-"
+        max_objects: 50
+
+# Paginate through large policy lists
+- name: Get next page of policies
+  volume_resource_only_policy:
+    operation: INSPECT_ALL
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    org_id: "default"
+    enumerate_options:
+      generic_enumerate_options:
+        max_objects: 20
+        object_index: 20  # Start from 21st policy
 ```
 
 ### Ownership Management
@@ -301,27 +366,62 @@ changed:
   returned: always
 ```
 
+## Enumeration Use Cases
+
+### Pagination Example
+
+When dealing with large numbers of policies, use pagination:
+
+```yaml
+# Get first 20 policies
+- name: Get first page of policies
+  volume_resource_only_policy:
+    operation: INSPECT_ALL
+    org_id: "default"
+    enumerate_options:
+      generic_enumerate_options:
+        max_objects: 20
+        object_index: 0
+
+# Get next 20 policies
+- name: Get second page of policies
+  volume_resource_only_policy:
+    operation: INSPECT_ALL
+    org_id: "default"
+    enumerate_options:
+      generic_enumerate_options:
+        max_objects: 20
+        object_index: 20
+```
+
+### Filtering Best Practices
+
+1. **Combine Filters**: Use multiple filtering options together for precise results
+2. **Label-based Organization**: Use consistent labeling strategies for easier filtering
+3. **Name Patterns**: Adopt naming conventions that work well with substring filtering
+4. **Pagination**: Always use pagination for production environments with many policies
+
 ## Error Handling
 
 The module implements comprehensive error handling:
 
 1. **Parameter Validation**
-
    - Required parameter checks
    - Valid enum value validation
    - Format validation
-2. **API Communication Errors**
+   - Enumeration option validation
 
+2. **API Communication Errors**
    - Connection failures
    - Authentication errors
    - API response parsing
-3. **Resource State Validation**
 
+3. **Resource State Validation**
    - Policy existence checks
    - Update conflict detection
    - Dependency validation
-4. **Permission Checks**
 
+4. **Permission Checks**
    - Access control validation
    - Ownership verification
 
@@ -332,3 +432,4 @@ The module implements comprehensive error handling:
 - **Permission denied**: When user lacks required permissions
 - **Invalid CSI driver**: When specifying non-existent CSI drivers
 - **Network connectivity**: When API endpoint is unreachable
+- **Invalid enumeration parameters**: When pagination or filtering parameters are malformed
