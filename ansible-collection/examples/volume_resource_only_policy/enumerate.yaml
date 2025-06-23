@@ -25,4 +25,5 @@
         token: "{{ px_backup_token }}"
         org_id: "{{ org_id | default('default') }}"
         labels: "{{ labels | default(omit) }}"
+        enumerate_options: "{{ enumerate_options | default(omit) }}"
       register: enumerate_result
