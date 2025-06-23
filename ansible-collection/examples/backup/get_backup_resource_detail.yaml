@@ -6,7 +6,7 @@
 
   vars_files:
     - "{{ inventory_dir }}/group_vars/common/all.yaml"
-    - "{{ inventory_dir }}/group_vars/backup/getbackupresourcedetail.yaml"
+    - "{{ inventory_dir }}/group_vars/backup/get_backup_resource_detail.yaml"
 
   pre_tasks:
     - name: Validate required variables
@@ -60,7 +60,7 @@
                   Volume Status: {{ volume.status.status }}
               {% endfor %}
               {% endfor %}
-
+          when: backup_result.backup.status.status == "Success"
 
       rescue:
         - name: Display error details
