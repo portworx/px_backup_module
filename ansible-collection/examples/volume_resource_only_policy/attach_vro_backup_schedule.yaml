@@ -1,0 +1,199 @@
+---
+- name: Configure PX-Backup Volume Resource Only Policy and attach it to an existing Backup Schedule
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/volume_resource_only_policy/attach_vro_backup_schedule.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - nfs_servers_list is defined and nfs_servers_list | length > 0
+          - backup_schedules_to_update is defined and backup_schedules_to_update | length > 0
+        fail_msg: "Required variables must be defined: px_backup_api_url, nfs_servers_list, and backup_schedules_to_update"
+
+    - name: Display configuration summary
+      debug:
+        msg:
+          - "=== NFS Volume Resource Only Backup Configuration ==="
+          - "API URL: {{ px_backup_api_url }}"
+          - "VRO Policy Name: {{ nfs_vro_policy_name }}"
+          - "NFS Servers: {{ nfs_servers_list | join(', ') }}"
+          - "Backup Schedules to Update: {{ backup_schedules_to_update | map(attribute='name') | list | join(', ') }}"
+
+  tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+
+    - name: Create NFS Volume Resource Only Policy
+      block:
+        - name: Create volume resource only policy for NFS
+          volume_resource_only_policy:
+            operation: CREATE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            name: "{{ nfs_vro_policy_name }}"
+            org_id: "{{ org_id | default('default') }}"
+            volume_types: "{{ volume_type }}"
+            nfs_servers: "{{ nfs_servers_list }}"
+            labels: "{{ nfs_vro_labels }}"
+          register: vro_policy_result
+
+      rescue:
+              - name: Handle VRO policy creation failure
+                debug:
+                  msg:
+                    - "=== VRO POLICY CREATION FAILED ==="
+                    - "Error: {{ vro_policy_result.msg | default('Unknown error') }}"
+                
+              - name: Check if policy already exists
+                volume_resource_only_policy:
+                  operation: INSPECT_ALL
+                  api_url: "{{ px_backup_api_url }}"
+                  token: "{{ px_backup_token }}"
+                  org_id: "{{ org_id | default('default') }}"
+                register: existing_vro_policies
+                ignore_errors: true
+
+              - name: Debug existing policies
+                debug:
+                  msg: 
+                    - "Found {{ existing_vro_policies.volume_resource_only_policies | length }} existing policies"
+                    - "Policy names: {{ existing_vro_policies.volume_resource_only_policies | map(attribute='metadata.name') | list }}"
+                when: 
+                  - existing_vro_policies is succeeded
+                  - existing_vro_policies.volume_resource_only_policies is defined
+
+              - name: Find matching policy by name
+                set_fact:
+                  matching_policy: "{{ item }}"
+                loop: "{{ existing_vro_policies.volume_resource_only_policies | default([]) }}"
+                when: 
+                  - existing_vro_policies is succeeded
+                  - existing_vro_policies.volume_resource_only_policies is defined
+                  - item.metadata.name == nfs_vro_policy_name
+                loop_control:
+                  label: "{{ item.metadata.name }}"
+
+              - name: Use existing policy if found
+                set_fact:
+                  vro_policy_result:
+                    volume_resource_only_policies: 
+                      - "{{ matching_policy }}"
+                    changed: false
+                when: matching_policy is defined
+
+              - name: Fail if policy cannot be created or found
+                fail:
+                  msg: "Failed to create VRO policy '{{ nfs_vro_policy_name }}' and it doesn't exist in the system. Cannot proceed."
+                when: matching_policy is not defined
+
+    - name: Prepare VRO policy reference
+      set_fact:
+        vro_policy_ref:
+          name: "{{ vro_policy_result.volume_resource_only_policies[0].metadata.name }}"
+          uid: "{{ vro_policy_result.volume_resource_only_policies[0].metadata.uid }}"
+
+    - name: Stop if user says no
+      meta: end_play
+      when: 
+        - interactive_mode | default(true) | bool
+        - user_input.user_input | default('yes') | lower != 'yes'
+
+    - name: Update Backup Schedules with VRO Policy
+      block:
+        - name: Update each backup schedule
+          backup_schedule:
+            operation: UPDATE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            org_id: "{{ org_id | default('default') }}"
+            name: "{{ item.name | default(omit) }}"
+            uid: "{{ item.uid | default(omit) }}"
+            volume_resource_only_policy_ref: "{{ vro_policy_ref }}"
+            # Preserve existing settings if provided
+            suspend: "{{ item.suspend | default(omit) }}"
+            cluster_ref: "{{ item.cluster_ref | default(omit) }}"
+            backup_object_type: "{{ item.backup_object_type | default(omit) }}"
+            schedule_policy_ref: "{{ item.schedule_policy_ref | default(omit) }}"
+            backup_location_ref: "{{ item.backup_location_ref | default(omit) }}"
+            pre_exec_rule_ref: "{{ item.pre_exec_rule_ref | default(omit) }}"
+            post_exec_rule_ref: "{{ item.post_exec_rule_ref | default(omit) }}"
+            policy_ref: "{{ item.policy_ref | default(omit) }}"
+            exclude_objects: "{{ item.exclude_objects | default(omit) }}"
+            include_objects: "{{ item.include_objects | default(omit) }}"
+            include_filter: "{{ item.include_filter | default(omit) }}"
+            exclude_filter: "{{ item.exclude_filter | default(omit) }}"
+            cluster_scope: "{{ item.cluster_scope | default(omit) }}"
+            labels: "{{ item.labels | default(omit) }}"
+          register: schedule_update_result
+          loop: "{{ backup_schedules_to_update }}"
+          loop_control:
+            label: "{{ item.name | default(item.uid) }}"
+
+        - name: Extract update results
+          set_fact:
+            successful_updates: "{{ schedule_update_result.results | selectattr('changed', 'equalto', true) | list }}"
+            failed_updates: "{{ schedule_update_result.results | selectattr('failed', 'defined') | selectattr('failed', 'equalto', true) | list }}"
+
+      rescue:
+        - name: Display schedule update errors
+          debug:
+            msg:
+              - "=== BACKUP SCHEDULE UPDATE FAILED ==="
+              - "Failed schedule: {{ item.item.name | default(item.item.uid) }}"
+              - "Error: {{ item.msg }}"
+          loop: "{{ failed_updates | default([]) }}"
+          when: failed_updates is defined and failed_updates | length > 0
+
+        - name: Fail with update error summary
+          fail:
+            msg: "Failed to update {{ failed_updates | length | default(0) }} backup schedules"
+
+    - name: Display detailed update results
+      debug:
+        msg:
+          - "=== BACKUP SCHEDULE UPDATE SUCCESS ==="
+          - "Schedule: {{ item.item.name | default(item.item.uid) }}"
+          - "VRO Policy Applied: {{ vro_policy_ref.name }} ({{ vro_policy_ref.uid }})"
+          - "Update Status: Success"
+          - "---"
+      loop: "{{ successful_updates }}"
+      loop_control:
+        label: "{{ item.item.name | default(item.item.uid) }}"
+      when: 
+        - successful_updates is defined 
+        - successful_updates | length > 0
+
+    - name: Build summary message
+      set_fact:
+        summary_lines:
+          - "=== CONFIGURATION SUMMARY ==="
+          - ""
+          - "Volume Resource Only Policy:"
+          - "  Name: {{ vro_policy_ref.name }}"
+          - "  UID: {{ vro_policy_ref.uid }}"
+          - "  Volume Type: NFS"
+          - "  NFS Servers: {{ nfs_servers_list | join(', ') }}"
+          - ""
+          - "Backup Schedule Updates:"
+          - "  Total Attempted: {{ backup_schedules_to_update | length }}"
+          - "  Successfully Updated: {{ successful_updates | length | default(0) }}"
+          - "  Failed: {{ failed_updates | length | default(0) }}"
+          - ""
+          - "Updated Schedules:"
+
+    - name: Add schedule names to summary
+      set_fact:
+        summary_lines: "{{ summary_lines + ['  • ' + item.item.name | default(item.item.uid)] }}"
+      loop: "{{ successful_updates }}"
+      loop_control:
+        label: "{{ item.item.name | default(item.item.uid) }}"
+
+    - name: Display comprehensive summary
+      debug:
+        msg: "{{ summary_lines }}"

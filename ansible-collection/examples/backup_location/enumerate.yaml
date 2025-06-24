@@ -1,11 +1,16 @@
 ---
-- name: List all PX-Backup backup locations
+- name: List all PX-Backup backup locations with proper formatting
   hosts: localhost
-  gather_facts: false
+  gather_facts: true
 
   vars_files:
     - "{{ inventory_dir}}/group_vars/common/all.yaml"
     - "{{ inventory_dir }}/group_vars/backup_location/enumerate.yaml"
+
+  vars:
+    # Output configuration - can be overridden with --extra-vars
+    output_format: "{{ output_format | default('yaml') }}"
+    output_mode: "{{ output_mode | default('display') }}"
 
   pre_tasks:
     - name: Validate required variables
@@ -17,9 +22,83 @@
   tasks:
     - name: Login and fetch Px-Backup token
       include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+    
     - name: Backup Location Enumerate call
       backup_location:
         operation: INSPECT_ALL
         api_url: "{{ px_backup_api_url }}"
         token: "{{ px_backup_token }}"
         org_id: "{{ org_id | default('default') }}"
+      register: backup_location_result
+
+    # YAML Display - Using built-in to_yaml filter
+    - name: Display as YAML
+      vars:
+        yaml_data:
+          generated: "{{ ansible_date_time.iso8601 }}"
+          total_count: "{{ backup_location_result.backup_locations | length }}"
+          backup_locations: "{{ backup_location_result.backup_locations }}"
+      debug:
+        msg: "{{ yaml_data | to_yaml }}"
+      when: output_format == "yaml" and output_mode == "display"
+
+    # JSON Display
+    - name: Display as JSON
+      vars:
+        json_output:
+          generated: "{{ ansible_date_time.iso8601 }}"
+          total_count: "{{ backup_location_result.backup_locations | length }}"
+          backup_locations: "{{ backup_location_result.backup_locations }}"
+      debug:
+        var: json_output
+      when: output_format == "json" and output_mode == "display"
+
+    # CSV Display
+    - name: Display as CSV
+      vars:
+        csv_header: "Name,UID,Type,Status,Path,Created,LastUpdated,Owner,ServerEndpoint,Region,Credential"
+        csv_rows: |
+          {% for location in backup_location_result.backup_locations %}
+          {{ location.metadata.name }},{{ location.metadata.uid }},{{ location.backup_location_info.type }},{{ location.backup_location_info.status.status }},{{ location.backup_location_info.path }},{{ location.metadata.create_time }},{{ location.metadata.last_update_time }},{{ location.metadata.ownership.owner }},{% if location.backup_location_info.type == 'NFS' %}{{ location.backup_location_info.nfs_config.server_addr }},{{ location.backup_location_info.nfs_config.sub_path }},{% elif location.backup_location_info.type == 'S3' %}{{ location.backup_location_info.s3_config.endpoint }},{{ location.backup_location_info.s3_config.region }},{{ location.backup_location_info.cloud_credential_ref.name }}{% else %},,{% endif %}
+          {% endfor %}
+      debug:
+        msg: |
+          {{ csv_header }}
+          {{ csv_rows }}
+      when: output_format == "csv" and output_mode == "display"
+
+    # File Output - YAML using to_yaml filter
+    - name: Save as YAML file
+      vars:
+        yaml_data:
+          generated: "{{ ansible_date_time.iso8601 }}"
+          total_count: "{{ backup_location_result.backup_locations | length }}"
+          backup_locations: "{{ backup_location_result.backup_locations }}"
+      copy:
+        content: "{{ yaml_data | to_yaml }}"
+        dest: "./backup_locations_{{ ansible_date_time.epoch }}.yaml"
+      when: output_format == "yaml" and output_mode == "file"
+
+    # File Output - JSON
+    - name: Save as JSON file
+      copy:
+        content: |
+          {
+            "generated": "{{ ansible_date_time.iso8601 }}",
+            "total_count": {{ backup_location_result.backup_locations | length }},
+            "backup_locations": {{ backup_location_result.backup_locations | to_nice_json(indent=2) }}
+          }
+        dest: "./backup_locations_{{ ansible_date_time.epoch }}.json"
+      when: output_format == "json" and output_mode == "file"
+
+    # File Output - CSV
+    - name: Save as CSV file
+      copy:
+        content: |
+          Name,UID,Type,Status,Path,Created,LastUpdated,Owner,ServerEndpoint,Region,Credential
+          {% for location in backup_location_result.backup_locations %}
+          {{ location.metadata.name }},{{ location.metadata.uid }},{{ location.backup_location_info.type }},{{ location.backup_location_info.status.status }},{{ location.backup_location_info.path }},{{ location.metadata.create_time }},{{ location.metadata.last_update_time }},{{ location.metadata.ownership.owner }},{% if location.backup_location_info.type == 'NFS' %}{{ location.backup_location_info.nfs_config.server_addr }},{{ location.backup_location_info.nfs_config.sub_path }},{% elif location.backup_location_info.type == 'S3' %}{{ location.backup_location_info.s3_config.endpoint }},{{ location.backup_location_info.s3_config.region }},{{ location.backup_location_info.cloud_credential_ref.name }}{% else %},,{% endif %}
+          {% endfor %}
+        dest: "./backup_locations_{{ ansible_date_time.epoch }}.csv"
+      when: output_format == "csv" and output_mode == "file"
+
