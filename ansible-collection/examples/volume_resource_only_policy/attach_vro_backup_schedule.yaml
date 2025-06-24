@@ -1,7 +1,7 @@
 ---
 - name: Configure PX-Backup Volume Resource Only Policy and attach it to an existing Backup Schedule
   hosts: localhost
-  gather_facts: false
+  gather_facts: true
 
   vars_files:
     - "{{ inventory_dir }}/group_vars/common/all.yaml"
@@ -95,8 +95,8 @@
     - name: Prepare VRO policy reference
       set_fact:
         vro_policy_ref:
-          name: "{{ vro_policy_result.volume_resource_only_policies[0].metadata.name }}"
-          uid: "{{ vro_policy_result.volume_resource_only_policies[0].metadata.uid }}"
+          name: "{{ vro_policy_result.volume_resource_only_policy.metadata.name }}"
+          uid: "{{ vro_policy_result.volume_resource_only_policy.metadata.uid }}"
 
     - name: Stop if user says no
       meta: end_play
@@ -114,7 +114,7 @@
             org_id: "{{ org_id | default('default') }}"
             name: "{{ item.name | default(omit) }}"
             uid: "{{ item.uid | default(omit) }}"
-            volume_resource_only_policy_ref: "{{ vro_policy_ref }}"
+            # volume_resource_only_policy_ref: "{{ vro_policy_ref }}"
             # Preserve existing settings if provided
             suspend: "{{ item.suspend | default(omit) }}"
             cluster_ref: "{{ item.cluster_ref | default(omit) }}"
@@ -134,66 +134,13 @@
           loop: "{{ backup_schedules_to_update }}"
           loop_control:
             label: "{{ item.name | default(item.uid) }}"
+          
 
-        - name: Extract update results
-          set_fact:
-            successful_updates: "{{ schedule_update_result.results | selectattr('changed', 'equalto', true) | list }}"
-            failed_updates: "{{ schedule_update_result.results | selectattr('failed', 'defined') | selectattr('failed', 'equalto', true) | list }}"
-
-      rescue:
-        - name: Display schedule update errors
+    # YAML Display - Using built-in to_yaml filter
+        - name: Display as YAML
+          vars:
+            yaml_data:
+              generated: "{{ ansible_date_time.iso8601 }}"
+              backup: "{{ backup_schedules_to_update }}"
           debug:
-            msg:
-              - "=== BACKUP SCHEDULE UPDATE FAILED ==="
-              - "Failed schedule: {{ item.item.name | default(item.item.uid) }}"
-              - "Error: {{ item.msg }}"
-          loop: "{{ failed_updates | default([]) }}"
-          when: failed_updates is defined and failed_updates | length > 0
-
-        - name: Fail with update error summary
-          fail:
-            msg: "Failed to update {{ failed_updates | length | default(0) }} backup schedules"
-
-    - name: Display detailed update results
-      debug:
-        msg:
-          - "=== BACKUP SCHEDULE UPDATE SUCCESS ==="
-          - "Schedule: {{ item.item.name | default(item.item.uid) }}"
-          - "VRO Policy Applied: {{ vro_policy_ref.name }} ({{ vro_policy_ref.uid }})"
-          - "Update Status: Success"
-          - "---"
-      loop: "{{ successful_updates }}"
-      loop_control:
-        label: "{{ item.item.name | default(item.item.uid) }}"
-      when: 
-        - successful_updates is defined 
-        - successful_updates | length > 0
-
-    - name: Build summary message
-      set_fact:
-        summary_lines:
-          - "=== CONFIGURATION SUMMARY ==="
-          - ""
-          - "Volume Resource Only Policy:"
-          - "  Name: {{ vro_policy_ref.name }}"
-          - "  UID: {{ vro_policy_ref.uid }}"
-          - "  Volume Type: NFS"
-          - "  NFS Servers: {{ nfs_servers_list | join(', ') }}"
-          - ""
-          - "Backup Schedule Updates:"
-          - "  Total Attempted: {{ backup_schedules_to_update | length }}"
-          - "  Successfully Updated: {{ successful_updates | length | default(0) }}"
-          - "  Failed: {{ failed_updates | length | default(0) }}"
-          - ""
-          - "Updated Schedules:"
-
-    - name: Add schedule names to summary
-      set_fact:
-        summary_lines: "{{ summary_lines + ['  • ' + item.item.name | default(item.item.uid)] }}"
-      loop: "{{ successful_updates }}"
-      loop_control:
-        label: "{{ item.item.name | default(item.item.uid) }}"
-
-    - name: Display comprehensive summary
-      debug:
-        msg: "{{ summary_lines }}"
+            msg: "{{ yaml_data | to_nice_yaml }}"

@@ -1,7 +1,7 @@
 ---
 - name: Configure PX-Backup Schedules
   hosts: localhost
-  gather_facts: false
+  gather_facts: true
 
   vars_files:
     - "{{ inventory_dir }}/group_vars/common/all.yaml"
@@ -51,3 +51,12 @@
           register: backup_result
           loop_control:
             label: "{{ item.name }}"
+
+    # YAML Display - Using built-in to_yaml filter
+        - name: Display as YAML
+          vars:
+            yaml_data:
+              generated: "{{ ansible_date_time.iso8601 }}"
+              backup: "{{ backup_result }}"
+          debug:
+            msg: "{{ yaml_data | to_nice_yaml }}"

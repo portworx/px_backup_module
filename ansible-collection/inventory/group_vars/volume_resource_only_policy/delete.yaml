@@ -3,9 +3,5 @@
 # Define volume resource only policies to delete
 volume_resource_only_policy_deletes:
   # Example: Delete portworx skip policy
-  - name: "skip-portworx-policy"
-    uid: "policy-uid-123"
-
-  # Example: Delete CSI skip policy
-  - name: "skip-csi-policy"
-    uid: "policy-uid-456"
+  - name: "nfs-skip-policy"
+    uid: "223e119b-446c-4faf-bf73-55c85612a535"

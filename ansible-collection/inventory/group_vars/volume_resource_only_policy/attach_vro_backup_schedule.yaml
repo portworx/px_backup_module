@@ -1,0 +1,45 @@
+---
+# VRO Policy Configuration for NFS Volume Exclusion
+nfs_vro_policy_name: "nfs-skip-policy"
+volume_type: "Nfs"  # Volume type to exclude from backup
+
+# List of NFS servers to exclude from backup
+nfs_servers_list:
+  - "nfs-pxbkp.pwx.dev.purestorage.com"
+
+# Labels for the VRO policy (optional)
+nfs_vro_labels:
+  purpose: "nfs-volume-exclusion"
+  environment: "demo"
+  created_by: "ansible"
+
+# Interactive mode - set to false to skip user confirmation
+# interactive_mode: false
+
+# Backup schedules to update with the VRO policy
+backup_schedules_to_update:
+  - name: "nfs-attached-schedule-demo"
+    uid: "40dd1a54-4b84-4c92-b8d0-68a6b6f8e0a4"
+    # Preserve existing backup schedule configuration
+    cluster_ref:
+      name: "self"
+      uid: "460bdeb4-1bc3-47ec-86db-e1f0b1d52936"
+    backup_object_type:
+      type: "All"
+    schedule_policy_ref:
+      name: "15min-retain3-incr2"
+      uid: "afd10698-97aa-4e43-be69-c4610e51105e"
+    backup_location_ref:
+      name: "minio"
+      uid: "4637d42d-28d9-441d-8dc9-81edbed5b084"
+    # Optional: preserve other existing settings
+    suspend: false
+    # pre_exec_rule_ref: {}
+    # post_exec_rule_ref: {}
+    # policy_ref: {}
+    # exclude_objects: []
+    # include_objects: []
+    # include_filter: {}
+    # exclude_filter: {}
+    # cluster_scope: false
+    # labels: {}
