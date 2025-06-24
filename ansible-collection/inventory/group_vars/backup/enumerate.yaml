@@ -1,35 +1,35 @@
 ---
 # Optional filter parameters
-cluster_name_filter: "px-source"  # Filter backups by cluster name
-cluster_uid_filter: "e73b9a4b-e64e-4873-8257-61186a868c3e"
-name_filter: ""         # Filter backups by backup name
-labels: {}             # Filter by labels
-  # environment: prod    # Example label filter
-max_objects: 5       # Maximum number of backups to return
-include_detailed_resources: true  # Include full resource lists in response
+# cluster_name_filter: "px-source"  # Filter backups by cluster name
+# cluster_uid_filter: "e73b9a4b-e64e-4873-8257-61186a868c3e"
+# name_filter: ""         # Filter backups by backup name
+# labels: {}             # Filter by labels
+#   # environment: prod    # Example label filter
+# max_objects: 5       # Maximum number of backups to return
+# include_detailed_resources: true  # Include full resource lists in response
 
-# Filters for specific backup attributes
-owners: []             # Filter by backup owners
-status:                # Filter by backup status
-  - "Success"
-  - "Failed"
+# # Filters for specific backup attributes
+# owners: []             # Filter by backup owners
+# status:                # Filter by backup status
+#   - "Success"
+#   - "Failed"
 
-backup_object_type: 
-  type: "VirtualMachine"   # Filter by backup object type, Can be "All" or "VirtualMachine"
+# backup_object_type: 
+#   type: "VirtualMachine"   # Filter by backup object type, Can be "All" or "VirtualMachine"
 
-schedule_policy_ref:
-  # Reference to a specific schedule policy
-  - name: "sched-pol"                # Name of the schedule policy
-    uid: "policy-uid"                 # UID of the schedule policy
+# schedule_policy_ref:
+#   # Reference to a specific schedule policy
+#   - name: "sched-pol"                # Name of the schedule policy
+#     uid: "policy-uid"                 # UID of the schedule policy
 
-backup_schedule_ref:
-  # Reference to a specific backup schedule
-  - name: "vm-sched-bkp-1"                # Name of the backup schedule
-    uid: "backup-schedule-uid"                 # UID of the backup schedule
+# backup_schedule_ref:
+#   # Reference to a specific backup schedule
+#   - name: "vm-sched-bkp-1"                # Name of the backup schedule
+#     uid: "backup-schedule-uid"                 # UID of the backup schedule
 
-sort_option:
-  sort_by: "Name"  
-  sort_order: "Ascending"    
+# sort_option:
+#   sort_by: "Name"  
+#   sort_order: "Ascending"    
 
-# SSL verification
-validate_certs: true
+# # SSL verification
+# validate_certs: true
