@@ -420,10 +420,16 @@ def process_restore_response(response: Dict[str, Any]) -> Dict[str, Any]:
     """
     result = {}
     
+    # Check if response is wrapped in 'restore' key
+    if 'restore' in response:
+        restore_data = response['restore']
+    else:
+        restore_data = response
+    
     # Process metadata if present
-    if 'metadata' in response:
+    if 'metadata' in restore_data:
         result['metadata'] = {}
-        metadata = response['metadata']
+        metadata = restore_data['metadata']
         # Process all fields in metadata
         for key, value in metadata.items():
             if value is not None:  # Only include non-None values
@@ -436,9 +442,9 @@ def process_restore_response(response: Dict[str, Any]) -> Dict[str, Any]:
                     result['metadata'][key] = value
 
     # Process restore_info if present
-    if 'restore_info' in response:
+    if 'restore_info' in restore_data:
         result['restore_info'] = {}
-        restore_info = response['restore_info']
+        restore_info = restore_data['restore_info']
         # Process all fields in restore_info
         for key, value in restore_info.items():
             if value is not None:  # Only include non-None values
