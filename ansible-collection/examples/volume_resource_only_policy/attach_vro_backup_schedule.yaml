@@ -82,8 +82,7 @@
               - name: Use existing policy if found
                 set_fact:
                   vro_policy_result:
-                    volume_resource_only_policies: 
-                      - "{{ matching_policy }}"
+                    volume_resource_only_policy: "{{ matching_policy }}"
                     changed: false
                 when: matching_policy is defined
 
@@ -95,8 +94,15 @@
     - name: Prepare VRO policy reference
       set_fact:
         vro_policy_ref:
-          name: "{{ vro_policy_result.volume_resource_only_policies[0].metadata.name }}"
-          uid: "{{ vro_policy_result.volume_resource_only_policies[0].metadata.uid }}"
+          name: "{{ policy_to_use.metadata.name }}"
+          uid: "{{ policy_to_use.metadata.uid }}"
+      vars:
+        policy_to_use: >-
+          {{
+            vro_policy_result.volume_resource_only_policy | default(
+              vro_policy_result.volume_resource_only_policies[0]
+            )
+          }}
 
     - name: Stop if user says no
       meta: end_play

@@ -1,0 +1,41 @@
+---
+# VRO Policy Configuration for NFS Volume Exclusion
+nfs_vro_policy_name: "nfs-skip-policy-9721"
+volume_type: "Nfs"
+
+# List of NFS servers to exclude from backup
+nfs_servers_list:
+  - "nfs-bkp01.backup.lab"
+  - "nfs-vol02.backup.local"
+
+# Labels for the VRO policy (optional)
+nfs_vro_labels:
+  purpose: "exclude-nfs-data"
+  environment: "staging"
+  created_by: "automation"
+
+# Backup schedules to update with the VRO policy
+backup_schedules_to_update:
+  - name: "staging-nfs-schedule-347a"
+    cluster_ref:
+      name: "staging-cluster-west"
+      uid: "f8e2cddb-5e3f-4f1e-89c3-872ab623b812"
+    backup_object_type:
+      type: "All"
+    schedule_policy_ref:
+      name: "30min-retain6"
+      uid: "db7311be-b91e-42e3-9cb6-d2f7fa6cf6e4"
+    backup_location_ref:
+      name: "s3-staging-bucket"
+      uid: "13a57c6b-2db8-4a6a-bf59-bf67a7e01e42"
+    suspend: false
+    # Optional: preserve other existing settings
+    # pre_exec_rule_ref: {}
+    # post_exec_rule_ref: {}
+    # policy_ref: {}
+    # exclude_objects: []
+    # include_objects: []
+    # include_filter: {}
+    # exclude_filter: {}
+    # cluster_scope: false
+    # labels: {}
