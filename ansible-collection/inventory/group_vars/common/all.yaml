@@ -9,3 +9,19 @@ pxcentral_username: "username"
 pxcentral_password: "password"
 token_duration: "365d"
 pxcentral_verify_ssl: "true"
+
+
+# Output configuration
+output_config:
+  enabled: true              # Master switch for output handling
+  display:
+    console: true            # Display to console/stdout
+    format: "yaml"           # Default display format: yaml, json
+  file:
+    enabled: true           # Save to file
+    formats:                 # Multiple formats can be saved
+      - yaml
+      - json
+    # see files saved at: ansible-collection/output
+    directory: "{{ playbook_dir | dirname | dirname }}/output"     # Output directory
+    timestamp: true          # Add timestamp to filename
