@@ -43,11 +43,11 @@
           loop_control:
             label: "{{ item.name }}"
 
-    # YAML Display - Using built-in to_yaml filter
-        - name: Display as YAML
-          vars:
-            yaml_data:
-              generated: "{{ ansible_date_time.iso8601 }}"
-              backup: "{{ restore_result }}"
-          debug:
-            msg: "{{ yaml_data | to_nice_yaml }}"
+
+    # Output configuration: Display the output or save to file
+    - name: Handle output
+      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
+      vars:
+        output_data: "{{ restore_result }}"
+        output_filename_prefix: "restore_create"
+      when: output_config.enabled | default(false)

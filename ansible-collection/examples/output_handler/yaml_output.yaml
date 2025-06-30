@@ -1,0 +1,11 @@
+# ansible-collection/examples/output_handler/yaml_output.yaml
+---
+- name: Save as YAML file
+  copy:
+    content: "{{ data_to_output | to_nice_yaml }}"
+    dest: "{{ _output_filename }}.yaml"
+  register: yaml_file_result
+
+- name: Report YAML file creation
+  debug:
+    msg: "YAML file saved to: {{ yaml_file_result.dest }}"
