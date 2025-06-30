@@ -1,6 +1,6 @@
 - name: Get PX-Backup Resource Types
   hosts: localhost
-  gather_facts: false
+  gather_facts: true
   collections:
   - purepx.px_backup
   
@@ -41,10 +41,11 @@
           fail:
             msg: "Failed to get resource types. See above for details."
 
-    - name: Display resource types
-      debug:
-        msg: 
-          - "Successfully retrieved resource types:"
-          - "Found types: {{ resource_result.resource_types }}"
-          - "Total count: {{ resource_result.resource_types | length }}"
-      when: resource_result is defined
+
+    # Output configuration: Display the output or save to file
+    - name: Handle output
+      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
+      vars:
+        output_data: "{{ resource_result }}"
+        output_filename_prefix: "resource_collector"
+      when: output_config.enabled | default(false)
