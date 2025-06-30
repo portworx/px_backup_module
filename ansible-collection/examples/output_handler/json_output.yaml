@@ -1,0 +1,11 @@
+# ansible-collection/examples/output_handler/json_output.yaml
+---
+- name: Save as JSON file
+  copy:
+    content: "{{ data_to_output | to_nice_json(indent=2) }}"
+    dest: "{{ _output_filename }}.json"
+  register: json_file_result
+
+- name: Report JSON file creation
+  debug:
+    msg: "JSON file saved to: {{ json_file_result.dest }}"

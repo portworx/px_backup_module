@@ -2,7 +2,7 @@
 ---
 - name: Inspect PX-Backup Backup
   hosts: localhost
-  gather_facts: false
+  gather_facts: true
 
   vars_files:
     - "{{ inventory_dir }}/group_vars/common/all.yaml"
@@ -33,17 +33,11 @@
             validate_certs: "{{ validate_certs | default(true) }}"
           register: backup_result
 
-        # Optional debug output
-        - name: Show raw response
-          debug:
-            msg: "{{ backup_result | to_nice_json }}"
-          when: debug_output | default(true)
 
-    # YAML Display - Using built-in to_yaml filter
-        - name: Display as YAML
-          vars:
-            yaml_data:
-              generated: "{{ ansible_date_time.iso8601 }}"
-              backup: "{{ backup_result.backup }}"
-          debug:
-            msg: "{{ yaml_data | to_yaml }}"
+    # Output configuration: Display the output or save to file
+    - name: Handle output
+      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
+      vars:
+        output_data: "{{ backup_result }}"
+        output_filename_prefix: "backup_inspect"
+      when: output_config.enabled | default(false)
