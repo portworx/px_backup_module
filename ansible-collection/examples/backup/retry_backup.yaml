@@ -2,7 +2,7 @@
 ---
 - name: Retry PX-Backup VM Backups
   hosts: localhost
-  gather_facts: false
+  gather_facts: true
 
   vars_files:
     - "{{ inventory_dir }}/group_vars/common/all.yaml"
@@ -34,27 +34,6 @@
             skip_vm_auto_exec_rules: "{{ skip_vm_auto_exec_rules | default(false) }}"
             validate_certs: "{{ validate_certs | default(true) }}"
           register: backup_result
-
-        - name: Print VM backup retry details
-          debug:
-            msg: |
-              Backup Retry Initiated:
-              - Backup Name: {{ backup_result.backup.metadata.name }}
-              - UID: {{ backup_result.backup.metadata.uid }}
-              - Org ID: {{ backup_result.backup.metadata.org_id }}
-              - Created At: {{ backup_result.backup.metadata.create_time }}
-              - Last Updated At: {{ backup_result.backup.metadata.last_update_time }}
-              - Cluster: {{ backup_result.backup.backup_info.cluster }}
-              - Backup Location: {{ backup_result.backup.backup_info.backup_location_ref.name }}
-              - Backup Type: {{ backup_result.backup.backup_info.backup_type.type }}
-              - Status: {{ backup_result.backup.backup_info.status.status }}
-              - Retry Parent Name: {{ backup_result.backup.backup_info.retry_parent.name }}
-              - Retry Parent UID: {{ backup_result.backup.backup_info.retry_parent.uid }}
-              - Included VMs:
-                {% for vm in backup_result.backup.backup_info.include_resources %}
-                  * VM Name: {{ vm.name }}
-                    Namespace: {{ vm.namespace }}
-                {% endfor %}
                 
       rescue:
         - name: Display error details
@@ -65,3 +44,13 @@
         - name: Fail with error message
           fail:
             msg: "Failed to enumerate backups. See above for details."
+
+
+    # Output configuration: Display the output or save to file
+    - name: Handle output
+      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
+      vars:
+        output_data: "{{ backup_result }}"
+        output_filename_prefix: "retry_backup"
+      when: output_config.enabled | default(false)
+

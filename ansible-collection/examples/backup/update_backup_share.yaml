@@ -2,7 +2,7 @@
 # ansible-collection/examples/backup/update_backup_share.yaml
 - name: Update PX-Backup Share Settings
   hosts: localhost
-  gather_facts: false
+  gather_facts: true
 
   vars_files:
     - "{{ inventory_dir }}/group_vars/common/all.yaml"
@@ -51,24 +51,6 @@
           loop_control:
             label: "{{ item.name }}"
 
-        # Display successful updates
-        - name: Display successful updates
-          debug:
-            msg: "Successfully updated sharing for backup '{{ item.item.name }}'"
-          loop: "{{ share_result.results }}"
-          loop_control:
-            label: "{{ item.item.name }}"
-          when: not item.failed
-
-        # Display failures
-        - name: Display failed updates
-          debug:
-            msg: "Failed to update sharing for backup '{{ item.item.name }}': {{ item.msg }}"
-          loop: "{{ share_result.results }}"
-          loop_control:
-            label: "{{ item.item.name }}"
-          when: item.failed
-
       rescue:
         - name: Display error details
           debug:
@@ -78,3 +60,13 @@
         - name: Fail with error message
           fail:
             msg: "Failed to update backup shares. See above for details."
+
+
+    # Output configuration: Display the output or save to file
+    - name: Handle output
+      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
+      vars:
+        output_data: "{{ share_result }}"
+        output_filename_prefix: "update_backup_share"
+      when: output_config.enabled | default(false)
+
