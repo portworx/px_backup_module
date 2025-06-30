@@ -1,7 +1,7 @@
 ---
 - name: Configure PX-Backup cloud credentials
   hosts: localhost
-  gather_facts: false
+  gather_facts: true
 
   vars_files:
     - "{{ inventory_dir }}/group_vars/common/all.yaml"
@@ -26,10 +26,12 @@
           loop_control:
             label: "{{ item.name }}"
 
-    - name: List Add Cloud Credentials
-      debug: 
-        msg: "Cloud Credentials: {{ cloudcred_result.results }}"
 
 
-
-
+    # Output configuration: Display the output or save to file
+    - name: Handle output
+      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
+      vars:
+        output_data: "{{ cloudcred_result }}"
+        output_filename_prefix: "cloud_credential_inspect"
+      when: output_config.enabled | default(false)
