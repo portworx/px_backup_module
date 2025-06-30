@@ -2,7 +2,7 @@
 ---
 - name: Enumerate PX-Backup Restores
   hosts: localhost
-  gather_facts: false
+  gather_facts: true
 
   vars_files:
     - "{{ inventory_dir }}/group_vars/common/all.yaml"
@@ -40,49 +40,10 @@
             validate_certs: "{{ validate_certs | default(true) }}"
           register: restore_result
 
-        - name: Display restore list summary
-          debug:
-            msg: 
-              - "Total restores found: {{ restore_result.restores | length }}"
-              - "Clusters with restores: {{ restore_result.restores | map(attribute='restore_info.cluster') | unique | sort | list }}"
-
-        - name: Display detailed restore information
-          debug:
-            msg: |
-              Restore Details:
-              {% for restore in restore_result.restores %}
-              - Name: {{ restore.metadata.name }}
-                UID: {{ restore.metadata.uid }}
-                Creation Time: {{ restore.metadata.create_time }}
-                Last Update: {{ restore.metadata.last_update_time }}
-                Owner: {{ restore.metadata.ownership.owner }}
-                Backup: {{ restore.restore_info.backup }}
-                Object Type: {{ restore.restore_info.backup_object_type.type }}
-                Cluster: {{ restore.restore_info.cluster }}
-                NameSpace Mapping: {{ restore.restore_info.namespace_mapping }}
-                Replace Policy: {{ restore.restore_info.replace_policy }}
-                Backup Location: {{ restore.restore_info.backup_location_ref.name }}
-                Status: {{ restore.restore_info.status.status }}
-                Status Reason: {{ restore.restore_info.status.reason }}
-                Volumes:
-                {% if restore.restore_info.volumes is defined %}
-                {% for volume in restore.restore_info.volumes %}
-                  * PVC: {{ volume.pvc }}
-                    PVC Source NameSpace: ({{ volume.source_namespace }})
-                    Status: {{ volume.status.status }}
-                {% endfor %}
-                {% else %}
-                  No volumes in this restore
-                {% endif %}
-              {% endfor %}
-          when: restore_result.restores | length > 0
-
-      rescue:
-        - name: Display error details
-          debug:
-            msg: "Failed to enumerate restores: {{ restore_result.params if restore_result.msg is defined else 'Unknown error occurred' }}"
-          when: restore_result is defined
-
-        - name: Fail with error message
-          fail:
-            msg: "Failed to enumerate restores. See above for details."
+    # Output configuration: Display the output or save to file
+    - name: Handle output
+      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
+      vars:
+        output_data: "{{ restore_result }}"
+        output_filename_prefix: "restore_enumerate"
+      when: output_config.enabled | default(false)
