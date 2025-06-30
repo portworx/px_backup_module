@@ -360,36 +360,7 @@ def build_restore_request(params: Dict[str, Any], module: AnsibleModule, client:
         "rancher_project_name_mapping": params.get('rancher_project_name_mapping', {})
     })
     
-    # Handle namespace mapping if not provided
-    if not params.get('namespace_mapping'):
-        if not params.get('backup_ref') or not params['backup_ref'].get('name'):
-            module.fail_json(msg="Missing 'backup_ref' or 'backup_ref.name' for namespace mapping resolution.")
-
-        backup = {
-            "name": params['backup_ref']['name'],
-            "uid": params['backup_ref']['uid'],
-        }
-        logger.debug(f"backup params are", backup)
-        # Call inspect_backup to retrieve backup details
-        try:
-            backup_details = inspect_backup(module, client, backup)
-        except Exception as e:
-            module.fail_json(msg=f"Error inspecting backup for namespace mapping: {str(e)}")
-
-        backup_info = backup_details.get('backup', {}).get('backup_info', {})
-        # Get namespaces from the backup info
-        source_namespaces = backup_info.get('namespaces', [])
-
-        # Add namespace mapping only if exactly one namespace is found
-        if len(source_namespaces) == 1:
-            namespace_mapping = {
-                source_namespaces[0]: source_namespaces[0]
-            }
-            request.update({"namespace_mapping": namespace_mapping})
-        else:
-            module.fail_json(msg=f"Unable to resolve namespace mapping: More than one source namespace found.{backup_details}")
-    
-    else:
+    if params.get('namespace_mapping'):
         request.update({"namespace_mapping": params.get('namespace_mapping')})
     
     if params.get('backup_ref'):
