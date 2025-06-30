@@ -1,7 +1,7 @@
 ---
 - name: Delete PX-Backup Recipients
   hosts: localhost
-  gather_facts: false
+  gather_facts: true
 
   vars_files:
     - "{{ inventory_dir }}/group_vars/common/all.yaml"
@@ -35,29 +35,11 @@
           loop_control:
             label: "{{ item.name }}"
 
-        - name: Set deletion status
-          set_fact:
-            deletion_info: "{{ delete_result.results | map(attribute='item') | list }}"
-          when: delete_result.results is defined
 
-        - name: Display successful deletions
-          debug:
-            msg: 
-              - "Successfully deleted the following recipients:"
-              - "{{ deletion_info | to_nice_yaml }}"
-          when: deletion_info is defined and (deletion_info | length > 0)
-
-        - name: Display when no recipients deleted
-          debug:
-            msg: "No recipients were deleted"
-          when: not deletion_info is defined or (deletion_info | length == 0)
-
-      rescue:
-        - name: Display error details
-          debug:
-            msg: "Failed to delete recipients: {{ ansible_failed_result | default('Unknown error') }}"
-          when: ansible_failed_result is defined
-
-        - name: Fail with error message
-          fail:
-            msg: "Failed to delete recipients. See above for details."
+    # Output configuration: Display the output or save to file
+    - name: Handle output
+      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
+      vars:
+        output_data: "{{ delete_result }}"
+        output_filename_prefix: "recipient_delete"
+      when: output_config.enabled | default(false)
