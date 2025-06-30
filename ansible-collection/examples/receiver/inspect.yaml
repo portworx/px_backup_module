@@ -1,7 +1,7 @@
 ---
 - name: Inspect PX-Backup Receiver
   hosts: localhost
-  gather_facts: false
+  gather_facts: true
 
   vars_files:
     - "{{ inventory_dir }}/group_vars/common/all.yaml"
@@ -51,18 +51,11 @@
                 encryption_starttls: "{{ receiver_info.receiver.receiver_info.email_config.encryption_starttls | default(false) }}"
           when: receiver_info.receiver is defined
 
-        - name: Display receiver details
-          debug:
-            msg: 
-              - "Receiver Details:"
-              - "{{ formatted_receiver | to_nice_yaml }}"
-          when: formatted_receiver is defined
 
-      rescue:
-        - name: Display error details
-          debug:
-            msg: "Failed to inspect receiver: {{ ansible_failed_result | default('Unknown error') }}"
-
-        - name: Fail with error message
-          fail:
-            msg: "Failed to inspect receiver. See above for details."
+    # Output configuration: Display the output or save to file
+    - name: Handle output
+      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
+      vars:
+        output_data: "{{ receiver_info }}"
+        output_filename_prefix: "receiver_inspect"
+      when: output_config.enabled | default(false)

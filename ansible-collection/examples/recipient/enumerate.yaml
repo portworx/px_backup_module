@@ -1,7 +1,7 @@
 ---
 - name: List PX-Backup Recipients
   hosts: localhost
-  gather_facts: false
+  gather_facts: true
 
   vars_files:
     - "{{ inventory_dir }}/group_vars/common/all.yaml"
@@ -29,43 +29,11 @@
             validate_certs: "{{ validate_certs | default(true) }}"
           register: recipient_list
 
-        - name: Set recipient information
-          set_fact:
-            recipient_info: []
-          when: recipient_list.recipients | length > 0
 
-        - name: Build recipient information
-          set_fact:
-            recipient_info: "{{ recipient_info + [{
-              'name': item.metadata.name,
-              'type': item.recipient_info.type,
-              'emails': item.recipient_info.recipient_id,
-              'active': item.recipient_info.active | default(true),
-              'severity': item.recipient_info.severity,
-              'receiver': item.recipient_info.receiver_ref.name,
-              'created': item.metadata.create_time }] }}"
-          loop: "{{ recipient_list.recipients }}"
-          when: recipient_list.recipients | length > 0
-
-        - name: Display recipients information
-          debug:
-            msg:
-              - "Total recipients found: {{ recipient_list.recipients | length }}"
-              - "Recipients:"
-              - "{{ recipient_info | to_nice_yaml }}"
-          when: recipient_list.recipients | length > 0
-
-        - name: Display when no recipients found
-          debug:
-            msg: "No recipients found in the organization"
-          when: recipient_list.recipients | length == 0
-
-      rescue:
-        - name: Display error details
-          debug:
-            msg: "Failed to list recipients: {{ ansible_failed_result | default('Unknown error') }}"
-          when: ansible_failed_result is defined
-
-        - name: Fail with error message
-          fail:
-            msg: "Failed to list recipients. See above for details."
+    # Output configuration: Display the output or save to file
+    - name: Handle output
+      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
+      vars:
+        output_data: "{{ recipient_list }}"
+        output_filename_prefix: "recipient_enumerate"
+      when: output_config.enabled | default(false)

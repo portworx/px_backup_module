@@ -1,7 +1,7 @@
 ---
 - name: Configure PX-Backup Email Receiver
   hosts: localhost
-  gather_facts: false
+  gather_facts: true
 
   vars_files:
     - "{{ inventory_dir }}/group_vars/common/all.yaml"
@@ -54,13 +54,11 @@
           fail:
             msg: "Failed to create email receivers. See above for details."
 
-    - name: Display creation results
-      debug:
-        msg: 
-          - "Successfully created email receivers:"
-          - "Created receivers: {{ receiver_result.results | map(attribute='item.name') | list }}"
-          - "Changed status: {{ receiver_result.results | map(attribute='changed') | list }}"
-      when: 
-        - receiver_result is defined 
-        - receiver_result.results is defined
-        - (receiver_result.results | selectattr('failed', 'defined') | selectattr('failed', 'true') | list | length) == 0
+
+    # Output configuration: Display the output or save to file
+    - name: Handle output
+      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
+      vars:
+        output_data: "{{ receiver_result }}"
+        output_filename_prefix: "receiver_create"
+      when: output_config.enabled | default(false)
