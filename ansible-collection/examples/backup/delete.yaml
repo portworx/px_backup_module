@@ -2,7 +2,7 @@
 # ansible-collection/examples/backup/delete.yaml
 - name: Delete PX-Backup Backups
   hosts: localhost
-  gather_facts: false
+  gather_facts: true
 
   vars_files:
     - "{{ inventory_dir }}/group_vars/common/all.yaml"
@@ -48,24 +48,6 @@
           loop_control:
             label: "{{ item.name }}"
 
-        # Display successful deletes
-        - name: Display successful deletes
-          debug:
-            msg: "Successfully deleted backup '{{ item.item.name }}'"
-          loop: "{{ delete_result.results }}"
-          loop_control:
-            label: "{{ item.item.name }}"
-          when: not item.failed
-
-        # Display failures
-        - name: Display failed deletes
-          debug:
-            msg: "Failed to delete backup '{{ item.item.name }}': {{ item.msg }}"
-          loop: "{{ delete_result.results }}"
-          loop_control:
-            label: "{{ item.item.name }}"
-          when: item.failed
-
       rescue:
         - name: Display error details
           debug:
@@ -75,3 +57,12 @@
         - name: Fail with error message
           fail:
             msg: "Failed to delete backups. See above for details."
+
+
+    # Output configuration: Display the output or save to file
+    - name: Handle output
+      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
+      vars:
+        output_data: "{{ delete_result }}"
+        output_filename_prefix: "backup_delete"
+      when: output_config.enabled | default(false)
