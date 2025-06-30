@@ -1,7 +1,7 @@
 ---
 - name: Update PX-Backup Backup Schedules
   hosts: localhost
-  gather_facts: false
+  gather_facts: true
 
   vars_files:
     - "{{ inventory_dir }}/group_vars/common/all.yaml"
@@ -70,10 +70,10 @@
       loop: "{{ update_result.results }}"
 
 
-    - name: Summarize update operation
-      debug:
-        msg:
-          - "Update Summary:"
-          - "Total attempted: {{ update_result.results | length }}"
-          - "Successfully updated: {{ update_result.results | selectattr('changed', 'true') | list | length }}"
-          - "Failed updates: {{ update_result.results | selectattr('failed', 'defined') | selectattr('failed', 'true') | list | length }}"
+    # Output configuration: Display the output or save to file
+    - name: Handle output
+      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
+      vars:
+        output_data: "{{ update_result }}"
+        output_filename_prefix: "backup_schedule_update"
+      when: output_config.enabled | default(false)
