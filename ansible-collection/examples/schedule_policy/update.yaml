@@ -1,7 +1,7 @@
 ---
 - name: Update PX-Backup Schedule Policies
   hosts: localhost
-  gather_facts: false
+  gather_facts: true
 
   vars_files:
     - "{{ inventory_dir }}/group_vars/common/all.yaml"
@@ -38,24 +38,6 @@
           loop: "{{ schedule_policy_updates }}"
           loop_control:
             label: "{{ item.name }}"
-
-        # Display successful updates
-        - name: Display update results
-          debug:
-            msg: "Successfully updated schedule policy '{{ item.item.name }}'"
-          loop: "{{ schedule_policy_result.results }}"
-          loop_control:
-            label: "{{ item.item.name }}"
-          when: not item.failed
-
-        # Display failed updates
-        - name: Display failed updates
-          debug:
-            msg: "Failed to update schedule policy '{{ item.item.name }}': {{ item.msg }}"
-          loop: "{{ schedule_policy_result.results }}"
-          loop_control:
-            label: "{{ item.item.name }}"
-          when: item.failed
           
       rescue:
         - name: Display error details
@@ -66,3 +48,11 @@
         - name: Fail with error message
           fail:
             msg: "Failed to update schedule policies. See above for details."
+
+    # Output configuration: Display the output or save to file
+    - name: Handle output
+      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
+      vars:
+        output_data: "{{ schedule_policy_result }}"
+        output_filename_prefix: "schedule_policy_update"
+      when: output_config.enabled | default(false)

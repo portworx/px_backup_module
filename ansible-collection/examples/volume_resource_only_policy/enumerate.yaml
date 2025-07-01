@@ -1,7 +1,7 @@
 ---
 - name: Enumerate PX-Backup Volume Resource Only Policies
   hosts: localhost
-  gather_facts: false
+  gather_facts: true
 
   vars_files:
     - "{{ inventory_dir }}/group_vars/common/all.yaml"
@@ -27,3 +27,11 @@
         labels: "{{ labels | default(omit) }}"
         enumerate_options: "{{ enumerate_options | default(omit) }}"
       register: enumerate_result
+
+    # Output configuration: Display the output or save to file
+    - name: Handle output
+      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
+      vars:
+        output_data: "{{ enumerate_result }}"
+        output_filename_prefix: "volume_resource_only_policy_enumerate"
+      when: output_config.enabled | default(false)

@@ -2,7 +2,7 @@
 ---
 - name: Update PX-Backup Volume Resource Only Policy
   hosts: localhost
-  gather_facts: false
+  gather_facts: true
 
   vars_files:
     - "{{ inventory_dir }}/group_vars/common/all.yaml"
@@ -60,3 +60,11 @@
           loop_control:
             label: "{{ item.name }} (ownership update)"
           when: volume_resource_only_policy_updates | selectattr('ownership', 'defined') | list | length > 0
+
+    # Output configuration: Display the output or save to file
+    - name: Handle output
+      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
+      vars:
+        output_data: "{{ ownership_result }}"
+        output_filename_prefix: "volume_resource_only_policy_update"
+      when: output_config.enabled | default(false)
