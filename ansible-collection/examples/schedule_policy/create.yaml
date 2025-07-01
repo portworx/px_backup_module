@@ -1,7 +1,7 @@
 ---
 - name: Configure PX-Backup Schedule Policies
   hosts: localhost
-  gather_facts: false
+  gather_facts: true
 
   vars_files:
     - "{{ inventory_dir }}/group_vars/common/all.yaml"
@@ -50,13 +50,10 @@
           fail:
             msg: "Failed to create schedule policies. See above for details."
 
-    - name: Display creation results
-      debug:
-        msg: 
-          - "Successfully created schedule_policies"
-          - "Created schedule policies: {{ schedule_policy_result.results | map(attribute='item.name') | list }}"
-          - "Changed status: {{ schedule_policy_result.results | map(attribute='changed') | list }}"
-      when: 
-        - schedule_policy_result is defined 
-        - schedule_policy_result.results is defined
-        - (schedule_policy_result.results | selectattr('failed', 'defined') | selectattr('failed', 'true') | list | length) == 0
+    # Output configuration: Display the output or save to file
+    - name: Handle output
+      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
+      vars:
+        output_data: "{{ schedule_policy_result }}"
+        output_filename_prefix: "schedule_policy_create"
+      when: output_config.enabled | default(false)

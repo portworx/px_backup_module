@@ -1,7 +1,7 @@
 ---
 - name: Inspect PX-Backup Schedule Policies
   hosts: localhost
-  gather_facts: false
+  gather_facts: true
 
   vars_files:
     - "{{ inventory_dir }}/group_vars/common/all.yaml"
@@ -52,32 +52,11 @@
           fail:
             msg: "Failed to inspect schedule policies. See above for details."
 
-    - name: Process and display inspection results
-      block:
-        - name: Display inspection results for each schedule policy
-          debug:
-            msg: >
-              [
-                "Policy Details:",
-                "----------------------------------------",
-                "Name: {{ item.schedule_policy.metadata.name }}",
-                "Created: {{ item.schedule_policy.metadata.create_time }}",
-                "Last Updated: {{ item.schedule_policy.metadata.last_update_time }}",
-                "Owner: {{ item.schedule_policy.metadata.ownership.owner }}",
-                "UID: {{ item.schedule_policy.metadata.uid }}",
-                "Schedule Policies Info: {{ item.schedule_policy.schedule_policy_info }}",
-                "----------------------------------------"
-              ]
-          loop: "{{ inspect_result.results }}"
-          loop_control:
-            label: "{{ item.schedule_policy.metadata.name }}"
-          when: item.schedule_policy is defined
 
-    - name: Summarize inspection
-      debug:
-        msg:
-          - "Inspection Summary:"
-          - "Total schedule policies inspected: {{ inspect_result.results | length }}"
-          - "Successful inspections: {{ inspect_result.results | selectattr('schedule_policy', 'defined') | list | length }}"
-          - "Failed inspections: {{ inspect_result.results | selectattr('failed', 'defined') | selectattr('failed', 'true') | list | length }}"
-      when: inspect_result is defined and inspect_result.results is defined
+    # Output configuration: Display the output or save to file
+    - name: Handle output
+      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
+      vars:
+        output_data: "{{ inspect_result }}"
+        output_filename_prefix: "schedule_policy_inspect"
+      when: output_config.enabled | default(false)

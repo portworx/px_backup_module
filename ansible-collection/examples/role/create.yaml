@@ -1,7 +1,7 @@
 ---
 - name: Configure PX-Backup Roles
   hosts: localhost
-  gather_facts: false
+  gather_facts: true
 
   vars_files:
     - "{{ inventory_dir }}/group_vars/common/all.yaml"
@@ -50,13 +50,11 @@
           fail:
             msg: "Failed to create roles. See above for details."
 
-    - name: Display creation results
-      debug:
-        msg: 
-          - "Successfully created roles"
-          - "Created roles: {{ role_result.results | map(attribute='item.name') | list }}"
-          - "Changed status: {{ role_result.results | map(attribute='changed') | list }}"
-      when: 
-        - role_result is defined 
-        - role_result.results is defined
-        - (role_result.results | selectattr('failed', 'defined') | selectattr('failed', 'true') | list | length) == 0
+
+    # Output configuration: Display the output or save to file
+    - name: Handle output
+      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
+      vars:
+        output_data: "{{ role_result }}"
+        output_filename_prefix: "role_create"
+      when: output_config.enabled | default(false)
