@@ -33,3 +33,11 @@
             name: "{{ name }}"
             uid: "{{ uid }}"
           register: result
+
+    # Output configuration: Display the output or save to file
+    - name: Handle output
+      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
+      vars:
+        output_data: "{{ result }}"
+        output_filename_prefix: "volume_resource_only_policy_inspect"
+      when: output_config.enabled | default(false)
