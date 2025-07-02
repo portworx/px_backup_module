@@ -1087,12 +1087,17 @@ def delete_backup(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict[s
         }
         
         # Add cluster information
-        if module.params.get('cluster_ref'):
-            if module.params['cluster_ref'].get('name'):
-                params['cluster'] = module.params['cluster_ref']['name']
-            if module.params['cluster_ref'].get('uid'):
-                params['cluster_uid'] = module.params['cluster_ref']['uid']
+        if module.params.get('cluster'):
+            params['cluster'] = module.params['cluster']
         
+        if module.params.get('cluster_ref'):
+            params['cluster_ref'] = {}
+            if module.params['cluster_ref'].get('name'):
+                params['cluster_ref.name'] = module.params['cluster_ref']['name']
+            if module.params['cluster_ref'].get('uid'):
+                params['cluster_ref.uid'] = module.params['cluster_ref']['uid']
+
+
         response = client.make_request(
             'DELETE',
             f"v1/backup/{module.params['org_id']}/{module.params['name']}",
