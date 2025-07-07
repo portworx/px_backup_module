@@ -30,7 +30,7 @@ module: receiver
 
 short_description: Manage alert receivers in PX-Backup
 
-version_added: "2.8.3"
+version_added: "2.8.4"
 
 description: 
     - Manage alert receivers in PX-Backup using different operations

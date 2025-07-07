@@ -12,7 +12,7 @@ The backup schedule module enables management of automated backup schedules in P
 
 ## Requirements
 
-* PX-Backup >= 2.8.3
+* PX-Backup >= 2.8.4
 * Stork >= 24.3.3
 * Python >= 3.9
 * The `requests` Python package
@@ -48,15 +48,16 @@ The module supports the following operations:
 ### Schedule Configuration Parameters
 
 
-| Parameter               | Type    | Required | Default  | Description                                                                    |
-| ------------------------- | --------- | ---------- | ---------- | -------------------------------------------------------------------------------- |
-| reclaim_policy          | string  | no       |          | Policy for backup retention (`Invalid`, `Delete`, `Retain`)                    |
-| backup_type             | string  | no       | `Normal` | Type of backup (`Invalid`, `Generic`, `Normal`)                                |
-| suspend                 | boolean | no       | `false`  | Whether to suspend the schedule                                                |
-| direct_kdmp             | boolean | no       | `false`  | Enable direct KDMP backup                                                      |
-| skip_vm_auto_exec_rules | boolean | no       | `false`  | Skip automatic execution rules for VMs                                         |
-| parallel_backup         | boolean | no       | `false`  | option to enable parallel schedule backups                                     |
-| keep_cr_status          | boolean | no       | `false`  | option to enable to keep the CR status of the resources in the backup schedule |
+| Parameter                         | Type    | Required | Default  | Description                                                                    |
+| ----------------------------------- | --------- | ---------- | ---------- | -------------------------------------------------------------------------------- |
+| reclaim_policy                    | string  | no       |          | Policy for backup retention (`Invalid`, `Delete`, `Retain`)                    |
+| backup_type                       | string  | no       | `Normal` | Type of backup (`Invalid`, `Generic`, `Normal`)                                |
+| suspend                           | boolean | no       | `false`  | Whether to suspend the schedule                                                |
+| direct_kdmp                       | boolean | no       | `false`  | Enable direct KDMP backup                                                      |
+| skip_vm_auto_exec_rules           | boolean | no       | `false`  | Skip automatic execution rules for VMs                                         |
+| parallel_backup                   | boolean | no       | `false`  | option to enable parallel schedule backups                                     |
+| keep_cr_status                    | boolean | no       | `false`  | option to enable to keep the CR status of the resources in the backup schedule |
+| advancecd_resource_label_selector | string  | no       |          | Advanced label selector for resources (string format with operator support)    |
 
 ### Resource Selection Parameters
 
