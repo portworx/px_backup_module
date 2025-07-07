@@ -46,7 +46,7 @@
             direct_kdmp: "{{ item.direct_kdmp | default(omit) }}"
             validate_certs: "{{ item.validate_certs | default(true) }}"
             labels: "{{ item.labels | default(omit) }}"
-            advanced_resource_label_selector: "{{ item.advanced_resource_label_selector }}"
+            advanced_resource_label_selector: "{{ item.advanced_resource_label_selector | default(omit) }}"
           loop: "{{ backups }}"
           register: backup_result
           loop_control:

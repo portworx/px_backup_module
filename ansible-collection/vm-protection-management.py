@@ -89,7 +89,8 @@ def create_vm_backup_schedule(vm, namespace, policy_name, policy_uid, backup_loc
                     "vm-namespace": namespace,
                     "policy-name": policy_name,
                     "created-at": datetime.now().strftime("%Y-%m-%d")
-                }
+                },
+                "advanced_resource_label_selector": ""
             }],
             "vm_namespaces": vm_namespaces,
             "include_resources": include_resources
