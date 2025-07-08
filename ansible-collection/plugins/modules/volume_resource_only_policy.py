@@ -148,7 +148,7 @@ options:
                             - Filter policies by name using substring matching
                             - Returns policies whose names contain the specified filter string
                             - Case-sensitive matching
-                            - Example: "prod" will match "prod-policy" and "my-prod-backup"
+                            - Example: 'prod' will match 'prod-policy' and 'my-prod-backup'
                         type: str
                         required: false
                     object_index:
