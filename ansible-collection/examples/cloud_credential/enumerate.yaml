@@ -1,7 +1,7 @@
 ---
 - name: List all PX-Backup Cloud Credentials
   hosts: localhost
-  gather_facts: false
+  gather_facts: true
 
   vars_files:
     - "{{ inventory_dir}}/group_vars/common/all.yaml"
@@ -23,3 +23,13 @@
         api_url: "{{ px_backup_api_url }}"
         token: "{{ px_backup_token }}"
         org_id: "{{ org_id | default('default') }}"
+      register: cloudcred_result
+
+
+    # Output configuration: Display the output or save to file
+    - name: Handle output
+      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
+      vars:
+        output_data: "{{ cloudcred_result }}"
+        output_filename_prefix: "cloud_credential_enumerate"
+      when: output_config.enabled | default(false)

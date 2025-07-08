@@ -1,0 +1,76 @@
+# ansible-collection/examples/output_handler/main.yaml
+---
+- name: Check if output handling is enabled
+  set_fact:
+    output_enabled: "{{ output_config.enabled | default(true) }}"
+
+- name: Process output only if enabled
+  when: output_enabled | bool
+  block:
+    - name: Determine output configuration
+      set_fact:
+        console_enabled: "{{ output_config.display.console | default(true) }}"
+        console_format: "{{ output_config.display.format | default('yaml') }}"
+        file_enabled: "{{ output_config.file.enabled | default(false) }}"
+        file_formats: "{{ output_config.file.formats | default(['yaml']) }}"
+        output_directory: "{{ output_config.file.directory | default('./output') }}"
+        add_timestamp: "{{ output_config.file.timestamp | default(true) }}"
+
+    - name: Debug output configuration
+      debug:
+        msg: |
+          Output enabled: {{ output_enabled }}
+          Console enabled: {{ console_enabled }}
+          Console format: {{ console_format }}
+          File enabled: {{ file_enabled }}
+          File formats: {{ file_formats }}
+          Output directory: {{ output_directory }}
+          Add timestamp: {{ add_timestamp }}
+      when: debug_output_config | default(false)
+
+    # Handle console display
+    - name: Display to console
+      when: console_enabled | bool
+      block:
+        - name: Display as YAML
+          debug:
+            var: output_data
+          when: console_format == 'yaml'
+          
+        - name: Display as JSON
+          debug:
+            msg: "{{ output_data | to_nice_json(indent=2) }}"
+          when: console_format == 'json'
+
+    # Handle file output
+    - name: Process file output
+      when: file_enabled | bool
+      block:
+        - name: Ensure output directory exists
+          file:
+            path: "{{ output_directory }}"
+            state: directory
+            mode: '0755'
+
+        - name: Generate base filename
+          set_fact:
+            output_base_filename: >-
+              {{ output_filename_prefix | default('output') }}
+              {%- if add_timestamp | bool -%}
+              _{{ ansible_date_time.epoch }}
+              {%- endif -%}
+
+        # Include format-specific tasks for file output
+        - name: Handle YAML file output
+          include_tasks: yaml_output.yaml
+          when: "'yaml' in file_formats"
+          vars:
+            data_to_output: "{{ output_data }}"
+            _output_filename: "{{ output_directory }}/{{ output_base_filename }}"
+
+        - name: Handle JSON file output
+          include_tasks: json_output.yaml
+          when: "'json' in file_formats"
+          vars:
+            data_to_output: "{{ output_data }}"
+            _output_filename: "{{ output_directory }}/{{ output_base_filename }}"

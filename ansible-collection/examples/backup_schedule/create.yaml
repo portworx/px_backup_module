@@ -1,7 +1,7 @@
 ---
 - name: Configure PX-Backup Schedules
   hosts: localhost
-  gather_facts: false
+  gather_facts: true
 
   vars_files:
     - "{{ inventory_dir }}/group_vars/common/all.yaml"
@@ -18,15 +18,16 @@
             api_url: "{{ px_backup_api_url }}"
             token: "{{ px_backup_token }}"
             name: "{{ item.name }}"
-            org_id: "{{ org_id | default('default') }}"
+            org_id: "{{ org_id | default(omit) }}"
+            owner: "{{ item.owner | default('admin') }}"
             reclaim_policy: "{{ item.reclaim_policy }}"
             namespaces: "{{ item.namespaces | default(omit) }}"
             label_selectors: "{{ item.label_selectors | default(omit) }}"
             pre_exec_rule: "{{ item.pre_exec_rule | default(omit)}}"
             post_exec_rule: "{{ item.post_exec_rule | default(omit) }}"
             include_resources: "{{ item.include_resources | default(omit) }}"
-            csi_snapshot_class_name: "{{ item.csi_snapshot_class_name }}"
-            resource_types: "{{ item.resource_types }}"
+            csi_snapshot_class_name: "{{ item.csi_snapshot_class_name | default(omit) }}"
+            resource_types: "{{ item.resource_types | default(omit) }}"
             schedule_policy_ref: "{{ item.schedule_policy_ref }}"
             backup_location_ref: "{{ item.backup_location_ref }}"
             pre_exec_rule_ref: "{{ item.pre_exec_rule_ref | default(omit) }}"
@@ -37,24 +38,25 @@
             backup_object_type: "{{ item.backup_object_type }}"
             skip_vm_auto_exec_rules: "{{ item.skip_vm_auto_exec_rules | default(omit) }}"
             volume_snapshot_class_mapping: "{{ item.volume_snapshot_class_mapping | default(omit) }}"
-            direct_kdmp: "{{ item.direct_kdmp }}"
-            owner: "admin"
+            direct_kdmp: "{{ item.direct_kdmp | default(omit) }}"
             exclude_resource_types: "{{ item.exclude_resource_types | default(omit) }}"
             labels: "{{ item.labels | default(omit) }}"
-            advanced_resource_label_selector: "{{ item.advanced_resource_label_selector | default(omit) }}"
+            advanced_resource_label_selector: "{{ item.advanced_resource_label_selector  | default(omit) }}"
+            volume_resource_only_policy_ref: "{{ item.volume_resource_only_policy_ref | default(omit) }}"
+            parallel_backup: "{{ item.parallel_backup | default(omit) }}"
+            keep_cr_status: "{{ item.keep_cr_status | default(omit) }}"
+            ownership: "{{ item.ownership | default(omit) }}"
+            validate_certs: "{{ item.validate_certs | default(true) }}"
           loop: "{{ backup_schedules }}"
           register: backup_result
           loop_control:
             label: "{{ item.name }}"
 
-    # - name: List Add Cloud Credentials
-    #   backup_schedule:
-    #     operation: INSPECT_ONE
-    #     api_url: "{{ px_backup_api_url }}"
-    #     token: "{{ px_backup_token }}"
-    #     org_id: "{{ org_id }}"
-    #     uid: "5ef3cfc7-3f01-4896-a8e0-201d96864205"
-    #     name: "kopia"
 
-
-
+    # Output configuration: Display the output or save to file
+    - name: Handle output
+      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
+      vars:
+        output_data: "{{ backup_result }}"
+        output_filename_prefix: "backup_schedule_create"
+      when: output_config.enabled | default(false)

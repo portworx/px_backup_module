@@ -1,7 +1,7 @@
 ---
 - name: Delete PX-Backup Rules
   hosts: localhost
-  gather_facts: false
+  gather_facts: true
 
   vars_files:
     - "{{ inventory_dir }}/group_vars/common/all.yaml"
@@ -43,13 +43,10 @@
           fail:
             msg: "Failed to delete rules. See above for details."
 
-    - name: Show deletion results
-      debug:
-        msg:
-          - "Deletion Results:"
-          - "Total attempted: {{ delete_result.results | length }}"
-          - "Successfully deleted: {{ delete_result.results | selectattr('changed', 'true') | list | length }}"
-          - "Failed: {{ delete_result.results | selectattr('failed', 'defined') | selectattr('failed', 'true') | list | length }}"
-          - "Deleted rules:"
-          - "{{ delete_result.results | selectattr('changed', 'true') | map(attribute='item') | list | json_query('[*].{name: name, uid: uid }') }}"
-      when: delete_result is defined and delete_result.results is defined
+    # Output configuration: Display the output or save to file
+    - name: Handle output
+      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
+      vars:
+        output_data: "{{ delete_result }}"
+        output_filename_prefix: "rule_delete"
+      when: output_config.enabled | default(false)

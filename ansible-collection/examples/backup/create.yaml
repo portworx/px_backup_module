@@ -1,7 +1,7 @@
 ---
 - name: Configure PX-Backup Backups
   hosts: localhost
-  gather_facts: false
+  gather_facts: true
 
   vars_files:
     - "{{ inventory_dir }}/group_vars/common/all.yaml"
@@ -46,7 +46,8 @@
             direct_kdmp: "{{ item.direct_kdmp | default(omit) }}"
             validate_certs: "{{ item.validate_certs | default(true) }}"
             labels: "{{ item.labels | default(omit) }}"
-            advanced_resource_label_selector: "{{ item.advanced_resource_label_selector | default(omit) }}"
+            advanced_resource_label_selector: "{{ item.advanced_resource_label_selector  | default(omit) }}"
+            volume_resource_only_policy_ref: "{{ item.volume_resource_only_policy_ref | default(omit) }}"
           loop: "{{ backups }}"
           register: backup_result
           loop_control:
@@ -62,13 +63,11 @@
           fail:
             msg: "Failed to create backups. See above for details."
 
-    - name: Display creation results
-      debug:
-        msg: 
-          - "Successfully created backups"
-          - "Created backups: {{ backup_result.results | map(attribute='item.name') | list }}"
-          - "Changed status: {{ backup_result.results | map(attribute='changed') | list }}"
-      when: 
-        - backup_result is defined 
-        - backup_result.results is defined
-        - (backup_result.results | selectattr('failed', 'defined') | selectattr('failed', 'true') | list | length) == 0
+
+    # Output configuration: Display the output or save to file
+    - name: Handle output
+      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
+      vars:
+        output_data: "{{ backup_result }}"
+        output_filename_prefix: "backup_create"
+      when: output_config.enabled | default(false)

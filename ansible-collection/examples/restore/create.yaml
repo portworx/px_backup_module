@@ -1,7 +1,7 @@
 ---
 - name: Configure PX-Backup restores
   hosts: localhost
-  gather_facts: false
+  gather_facts: true
 
   vars_files:
     - "{{ inventory_dir }}/group_vars/common/all.yaml"
@@ -43,23 +43,11 @@
           loop_control:
             label: "{{ item.name }}"
 
-      rescue:
-        - name: Display error details
-          debug:
-            msg: "Failed to create restore: {{ restore_result.results | selectattr('failed', 'true') | map(attribute='msg') | list }}"
-          when: restore_result is defined and restore_result.results is defined
 
-        - name: Fail with error message
-          fail:
-            msg: "Failed to create restores. See above for details."
-
-    - name: Display creation results
-      debug:
-        msg: 
-          - "Successfully created restores:"
-          - "Created restores: {{ restore_result.results | map(attribute='item.name') | list }}"
-          - "Changed status: {{ restore_result.results | map(attribute='changed') | list }}"
-      when: 
-        - restore_result is defined 
-        - restore_result.results is defined
-        - (restore_result.results | selectattr('failed', 'defined') | selectattr('failed', 'true') | list | length) == 0
+    # Output configuration: Display the output or save to file
+    - name: Handle output
+      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
+      vars:
+        output_data: "{{ restore_result }}"
+        output_filename_prefix: "restore_create"
+      when: output_config.enabled | default(false)

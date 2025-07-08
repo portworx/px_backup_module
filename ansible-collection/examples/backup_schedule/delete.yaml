@@ -1,7 +1,7 @@
 ---
 - name: Configure PX-Backup Schedules
   hosts: localhost
-  gather_facts: false
+  gather_facts: true
 
   vars_files:
     - "{{ inventory_dir }}/group_vars/common/all.yaml"
@@ -15,5 +15,15 @@
         api_url: "{{ px_backup_api_url }}"
         token: "{{ px_backup_token }}"
         org_id: "{{ org_id }}"
-        uid: "092c9ac5-fe55-4eb5-b7c5-23d45eb0a95e"
-        name: "bs-1"
+        uid: "f7152020"
+        name: "schedule-name"
+        register: delete_result
+
+
+    # Output configuration: Display the output or save to file
+    - name: Handle output
+      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
+      vars:
+        output_data: "{{ delete_result }}"
+        output_filename_prefix: "backup_schedule_delete"
+      when: output_config.enabled | default(false)

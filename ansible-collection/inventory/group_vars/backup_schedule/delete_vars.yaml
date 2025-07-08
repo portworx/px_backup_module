@@ -1,0 +1,15 @@
+schedule_deletes:
+  # List of backup schedules to delete
+  - name: "sched-bkp-1"
+    uid: "uid-1"
+
+  # OR Bulk delete schedules
+  - exclude_filter: "^.*$"
+    include_objects:
+      - name: "sched-bkp-2"
+        uid: "uid-2"
+    cluster_scope:
+      all_clusters: true
+    backup_object_type:
+      type: "VM"  # Can be "All" or "VM" or "NS"
+

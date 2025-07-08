@@ -1,7 +1,7 @@
 ---
 - name: Update PX-Backup Schedule Policy ownership
   hosts: localhost
-  gather_facts: false
+  gather_facts: true
 
   vars_files:
     - "{{ inventory_dir }}/group_vars/common/all.yaml"
@@ -44,13 +44,10 @@
           fail:
             msg: "Failed to update schedule policy ownership. See above for details."
 
-    - name: Display update results
-      debug:
-        msg: 
-          - "Successfully updated ownership for schedule_policies:"
-          - "Updated schedule policies: {{ ownership_result.results | map(attribute='item.name') | list }}"
-          - "Changed status: {{ ownership_result.results | map(attribute='changed') | list }}"
-      when: 
-        - ownership_result is defined 
-        - ownership_result.results is defined
-        - (ownership_result.results | selectattr('failed', 'defined') | selectattr('failed', 'true') | list | length) == 0
+    # Output configuration: Display the output or save to file
+    - name: Handle output
+      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
+      vars:
+        output_data: "{{ ownership_result }}"
+        output_filename_prefix: "schedule_policy_update_ownership"
+      when: output_config.enabled | default(false)

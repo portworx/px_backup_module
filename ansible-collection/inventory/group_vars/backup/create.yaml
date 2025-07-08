@@ -22,6 +22,9 @@ backups:
       - "configmaps"
     validate_certs: true
     advanced_resource_label_selector: "env=prod"
+    volume_resource_only_policy_ref:
+      name: "volume-resource-only-policy"
+      uid: "volume-resource-only-policy-uid"
 
   # Example backup 2: VM backup
   - name: "vm-backup"

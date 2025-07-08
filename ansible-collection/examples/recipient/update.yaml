@@ -1,7 +1,7 @@
 ---
 - name: Update PX-Backup Recipients
   hosts: localhost
-  gather_facts: false
+  gather_facts: true
 
   vars_files:
     - "{{ inventory_dir }}/group_vars/common/all.yaml"
@@ -42,25 +42,11 @@
           loop_control:
             label: "{{ item.name }}"
 
-        - name: Set update status
-          set_fact:
-            updated_recipients: "{{ update_result.results | map(attribute='recipient') | list }}"
-          when: update_result.results is defined
 
-        - name: Display update results
-          debug:
-            msg:
-              - "Update Results:"
-              - "Successfully updated recipients:"
-              - "{{ updated_recipients | to_nice_yaml }}"
-          when: updated_recipients is defined
-
-      rescue:
-        - name: Display error details
-          debug:
-            msg: "Failed to update recipients: {{ ansible_failed_result | default('Unknown error') }}"
-          when: ansible_failed_result is defined
-
-        - name: Fail with error message
-          fail:
-            msg: "Failed to update recipients. See above for details."
+    # Output configuration: Display the output or save to file
+    - name: Handle output
+      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
+      vars:
+        output_data: "{{ update_result }}"
+        output_filename_prefix: "recipient_update"
+      when: output_config.enabled | default(false)

@@ -1,7 +1,7 @@
 ---
 - name: Update PX-Backup Backup Locations
   hosts: localhost
-  gather_facts: false
+  gather_facts: true
 
   vars_files:
     - "{{ inventory_dir }}/group_vars/common/all.yaml"
@@ -96,20 +96,6 @@
         label: "{{ item.name }}"
       when: update_result is changed
 
-    - name: Show update results
-      debug:
-        msg: 
-          - "Update Results:"
-          - "----------------------------------------"
-          - "Location: {{ item.item.name }}"
-          - "Configuration Update: {{ 'Success' if item is changed else 'No changes needed' }}"
-          - "Location Status: {{ item.backup_location.backup_location_info.status.status | default('Unknown') }}"
-          - "Location Status Reason: {{ item.backup_location.backup_location_info.status.reason | default('Unknown') }}"
-          - "----------------------------------------"
-      loop: "{{ update_result.results }}"
-      loop_control:
-        label: "{{ item.item.name }}"
-
     - name: Summarize update operation
       debug:
         msg:
@@ -118,3 +104,12 @@
           - "Successfully updated: {{ update_result.results | selectattr('changed', 'true') | list | length }}"
           - "Failed updates: {{ update_result.results | selectattr('failed', 'defined') | selectattr('failed', 'true') | list | length }}"
           - "Updated locations: {{ update_result.results | selectattr('changed', 'true') | map(attribute='item.name') | list }}"
+
+
+    # Output configuration: Display the output or save to file
+    - name: Handle output
+      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
+      vars:
+        output_data: "{{ final_validation }}"
+        output_filename_prefix: "backup_location_update"
+      when: output_config.enabled | default(false)

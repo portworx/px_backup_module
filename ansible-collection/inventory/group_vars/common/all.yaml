@@ -1,11 +1,27 @@
+---
 # Common variables used across all playbooks
-px_backup_api_url: "http://10.13.242.200:31471"
-#px_backup_token: ""
+px_backup_api_url: "https://px-backup-svc-exposed.com"
+px_backup_token: "eyJhbGciOiJSUzI1..."  # Skip if providing username and password
 org_id: "default"
-pxcentral_auth_url: "http://10.13.242.200:32458"
-pxcentral_client_id: "pxcentral"
-# Pull username and password from environment variables, falling back to "admin" if not set
-pxcentral_username: "{{ lookup('env', 'PXCENTRAL_USERNAME') | default('admin', true) }}"
-pxcentral_password: "{{ lookup('env', 'PXCENTRAL_PASSWORD') | default('admin', true) }}"
+pxcentral_auth_url: "https://px-auth-svc-exposed.com"
+pxcentral_client_id: "client_id"
+pxcentral_username: "username"
+pxcentral_password: "password"
 token_duration: "365d"
-pxcentral_verify_ssl: "false"
+pxcentral_verify_ssl: "true"
+
+
+# Output configuration
+output_config:
+  enabled: true              # Master switch for output handling
+  display:
+    console: true            # Display to console/stdout
+    format: "yaml"           # Default display format: yaml, json
+  file:
+    enabled: true           # Save to file
+    formats:                 # Multiple formats can be saved
+      - yaml
+      - json
+    # see files saved at: ansible-collection/output
+    directory: "{{ playbook_dir | dirname | dirname }}/output"     # Output directory
+    timestamp: true          # Add timestamp to filename

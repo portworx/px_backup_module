@@ -1,7 +1,7 @@
 ---
 - name: Complete PX-Backup Workflow
   hosts: localhost
-  gather_facts: false
+  gather_facts: true
 
   vars_files:
     - "{{ inventory_dir }}/group_vars/common/all.yaml"
@@ -199,3 +199,38 @@
         - cluster_uid is defined
         - backup_location_uid is defined
         - backup_uid is defined
+
+
+    # Combine all results into a single structure
+    - name: Prepare combined workflow results
+      set_fact:
+        workflow_results:
+          summary:
+            timestamp: "{{ ansible_date_time.iso8601 }}"
+            workflow: "combined-output"
+            status: "completed"
+          cloud_credential:
+            name: "{{ cloud_credential.name }}"
+            uid: "{{ cloud_credential_uid | default('not_created') }}"
+            result: "{{ cloudcred_result | default({}) }}"
+          cluster:
+            name: "{{ cluster.name }}"
+            uid: "{{ cluster_uid | default('not_created') }}"
+            result: "{{ cluster_result | default({}) }}"
+          backup_location:
+            name: "{{ backup_location.name }}"
+            uid: "{{ backup_location_uid | default('not_created') }}"
+            result: "{{ backup_location_result | default({}) }}"
+          backup:
+            name: "{{ backups.name }}"
+            uid: "{{ backup_uid | default('not_created') }}"
+            result: "{{ backup_result | default({}) }}"
+            final_status: "{{ backup_status | default(backup_result) | default({}) }}"
+
+    # Output configuration: Save combined results
+    - name: Handle output
+      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
+      vars:
+        output_data: "{{ workflow_results }}"
+        output_filename_prefix: "px_backup_complete_workflow"
+      when: output_config.enabled | default(false)

@@ -2,7 +2,7 @@
 ---
 - name: Inspect PX-Backup Restore
   hosts: localhost
-  gather_facts: false
+  gather_facts: true
 
   vars_files:
     - "{{ inventory_dir }}/group_vars/common/all.yaml"
@@ -32,86 +32,11 @@
             validate_certs: "{{ validate_certs | default(true) }}"
           register: restore_result
 
-        # Optional debug output
-        - name: Show raw response
-          debug:
-            msg: "{{ restore_result | to_nice_json }}"
-          when: debug_output | default(false)
 
-        # Format and display restore details
-        - name: Display restore details
-          debug:
-            msg: |
-              {% set restore = restore_result.restore %}
-              RESTORE DETAILS
-              ==============
-
-              GENERAL INFORMATION
-              ------------------
-              Name: {{ restore.metadata.name }}
-              UID: {{ restore.metadata.uid }}
-              Organization: {{ restore.metadata.org_id }}
-              Created: {{ restore.metadata.create_time }}
-              Last Updated: {{ restore.metadata.last_update_time }}
-              Owner: {{ restore.metadata.ownership.owner }}
-
-              RESTORE STATUS
-              -------------
-              Status: {{ restore.restore_info.status.status }}
-              Reason: {{ restore.restore_info.status.reason }}
-              
-              CLUSTER INFORMATION
-              ------------------
-              Cluster: {{ restore.restore_info.cluster }}
-              Cluster UID: {{ restore.restore_info.cluster_ref.uid }}
-
-              NAMESPACE MAPPING INFORMATION
-              ------------------
-              {% for source, destination in restore.restore_info.namespace_mapping.items() %}
-              - Source: {{ source }} 
-              - Destination: {{ destination }}
-              {% endfor %}
-
-              RESTORE CONFIGURATION
-              -------------------
-              Backup Restored Name: {{ restore.restore_info.backup_ref.name }} 
-              Backup Restored UID: {{ restore.restore_info.backup_ref.uid }}
-              Backup Location Restored Name: {{ restore.restore_info.backup_location_ref.name }} 
-              Backup Location Restored UID: {{ restore.restore_info.backup_location_ref.uid }}
-              Object Type: {{ restore.restore_info.backup_object_type.type }}
-              Replace Policy: {{ restore.restore_info.replace_policy }}
-
-              {% if restore.restore_info.resources is defined and restore.restore_info.resources %}
-              RESOURCE INFORMATION
-              -------------------
-              Resources Count: {{ restore.restore_info.resource_count }}
-              {% for resource in restore.restore_info.resources %}
-              Resource: {{ resource.name }}
-              - Kind: {{ resource.kind }}
-              - Version: {{ resource.version }}
-              - Status: {{ resource.status.status }}
-              - Reason: {{ resource.status.reason }}
-              {% endfor %}
-              {% endif %}
-
-              {% if restore.restore_info.volumes is defined and restore.restore_info.volumes %}
-              VOLUME INFORMATION
-              -----------------
-              {% for volume in restore.restore_info.volumes %}
-              Volume: {{ volume.pvc }}
-              - Source Namespace: {{ volume.source_namespace }}
-              - Size: {{ volume.total_size | default('N/A') | filesizeformat }}
-              - Status: {{ volume.status.status }}
-              - Driver: {{ volume.driver_name }}
-              {% endfor %}
-              {% endif %}
-
-      rescue:
-        - name: Display error details
-          debug:
-            msg: "Failed to inspect restore: {{ restore_result.msg if restore_result.msg is defined else 'Unknown error occurred' }}"
-          when: restore_result is defined
-
-        - name: Fail with error message
-          fail:
-            msg: "Failed to inspect restore. See above for details."
+    # Output configuration: Display the output or save to file
+    - name: Handle output
+      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
+      vars:
+        output_data: "{{ restore_result }}"
+        output_filename_prefix: "restore_inspect"
+      when: output_config.enabled | default(false)

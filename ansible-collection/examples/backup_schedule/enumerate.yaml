@@ -1,10 +1,19 @@
 ---
 - name: Configure PX-Backup Schedules
   hosts: localhost
-  gather_facts: false
+  gather_facts: true
 
   vars_files:
     - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/backup_schedule/enumerate_vars.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - org_id is defined
+        fail_msg: "Required variables must be defined"
   
   tasks:
     - name: Login and fetch Px-Backup token
@@ -17,6 +26,16 @@
         token: "{{ px_backup_token }}"
         org_id: "{{ org_id }}"
         enumerate_options:
-          cluster_name_filter: "{{ enumerate_options.cluster_name_filter }}"
-          cluster_uid_filter: "{{ enumerate_options.cluster_uid_filter }}"
-          backup_object_type: "{{ enumerate_options.backup_object_type }}"
+          cluster_name_filter: "{{ enumerate_options.cluster_name_filter | default(omit) }}"
+          cluster_uid_filter: "{{ enumerate_options.cluster_uid_filter | default(omit) }}"
+          backup_object_type: "{{ enumerate_options.backup_object_type | default(omit) }}"
+      register: backup_schedule_result
+
+
+    # Output configuration: Display the output or save to file
+    - name: Handle output
+      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
+      vars:
+        output_data: "{{ backup_schedule_result }}"
+        output_filename_prefix: "backup_schedule_enumerate"
+      when: output_config.enabled | default(false)

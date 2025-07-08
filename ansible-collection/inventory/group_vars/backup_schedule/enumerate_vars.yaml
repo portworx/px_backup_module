@@ -1,0 +1,27 @@
+---
+# Optional filter parameters
+cluster_name_filter: "px-source"  # Filter backups by cluster name
+cluster_uid_filter: "e73b9a4b-e64e-4873-8257-61186a868c3e"
+name_filter: ""         # Filter backups by backup name
+labels: {}             # Filter by labels
+  # environment: prod    # Example label filter
+max_objects: 5       # Maximum number of backups to return
+include_detailed_resources: true  # Include full resource lists in response
+
+# Filters for specific backup attributes
+owners: []             # Filter by backup owners
+status:                # Filter by backup status
+  - "Success"
+  - "Failed"
+
+backup_object_type: 
+  type: "VirtualMachine"   # Filter by backup object type, Can be "All" or "VirtualMachine"
+
+sort_option:
+  sort_by: "Name"  
+  sort_order: "Ascending" 
+
+# SSL verification
+validate_certs: true
+
+               

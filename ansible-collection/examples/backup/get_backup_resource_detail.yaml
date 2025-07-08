@@ -1,0 +1,52 @@
+# ansible-collection/examples/backup/get_backup_resource_detail.yaml
+---
+- name: Enumerate PX-Backup Backups
+  hosts: localhost
+  gather_facts: true
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/backup/get_backup_resource_detail.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - org_id is defined
+        fail_msg: "Required variables must be defined"
+
+  tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+    - name: Enumerate VM backups
+      block:
+        - name: Get list of VM backups
+          backup:
+            operation: GET_BACKUP_RESOURCE_DETAILS
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            org_id: "{{ org_id }}"
+            name: "{{ name }}"
+            uid: "{{ uid }}"
+            validate_certs: "{{ validate_certs | default(true) }}"
+          register: backup_result
+
+      rescue:
+        - name: Display error details
+          debug:
+            msg: "Failed to enumerate backups: {{ backup_result.msg if backup_result.msg is defined else 'Unknown error occurred' }}"
+          when: backup_result is defined
+
+        - name: Fail with error message
+          fail:
+            msg: "Failed to enumerate backups. See above for details."
+
+
+    # Output configuration: Display the output or save to file
+    - name: Handle output
+      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
+      vars:
+        output_data: "{{ backup_result }}"
+        output_filename_prefix: "backup_resource_details"
+      when: output_config.enabled | default(false)

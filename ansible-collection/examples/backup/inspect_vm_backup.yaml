@@ -2,7 +2,7 @@
 ---
 - name: Inspect PX-Backup Backup
   hosts: localhost
-  gather_facts: false
+  gather_facts: true
 
   vars_files:
     - "{{ inventory_dir }}/group_vars/common/all.yaml"
@@ -31,12 +31,6 @@
             validate_certs: "{{ validate_certs | default(true) }}"
           register: backup_result
 
-        # Optional debug output
-        - name: Show raw response
-          debug:
-            msg: "{{ backup_result | to_nice_json }}"
-          when: debug_output | default(false)
-
       rescue:
         - name: Display error details
           debug:
@@ -46,3 +40,12 @@
         - name: Fail with error message
           fail:
             msg: "Failed to inspect backup. See above for details."
+
+
+    # Output configuration: Display the output or save to file
+    - name: Handle output
+      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
+      vars:
+        output_data: "{{ backup_result }}"
+        output_filename_prefix: "inspect_vm_backup"
+      when: output_config.enabled | default(false)

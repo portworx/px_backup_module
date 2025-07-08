@@ -1,0 +1,43 @@
+---
+- name: Inspect PX-Backup Volume Resource Only Policies
+  hosts: localhost
+  gather_facts: true
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/volume_resource_only_policy/inspect.yaml"
+    
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+        fail_msg: "Required variables must be defined."
+    - name: Display inspection configuration
+      debug:
+        msg:
+          - "=== PX-Backup Volume Resource Only Policy Inspection ==="
+          - "API URL: {{ px_backup_api_url }}"
+          - "Organization ID: {{ org_id | default('default') }}"
+  tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+    # Block for inspecting all policies
+    - name: Inspect all volume resource only policies
+      block:
+        - name: Enumerate all volume resource only policies
+          volume_resource_only_policy:
+            operation: INSPECT_ONE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            org_id: "{{ org_id | default('default') }}"
+            name: "{{ name }}"
+            uid: "{{ uid }}"
+          register: result
+
+    # Output configuration: Display the output or save to file
+    - name: Handle output
+      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
+      vars:
+        output_data: "{{ result }}"
+        output_filename_prefix: "volume_resource_only_policy_inspect"
+      when: output_config.enabled | default(false)

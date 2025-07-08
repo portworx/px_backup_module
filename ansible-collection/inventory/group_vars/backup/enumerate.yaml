@@ -14,7 +14,22 @@ status:                # Filter by backup status
   - "Success"
   - "Failed"
 
-backup_object_type: "All"   # Filter by backup object type, Can be "All" or "VirtualMachine"
+backup_object_type: 
+  type: "VirtualMachine"   # Filter by backup object type, Can be "All" or "VirtualMachine"
+
+schedule_policy_ref:
+  # Reference to a specific schedule policy
+  - name: "sched-pol"                # Name of the schedule policy
+    uid: "policy-uid"                 # UID of the schedule policy
+
+backup_schedule_ref:
+  # Reference to a specific backup schedule
+  - name: "vm-sched-bkp-1"                # Name of the backup schedule
+    uid: "backup-schedule-uid"                 # UID of the backup schedule
+
+sort_option:
+  sort_by: "Name"  
+  sort_order: "Ascending"    
 
 # SSL verification
 validate_certs: true

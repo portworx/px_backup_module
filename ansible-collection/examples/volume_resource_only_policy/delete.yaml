@@ -1,0 +1,56 @@
+# ansible-collection/examples/volume_resource_only_policy/delete.yaml
+---
+- name: Delete PX-Backup Volume Resource Only Policies
+  hosts: localhost
+  gather_facts: true
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/volume_resource_only_policy/delete.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - org_id is defined
+          - volume_resource_only_policy_deletes is defined
+        fail_msg: "Required variables must be defined"
+
+    # Validate policy configurations
+    - name: Validate volume resource only policy configurations
+      assert:
+        that: 
+          - "item.name is defined"
+          - "item.uid is defined"
+        fail_msg: "Each volume resource only policy configuration must include 'name' and 'uid'"
+      loop: "{{ volume_resource_only_policy_deletes }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+  tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+    
+    - name: Delete volume resource only policies
+      block:
+        - name: Delete volume resource only policy
+          volume_resource_only_policy:
+            operation: DELETE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            org_id: "{{ org_id }}"
+            name: "{{ item.name }}"
+            uid: "{{ item.uid }}"
+          register: delete_result
+          loop: "{{ volume_resource_only_policy_deletes }}"
+          loop_control:
+            label: "{{ item.name }}"
+
+    # Output configuration: Display the output or save to file
+    - name: Handle output
+      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
+      vars:
+        output_data: "{{ delete_result }}"
+        output_filename_prefix: "volume_resource_only_policy_delete"
+      when: output_config.enabled | default(false)

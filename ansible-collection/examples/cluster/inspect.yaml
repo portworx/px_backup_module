@@ -1,7 +1,7 @@
 ---
 - name: Inspect PX-Backup Clusters
   hosts: localhost
-  gather_facts: false
+  gather_facts: true
 
   vars_files:
     - "{{ inventory_dir }}/group_vars/common/all.yaml"
@@ -52,28 +52,12 @@
         - name: Fail with error message
           fail:
             msg: "Failed to inspect clusters. See above for details."
-        
-    - name: Process and display inspection results
-      block:
-        - name: Display inspection results for each cluster
-          debug:
-            msg: >
-              [
-                "Cluster Details:",
-                "----------------------------------------",
-                "Name: {{ item.cluster.cluster }}",
-                "----------------------------------------"
-              ]
-          loop: "{{ inspect_result.results }}"
-          loop_control:
-            label: "{{ item.cluster.cluster.metadata.name }}"
-          when: item.cluster is defined
 
-    - name: Summarize inspection
-      debug:
-        msg:
-          - "Inspection Summary:"
-          - "Total clusters inspected: {{ inspect_result.results | length }}"
-          - "Successful inspections: {{ inspect_result.results | selectattr('cluster', 'defined') | list | length }}"
-          - "Failed inspections: {{ inspect_result.results | selectattr('failed', 'defined') | selectattr('failed', 'true') | list | length }}"
-      when: inspect_result is defined and inspect_result.results is defined
+
+    # Output configuration: Display the output or save to file
+    - name: Handle output
+      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
+      vars:
+        output_data: "{{ inspect_result }}"
+        output_filename_prefix: "cluster_inspect"
+      when: output_config.enabled | default(false)

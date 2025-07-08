@@ -1,11 +1,16 @@
 ---
-- name: List all PX-Backup backup locations
+- name: List all PX-Backup backup locations with proper formatting
   hosts: localhost
-  gather_facts: false
+  gather_facts: true
 
   vars_files:
     - "{{ inventory_dir}}/group_vars/common/all.yaml"
     - "{{ inventory_dir }}/group_vars/backup_location/enumerate.yaml"
+
+  vars:
+    # Output configuration - can be overridden with --extra-vars
+    output_format: "{{ output_format | default('yaml') }}"
+    output_mode: "{{ output_mode | default('display') }}"
 
   pre_tasks:
     - name: Validate required variables
@@ -17,9 +22,20 @@
   tasks:
     - name: Login and fetch Px-Backup token
       include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+    
     - name: Backup Location Enumerate call
       backup_location:
         operation: INSPECT_ALL
         api_url: "{{ px_backup_api_url }}"
         token: "{{ px_backup_token }}"
         org_id: "{{ org_id | default('default') }}"
+      register: backup_location_result
+
+
+    # Output configuration: Display the output or save to file
+    - name: Handle output
+      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
+      vars:
+        output_data: "{{ backup_location_result }}"
+        output_filename_prefix: "backup_location_enumerate"
+      when: output_config.enabled | default(false)

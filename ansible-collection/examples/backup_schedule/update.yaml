@@ -1,7 +1,7 @@
 ---
 - name: Update PX-Backup Backup Schedules
   hosts: localhost
-  gather_facts: false
+  gather_facts: true
 
   vars_files:
     - "{{ inventory_dir }}/group_vars/common/all.yaml"
@@ -24,55 +24,32 @@
       include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
     - name: Backup and update schedules
       block:
-        - name: Get current configurations
-          backup_schedule:
-            operation: INSPECT_ONE
-            api_url: "{{ px_backup_api_url }}"
-            token: "{{ px_backup_token }}"
-            name: "{{ item.name }}"
-            uid: "{{ item.uid }}"
-            org_id: "{{ org_id | default('default') }}"
-            suspend: "{{ item.suspend }}"
-            cluster_ref: "{{ item.cluster_ref }}"
-            schedule_policy_ref: "{{ item.schedule_policy_ref }}"
-            backup_location_ref: "{{ item.backup_location_ref }}"
-            pre_exec_rule_ref: "{{ item.pre_exec_rule_ref | default(omit) }}"
-            post_exec_rule_ref: "{{ item.post_exec_rule_ref | default(omit) }}"
-            labels: "{{ item.labels | default(omit) }}"
-          register: current_configs
-          loop: "{{ backup_schedules_update }}"
-          loop_control:
-            label: "{{ item.name }}"
-
-        - name: Backup current configurations
-          copy:
-            content: "{{ item }}"
-            dest: "/tmp/backup_schedule_{{ item.item.name }}_{{ current_timestamp }}.json"
-          loop: "{{ current_configs.results }}"
-          loop_control:
-            label: "{{ item.item.name }}"
-          when: backup_configs | bool
-
         - name: Update backup schedules
           backup_schedule:
             operation: UPDATE
             api_url: "{{ px_backup_api_url }}"
             token: "{{ px_backup_token }}"
             org_id: "{{ org_id | default('default') }}"
-            name: "{{ item.name }}"
-            uid: "{{ item.uid }}"
+            name: "{{ item.name  | default(omit) }}"
+            uid: "{{ item.uid | default(omit) }}"
             suspend: "{{ item.suspend }}"
-            cluster_ref: "{{ item.cluster_ref }}"
-            schedule_policy_ref: "{{ item.schedule_policy_ref }}"
-            backup_location_ref: "{{ item.backup_location_ref }}"
+            cluster_ref: "{{ item.cluster_ref | default(omit) }}"
+            backup_object_type: "{{ item.backup_object_type | default('All') }}"
+            schedule_policy_ref: "{{ item.schedule_policy_ref | default(omit) }}"
+            backup_location_ref: "{{ item.backup_location_ref | default(omit) }}"
             pre_exec_rule_ref: "{{ item.pre_exec_rule_ref | default(omit) }}"
             post_exec_rule_ref: "{{ item.post_exec_rule_ref | default(omit) }}"
+            policy_ref: "{{ item.policy_ref | default(omit) }}"
+            volume_resource_only_policy_ref: "{{ item.volume_resource_only_policy_ref | default(omit) }}"
+            exclude_objects: "{{ item.exclude_objects | default(omit) }}"
+            include_objects: "{{ item.include_objects | default(omit) }}"
+            include_filter: "{{ item.include_filter | default(omit) }}"
+            exclude_filter: "{{ item.exclude_filter | default(omit) }}"
+            cluster_scope: "{{ item.cluster_scope | default(omit) }}"
             labels: "{{ item.labels | default(omit) }}"
             advanced_resource_label_selector: "{{ item.advanced_resource_label_selector | default(omit) }}"
           register: update_result
           loop: "{{ backup_schedules_update }}"
-          loop_control:
-            label: "{{ item.name }}"
 
       rescue:
         - name: Display error details
@@ -83,44 +60,21 @@
           fail:
             msg: "Failed to update backup schedules. See above for details."
 
-    - name: Validate updated configurations
-      backup_schedule:
-        operation: INSPECT_ONE
-        api_url: "{{ px_backup_api_url }}"
-        token: "{{ px_backup_token }}"
-        org_id: "{{ org_id | default('default') }}"
-        name: "{{ item.name }}"
-        uid: "{{ item.uid }}"
-        suspend: "{{ item.suspend }}"
-        cluster_ref: "{{ item.cluster_ref }}"
-        schedule_policy_ref: "{{ item.schedule_policy_ref }}"
-        backup_location_ref: "{{ item.backup_location_ref }}"
-        pre_exec_rule_ref: "{{ item.pre_exec_rule_ref | default(omit) }}"
-        post_exec_rule_ref: "{{ item.post_exec_rule_ref | default(omit) }}"
-        labels: "{{ item.labels | default(omit) }}"
-      register: final_validation
-      loop: "{{ backup_schedules_update }}"
-      loop_control:
-        label: "{{ item.name }}"
-      when: update_result is changed
-
     - name: Show update results
       debug:
         msg: 
           - "Update Results:"
           - "----------------------------------------"
-          - "Schedule: {{ item.item.name }}"
+          - "Schedule: {{ item.item }}"
           - "Configuration Update: {{ 'Success' if item is changed else 'No changes needed' }}"
           - "----------------------------------------"
       loop: "{{ update_result.results }}"
-      loop_control:
-        label: "{{ item.item.name }}"
 
-    - name: Summarize update operation
-      debug:
-        msg:
-          - "Update Summary:"
-          - "Total attempted: {{ update_result.results | length }}"
-          - "Successfully updated: {{ update_result.results | selectattr('changed', 'true') | list | length }}"
-          - "Failed updates: {{ update_result.results | selectattr('failed', 'defined') | selectattr('failed', 'true') | list | length }}"
-          - "Updated schedules: {{ update_result.results | selectattr('changed', 'true') | map(attribute='item.name') | list }}"
+
+    # Output configuration: Display the output or save to file
+    - name: Handle output
+      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
+      vars:
+        output_data: "{{ update_result }}"
+        output_filename_prefix: "backup_schedule_update"
+      when: output_config.enabled | default(false)

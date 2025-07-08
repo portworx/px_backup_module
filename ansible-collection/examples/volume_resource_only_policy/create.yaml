@@ -1,0 +1,60 @@
+---
+- name: Configure PX-Backup Volume Resource Only Policies
+  hosts: localhost
+  gather_facts: true
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/volume_resource_only_policy/create.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - volume_resource_only_policies is defined
+          - volume_resource_only_policies | length > 0
+        fail_msg: "Required variables must be defined"
+
+    - name: Display configuration summary
+      debug:
+        msg:
+          - "=== PX-Backup Volume Resource Only Policy Configuration ==="
+          - "API URL: {{ px_backup_api_url }}"
+          - "Organization ID: {{ org_id | default('default') }}"
+          - "Number of policies to create: {{ volume_resource_only_policies | length }}"
+          - "Policy names: {{ volume_resource_only_policies | map(attribute='name') | list | join(', ') }}"
+
+  tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+
+    - name: Create volume resource only policies
+      block:
+        - name: Create volume resource only policy
+          volume_resource_only_policy:
+            operation: CREATE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            name: "{{ item.name }}"
+            org_id: "{{ org_id | default('default') }}"
+            # Policy configuration
+            volume_types: "{{ item.volume_types | default(omit) }}"
+            csi_drivers: "{{ item.csi_drivers | default(omit) }}"
+            nfs_servers: "{{ item.nfs_servers | default(omit) }}"
+            # Optional metadata
+            labels: "{{ item.labels | default(omit) }}"
+            ownership: "{{ item.ownership | default(omit) }}"
+            validate_certs: "{{ item.validate_certs | default(true) }}"
+          loop: "{{ volume_resource_only_policies }}"
+          register: policy_result
+          loop_control:
+            label: "{{ item.name }}"
+
+    # Output configuration: Display the output or save to file
+    - name: Handle output
+      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
+      vars:
+        output_data: "{{ policy_result }}"
+        output_filename_prefix: "volume_resource_only_policy_create"
+      when: output_config.enabled | default(false)

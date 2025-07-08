@@ -1,0 +1,37 @@
+---
+- name: Enumerate PX-Backup Volume Resource Only Policies
+  hosts: localhost
+  gather_facts: true
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/volume_resource_only_policy/enumerate.yaml"
+    
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+        fail_msg: "Required variables must be defined."
+
+  tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+
+    - name: Enumerate volume resource only policies
+      volume_resource_only_policy:
+        operation: INSPECT_ALL
+        api_url: "{{ px_backup_api_url }}"
+        token: "{{ px_backup_token }}"
+        org_id: "{{ org_id | default('default') }}"
+        labels: "{{ labels | default(omit) }}"
+        enumerate_options: "{{ enumerate_options | default(omit) }}"
+      register: enumerate_result
+
+    # Output configuration: Display the output or save to file
+    - name: Handle output
+      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
+      vars:
+        output_data: "{{ enumerate_result }}"
+        output_filename_prefix: "volume_resource_only_policy_enumerate"
+      when: output_config.enabled | default(false)
