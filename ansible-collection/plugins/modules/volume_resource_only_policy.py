@@ -130,10 +130,7 @@ options:
                 required: false
                 suboptions:
                     labels:
-                        description: 
-                            - Key-value pairs for filtering policies by labels
-                            - Only policies matching all specified labels will be returned
-                            - Example: {"environment": "production", "team": "backend"}
+                        description: Labels to attach to the volume resource only policy
                         type: dict
                         required: false
                     max_objects:
@@ -144,11 +141,7 @@ options:
                         type: int
                         required: false
                     name_filter:
-                        description: 
-                            - Filter policies by name using substring matching
-                            - Returns policies whose names contain the specified filter string
-                            - Case-sensitive matching
-                            - Example: 'prod' will match 'prod-policy' and 'my-prod-backup'
+                        description: Filter policies by name using substring matching
                         type: str
                         required: false
                     object_index:
