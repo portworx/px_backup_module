@@ -68,6 +68,14 @@ Complete documentation for the PX-Backup Ansible collection modules, playbooks, 
   - Update schedule policy configurations
   - Control policy access
 
+### Volume Resource Only Policy Module
+- [volume_resource_only_policy](modules/volume_resource_only_policy.md)
+  - Manage volume resource only policies for selective backup exclusion
+  - Skip volume data backup while preserving resource definitions
+  - Support for Portworx, CSI, and NFS volume types
+  - Configure CSI driver-specific and NFS server-specific exclusions
+  - Control policy ownership and access permissions
+
 ## Configuration
 
 ### Authentication
@@ -105,9 +113,15 @@ inventory/
 ├── group_vars/
 │   ├── backup/
 │   ├── backup_location/
+│   ├── backup_schedule/
 │   ├── cloud_credential/
 │   ├── cluster/
-│   └── common/
+│   ├── common/
+│   ├── restore/
+│   ├── rule/
+│   ├── role/
+│   ├── schedule_policy/
+│   └── volume_resource_only_policy/
 └── hosts
 ```
 
