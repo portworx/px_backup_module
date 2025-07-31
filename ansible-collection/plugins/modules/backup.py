@@ -31,7 +31,7 @@ module: backup
 
 short_description: Manage backups in PX-Backup
 
-version_added: "2.8.3"
+version_added: "2.8.4"
 
 description:
     - Manage backups in PX-Backup using different operations
@@ -229,6 +229,10 @@ options:
         description: option to enable to keep the CR status of the resources in the backup schedule
         required: false
         type: bool
+    advanced_resource_label_selector:
+        description: Advanced label selector for resources (string format with operator support)
+        required: false
+        type: str
 
 requirements:
     - python >= 3.9
@@ -255,7 +259,7 @@ EXAMPLES = r'''
       - "app1"
       - "app2"
     backup_type: "Normal"
-
+    advanced_resource_label_selector: "env=prod"
 # List all backups
 - name: List all backups
   backup:
@@ -496,7 +500,8 @@ def build_backup_request(params: Dict[str, Any]) -> Dict[str, Any]:
         'direct_kdmp',
         'exclude_resource_types',
         'parallel_backup',
-        'keep_cr_status'
+        'keep_cr_status',
+        'advanced_resource_label_selector',
     ]
 
     for field in optional_fields:
@@ -1081,11 +1086,11 @@ def run_module():
             elements='dict',
             required=False,
             options=dict(
-                name=dict(type='str', required=True),
-                namespace=dict(type='str', required=True),
-                group=dict(type='str', required=True),
-                kind=dict(type='str', required=True),
-                version=dict(type='str', required=True)
+                name=dict(type='str', required=False),
+                namespace=dict(type='str', required=False),
+                group=dict(type='str', required=False),
+                kind=dict(type='str', required=False),
+                version=dict(type='str', required=False)
             )
         ),
         backup_type=dict(
@@ -1106,6 +1111,7 @@ def run_module():
         direct_kdmp=dict(type='bool', required=False, default=False),
         parallel_backup=dict(type='bool', required=False, default=False),
         keep_cr_status=dict(type='bool', required=False, default=False),
+        advanced_resource_label_selector=dict(type='str', required=False),
 
         # Backup share configuration
         backup_share=dict(
