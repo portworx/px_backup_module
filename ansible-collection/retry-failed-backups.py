@@ -131,19 +131,21 @@ def get_all_backups(cluster_name_filter, cluster_uid):
         logging.debug(f"[ERROR] JSON parsing failed: {str(e)}")
 
 
-def get_failed_backups(file_path, min_last_update, tz_str=None):
+def get_failed_backups(file_path, min_last_update, tz_str=None, time_field="completion_time"):
     """
     Reads the backup JSON file and returns a list of backup objects (each containing
     'metadata' and 'backup_info') that match all of the following criteria:
       - backup_object_type == 'VirtualMachine'
       - status == 'Failed' or 'PartialSuccess'
-      - last_update_time > min_last_update (converted to UTC)
+      - specified time field > min_last_update (converted to UTC)
 
     Args:
         file_path (str): Path to the backup JSON file.
         min_last_update (str): Minimum last update time in 'MM/DD/YYYY HH:MMAM/PM' format.
         tz_str (str, optional): Time zone identifier (e.g. 'Asia/Kolkata'). Defaults to 'America/New_York' (EDT)
                                 if not provided.
+        time_field (str, optional): Time field to use for filtering. Either 'create_time' or 'completion_time'.
+                                   Defaults to 'completion_time'.
 
     Returns:
         list: A list of backup objects, where each object includes 'metadata' and 'backup_info'.
@@ -165,27 +167,34 @@ def get_failed_backups(file_path, min_last_update, tz_str=None):
     for backup in data.get("backups", []):
         status = backup.get("backup_info", {}).get("status", {}).get("status")
         backup_type = backup.get("backup_info", {}).get("backup_object_type", {}).get("type")
-        last_update_str = backup.get("metadata", {}).get("create_time")
-        if not last_update_str:
+
+        # Get the time field based on user choice
+        if time_field == "create_time":
+            time_str = backup.get("metadata", {}).get("create_time")
+        else:  # default to completion_time
+            # Get completion time from backup_info.completion_time_info.total_completion_time
+            time_str = backup.get("backup_info", {}).get("completion_time_info", {}).get("total_completion_time", {})
+
+        if not time_str:
             continue
 
-        # Parse the ISO8601 last_update_time
+        # Parse the ISO8601 timestamp
         try:
-            last_update_str = last_update_str.rstrip("Z")
-            if '.' in last_update_str:
-                date_part, frac = last_update_str.split('.', 1)
+            time_str = time_str.rstrip("Z")
+            if '.' in time_str:
+                date_part, frac = time_str.split('.', 1)
                 frac = frac[:6]  # Truncate microseconds to 6 digits
-                last_update_str = f"{date_part}.{frac}"
-            last_update_dt = datetime.datetime.fromisoformat(last_update_str)
-            if last_update_dt.tzinfo is None:
+                time_str = f"{date_part}.{frac}"
+            time_dt = datetime.datetime.fromisoformat(time_str)
+            if time_dt.tzinfo is None:
                 # If there's no tzinfo, assume the timestamp is already in UTC
-                last_update_dt = last_update_dt.replace(tzinfo=ZoneInfo("UTC"))
+                time_dt = time_dt.replace(tzinfo=ZoneInfo("UTC"))
         except Exception as e:
-            logging.debug(f"[WARNING] Error parsing last_update_time '{last_update_str}': {e}")
+            logging.debug(f"[WARNING] Error parsing {time_field} '{time_str}': {e}")
             continue
 
         # Check filters
-        if backup_type == "VirtualMachine" and status in ["Failed", "PartialSuccess"] and last_update_dt >= min_last_update_dt:
+        if backup_type == "VirtualMachine" and status in ["Failed", "PartialSuccess"] and time_dt >= min_last_update_dt:
             # Append the entire backup object but keep only metadata + backup_info
             new_backup_obj = {
                 "metadata": backup.get("metadata", {}),
@@ -666,6 +675,8 @@ if __name__ == "__main__":
                              "e.g., 03/18/2025 07:25AM")
     parser.add_argument("--hours-ago", type=int,
                         help="Number of hours ago to use if no timestamp is provided. Defaults to 12.")
+    parser.add_argument("--time-field", choices=["create_time", "completion_time"], default="completion_time",
+                        help="Time field to use for filtering backups. Choose 'completion_time' (default) or 'create_time'.")
     parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose logging")
     parser.add_argument("--dry-run", action="store_true", help="Dry run mode")
 
@@ -685,8 +696,9 @@ if __name__ == "__main__":
     cluster_name = args.cluster_name
     cluster_uid = args.cluster_uid
     logging.info(f"Backing up cluster: {cluster_name} with uid {cluster_uid}")
+    logging.info(f"Using time field: {args.time_field} for filtering backups")
     enumerate_response = get_all_backups(cluster_name, cluster_uid)
-    failed_backups = get_failed_backups(enumerate_response, args.timestamp)
+    failed_backups = get_failed_backups(enumerate_response, args.timestamp, time_field=args.time_field)
     # print only the backup name from the failed backups
     failed_backup_names = [backup.get("metadata", {}).get("name") for backup in failed_backups]
     logging.debug(f"Enumerated backup list: {failed_backup_names}")
