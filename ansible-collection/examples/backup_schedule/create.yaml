@@ -41,6 +41,7 @@
             owner: "admin"
             exclude_resource_types: "{{ item.exclude_resource_types | default(omit) }}"
             labels: "{{ item.labels | default(omit) }}"
+            advanced_resource_label_selector: "{{ item.advanced_resource_label_selector | default(omit) }}"
           loop: "{{ backup_schedules }}"
           register: backup_result
           loop_control:
