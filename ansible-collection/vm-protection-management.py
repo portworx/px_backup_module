@@ -602,6 +602,13 @@ def update_schedules(matching_schedules, suspend=False):
             "type": "VirtualMachine"
         }
 
+        # Extract and preserve the original volume_snapshot_class_mapping
+        volume_snapshot_class_mapping = schedule["backup_schedule_info"].get("volume_snapshot_class_mapping", {})
+        if volume_snapshot_class_mapping:
+            logging.info(f"Preserving original volume_snapshot_class_mapping for schedule {backup_name}: {volume_snapshot_class_mapping}")
+        else:
+            logging.info(f"No volume_snapshot_class_mapping found in original schedule {backup_name}")
+
         playbook_data = [{
             "name": "Update VM Backup Schedule",
             "hosts": "localhost",
@@ -610,6 +617,7 @@ def update_schedules(matching_schedules, suspend=False):
                 "backup_schedules": [{
                     "name": backup_name,
                     "suspend": suspend,
+                    "volume_snapshot_class_mapping": volume_snapshot_class_mapping,
                     "backup_location_ref": schedule["backup_schedule_info"].get("backup_location_ref", {}),
                     "schedule_policy_ref": schedule["backup_schedule_info"].get("schedule_policy_ref", {}),
                     "cluster_ref": schedule["backup_schedule_info"].get("cluster_ref", {}),
