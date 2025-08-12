@@ -155,6 +155,13 @@ def update_schedules(matching_schedules, suspend=False):
         logging.info(f"  Namespaces: {vm_namespaces}")
         logging.info(f"  Include Resources: {include_resources}")
 
+        # Extract and preserve the original volume_snapshot_class_mapping
+        volume_snapshot_class_mapping = schedule["backup_schedule_info"].get("volume_snapshot_class_mapping", {})
+        if volume_snapshot_class_mapping:
+            logging.info(f"Preserving original volume_snapshot_class_mapping for schedule {backup_schedule_name}: {volume_snapshot_class_mapping}")
+        else:
+            logging.info(f"No volume_snapshot_class_mapping found in original schedule {backup_schedule_name}")
+
         # Define backup config - use the same format as the working version
         backup_object_type = {
             "type": "VirtualMachine"
@@ -168,6 +175,7 @@ def update_schedules(matching_schedules, suspend=False):
                 "backup_schedules": [{
                     "name": backup_schedule_name,
                     "suspend": suspend,
+                    "volume_snapshot_class_mapping": volume_snapshot_class_mapping,
                     "backup_location_ref": schedule["backup_schedule_info"].get("backup_location_ref", {}),
                     "schedule_policy_ref": schedule["backup_schedule_info"].get("schedule_policy_ref", {}),
                     "cluster_ref": schedule["backup_schedule_info"].get("cluster_ref", {}),
