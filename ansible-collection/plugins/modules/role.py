@@ -85,7 +85,7 @@ options:
         type: bool
         default: true
     rules:
-        description: 
+        description: List of rules
         required: False
         type: list
         elements: dict
