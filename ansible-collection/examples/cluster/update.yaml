@@ -32,6 +32,11 @@
           org_id: "default"
           name: "{{ item.name }}"
           uid: "{{ item.uid }}"
+          # SSL Certificate Parameters
+          validate_certs: "{{ px_backup_validate_certs | default(true) }}"
+          ca_cert: "{{ px_backup_ca_cert | default(omit) }}"
+          client_cert: "{{ px_backup_client_cert | default(omit) }}"
+          client_key: "{{ px_backup_client_key | default(omit) }}"
         register: current_configs
         loop: "{{ clusters_update }}"
         loop_control:
@@ -58,6 +63,11 @@
           cloud_credential_ref: "{{ item.cloud_credential_ref | default(omit) }}"
           platform_credential_ref: "{{ item.platform_credential_ref | default(omit) }}"
           ownership: "{{ item.ownership | default(omit) }}"
+          # SSL Certificate Parameters
+          validate_certs: "{{ px_backup_validate_certs | default(true) }}"
+          ca_cert: "{{ px_backup_ca_cert | default(omit) }}"
+          client_cert: "{{ px_backup_client_cert | default(omit) }}"
+          client_key: "{{ px_backup_client_key | default(omit) }}"
         register: update_results
         loop: "{{ clusters_update }}"
         loop_control:
@@ -80,6 +90,11 @@
         org_id: "default"
         name: "{{ item.name }}"
         uid: "{{ item.uid }}"
+        # SSL Certificate Parameters
+        validate_certs: "{{ px_backup_validate_certs | default(true) }}"
+        ca_cert: "{{ px_backup_ca_cert | default(omit) }}"
+        client_cert: "{{ px_backup_client_cert | default(omit) }}"
+        client_key: "{{ px_backup_client_key | default(omit) }}"
       register: final_validation
       loop: "{{ clusters_update }}"
       loop_control:

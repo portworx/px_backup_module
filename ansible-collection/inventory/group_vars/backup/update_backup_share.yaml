@@ -14,7 +14,6 @@ backup_share_updates:
           access: "View"
         # - id: "user2@example.com"
         #   access: "View"
-    validate_certs: true
 
   # - name: "staging-backup"
   #   uid: "backup-456"

@@ -30,7 +30,11 @@
             # Optional filters
             labels: "{{ labels | default(omit) }}"
             max_objects: "{{ max_objects | default(omit) }}"
-            validate_certs: "{{ validate_certs | default(true) }}"
+            # SSL Certificate Parameters
+            validate_certs: "{{ px_backup_validate_certs | default(true) }}"
+            ca_cert: "{{ px_backup_ca_cert | default(omit) }}"
+            client_cert: "{{ px_backup_client_cert | default(omit) }}"
+            client_key: "{{ px_backup_client_key | default(omit) }}"
           register: role_result
 
         - name: Display role list summary

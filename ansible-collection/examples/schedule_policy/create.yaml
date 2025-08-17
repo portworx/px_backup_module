@@ -32,9 +32,13 @@
             token: "{{ px_backup_token }}"
             name: "{{ item.name }}"
             org_id: "{{ org_id | default('default') }}"
-            validate_certs: "{{ item.validate_certs | default(true) }}"
             labels: "{{ item.labels | default(omit) }}"
             schedule_policy: "{{ item.schedule_policy }}"
+            # SSL Certificate Parameters
+            validate_certs: "{{ px_backup_validate_certs | default(true) }}"
+            ca_cert: "{{ px_backup_ca_cert | default(omit) }}"
+            client_cert: "{{ px_backup_client_cert | default(omit) }}"
+            client_key: "{{ px_backup_client_key | default(omit) }}"
           loop: "{{ schedule_policies }}"
           register: schedule_policy_result
           loop_control:

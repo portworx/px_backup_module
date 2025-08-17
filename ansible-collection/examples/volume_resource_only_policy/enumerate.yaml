@@ -26,6 +26,11 @@
         org_id: "{{ org_id | default('default') }}"
         labels: "{{ labels | default(omit) }}"
         enumerate_options: "{{ enumerate_options | default(omit) }}"
+        # SSL Certificate Parameters
+        validate_certs: "{{ px_backup_validate_certs | default(true) }}"
+        ca_cert: "{{ px_backup_ca_cert | default(omit) }}"
+        client_cert: "{{ px_backup_client_cert | default(omit) }}"
+        client_key: "{{ px_backup_client_key | default(omit) }}"
       register: enumerate_result
 
     # Output configuration: Display the output or save to file

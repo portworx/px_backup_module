@@ -51,24 +51,28 @@ Complete documentation for the PX-Backup Ansible collection modules, playbooks, 
   - List the available resources on a cluster for backup
 
 ### Rule Module
+
 - [rule](modules/rule.md)
   - Manage rule operations
   - Control rule access
   - Update rule configurations
 
 ### Role Module
+
 - [role](modules/role.md)
   - Manage role operations
   - Update role configurations
   - Fetch role permissions
 
 ### Schedule Policy Module
+
 - [schedule_policy](modules/schedule_policy.md)
   - Manage schedule policy operations
   - Update schedule policy configurations
   - Control policy access
 
 ### Volume Resource Only Policy Module
+
 - [volume_resource_only_policy](modules/volume_resource_only_policy.md)
   - Manage volume resource only policies for selective backup exclusion
   - Skip volume data backup while preserving resource definitions
@@ -98,6 +102,16 @@ pxcentral_client_id: "client_id"
 pxcentral_username: "username"
 pxcentral_password: "password"
 ```
+
+### SSL/TLS Configuration
+
+All modules support comprehensive SSL/TLS certificate management. See [SSL Certificate Configuration](common/ssl_configuration.md) for:
+
+- SSL parameter reference
+- Configuration examples
+- Global SSL settings
+- Troubleshooting guide
+- Security best practices
 
 ## API Integration
 

@@ -4,7 +4,6 @@ receivers_to_update:
   - name: "smtp"  # Name of the receiver to update
     uid: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"  # UID of the receiver
     receiver_type: "EMAIL"
-    validate_certs: true
     email_config:
       from_address: "example+1@example.com"
       host: "smtp.example.com"

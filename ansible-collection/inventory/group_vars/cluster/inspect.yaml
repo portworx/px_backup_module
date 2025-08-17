@@ -14,5 +14,4 @@ clusters_inspect:
     include_secrets: false
 
 # Global inspect configuration
-validate_certs: false
 default_include_secrets: false

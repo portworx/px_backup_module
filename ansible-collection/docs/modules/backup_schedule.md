@@ -51,6 +51,16 @@ The module supports the following operations:
 | validate_certs | boolean | no       | true    | Verify SSL certificates                        |
 | labels         | dict    | no       |         | Labels to attach to the Backup Schedule        |
 
+### SSL/TLS Configuration
+
+All modules support comprehensive SSL/TLS certificate management. See [SSL Certificate Configuration](../common/ssl_configuration.md) for:
+
+- SSL parameter reference
+- Configuration examples
+- Global SSL settings
+- Troubleshooting guide
+- Security best practices
+
 ### Schedule Configuration Parameters
 
 

@@ -52,6 +52,16 @@ The module supports the following operations:
 | google_config   | dictionary | false    |         | google config                                  |                                            |
 | rancher_config  | dictionary | false    |         | rancher config                                 |                                            |
 
+### SSL/TLS Configuration
+
+All modules support comprehensive SSL/TLS certificate management. See [SSL Certificate Configuration](../common/ssl_configuration.md) for:
+
+- SSL parameter reference
+- Configuration examples
+- Global SSL settings
+- Troubleshooting guide
+- Security best practices
+
 ### AWS Configuration
 
 

@@ -11,6 +11,3 @@ schedule_policy_ownership_updates:
       collaborators:
         - id: "test-user-0"
           access: "Read"
-
-# Global update configuration
-validate_certs: false

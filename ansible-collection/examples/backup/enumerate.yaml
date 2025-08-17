@@ -40,7 +40,11 @@
             sort_option: "{{ sort_option | default(omit) }}"
             schedule_policy_ref: "{{ schedule_policy_ref | default(omit) }}"
             backup_schedule_ref: "{{ backup_schedule_ref | default(omit) }}"
-            validate_certs: "{{ validate_certs | default(true) }}"
+            # SSL Certificate Parameters
+            validate_certs: "{{ px_backup_validate_certs | default(true) }}"
+            ca_cert: "{{ px_backup_ca_cert | default(omit) }}"
+            client_cert: "{{ px_backup_client_cert | default(omit) }}"
+            client_key: "{{ px_backup_client_key | default(omit) }}"
           register: backup_result
 
 

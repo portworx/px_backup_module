@@ -19,7 +19,6 @@
             api_url: "{{ px_backup_api_url }}"
             token: "{{ px_backup_token }}"
             org_id: "{{ org_id | default('default') }}"
-            validate_certs: "{{ validate_certs | default(true) }}"
             # Reference filters
             backup_location_ref: "{{ backup_location_ref | default(omit) }}"
             cluster_ref: "{{ cluster_ref | default(omit) }}"
@@ -32,6 +31,11 @@
             exclude_filter: "{{ exclude_filter | default(omit) }}"
             # Enumerate options
             enumerate_options: "{{ enumerate_options | default(omit) }}"
+            # SSL Certificate Parameters
+            validate_certs: "{{ px_backup_validate_certs | default(true) }}"
+            ca_cert: "{{ px_backup_ca_cert | default(omit) }}"
+            client_cert: "{{ px_backup_client_cert | default(omit) }}"
+            client_key: "{{ px_backup_client_key | default(omit) }}"
           register: backup_schedules_result
 
         - name: Display total count of backup schedules found

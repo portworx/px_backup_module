@@ -6,8 +6,6 @@ backup_deletes:
     cluster_ref:
       name: "prod-cluster"
       uid: "cluster-456"
-    validate_certs: true
 
   - name: "test-backup"
     uid: "backup-789"
-    validate_certs: true

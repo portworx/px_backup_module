@@ -5,6 +5,3 @@ cloud_credentials:
 
   - name: "ibm-cc"
     uid: "uid"
-
-# Global delete configuration
-validate_certs: false

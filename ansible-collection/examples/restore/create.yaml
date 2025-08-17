@@ -33,7 +33,11 @@
             namespace_mapping: "{{ item.namespace_mapping | default({}) }}"
             storage_class_mapping: "{{ item.storage_class_mapping | default({}) }}"
             include_resources: "{{ item.include_resources | default(omit) }}"
-            validate_certs: "{{ item.validate_certs | default(true) }}"
+            # SSL Certificate Parameters
+            validate_certs: "{{ px_backup_validate_certs | default(true) }}"
+            ca_cert: "{{ px_backup_ca_cert | default(omit) }}"
+            client_cert: "{{ px_backup_client_cert | default(omit) }}"
+            client_key: "{{ px_backup_client_key | default(omit) }}"
             replace_policy: "{{ item.replace_policy | default('Retain') }}"
             rancher_project_mapping: "{{ rancher_project_mapping | default(omit) }}"
             rancher_project_name_mapping: "{{ rancher_project_name_mapping | default(omit) }}"

@@ -5,7 +5,3 @@ restore_deletes:
     # cluster_ref:
     #   name: "prod-cluster"
     #   uid: "cluster-456"
-    validate_certs: true
-
-  # - name: "test-backup"
-  #   validate_certs: true
