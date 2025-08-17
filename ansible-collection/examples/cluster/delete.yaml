@@ -1,56 +1,16 @@
 ---
-- name: Delete PX-Backup Clusters
+- name: Delete Cluster Example (Idempotent)
   hosts: localhost
-  gather_facts: true
-
-  vars_files:
-    - "{{ inventory_dir }}/group_vars/common/all.yaml"
-    - "{{ inventory_dir }}/group_vars/common/credentials.yaml"
-    - "{{ inventory_dir }}/group_vars/cluster/delete.yaml"
-
-  pre_tasks:
-    - name: Validate required variables
-      assert:
-        that:
-          - px_backup_api_url is defined
-          - clusters_delete is defined
-        fail_msg: "Required variables must be defined"
-
+  gather_facts: no
   tasks:
-    - name: Login and fetch Px-Backup token
-      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
-    - name: Delete clusters
-      block:
-        - name: Delete cluster
-          cluster:
-            operation: DELETE
-            api_url: "{{ px_backup_api_url }}"
-            token: "{{ px_backup_token }}"
-            org_id: "{{ org_id | default('default') }}"
-            name: "{{ item.name }}"
-            uid: "{{ item.uid }}"
-          register: delete_result
-          loop: "{{ clusters_delete }}"
-          loop_control:
-            label: "{{ item.name }}"
+    - name: Ensure a cluster is absent (deletes if exists)
+      purepx.px_backup.cluster:
+        state: absent
+        api_url: "https://px-backup.example.com"
+        token: "{{ px_backup_token }}"
+        name: "my-old-cluster"
+        org_id: "default"
+        # NOTE: The 'cluster' module requires 'kubeconfig' or 'px_config' even for
+        # the 'absent' state. A dummy value can be provided if the real one isn't available.
+        kubeconfig: "dummy-value"
 
-      rescue:
-        - name: Display error details
-          debug:
-            msg: "Failed to delete clusters: {{ delete_result.results | selectattr('failed', 'true') | map(attribute='msg') | list }}"
-          when: delete_result is defined and delete_result.results is defined
-
-        - name: Fail with error message
-          fail:
-            msg: "Failed to delete clusters. See above for details."
-
-
-    # Output configuration: Display the output or save to file
-    - name: Handle output
-      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
-      vars:
-        output_data: "{{ delete_result }}"
-        output_filename_prefix: "cluster_delete"
-      when: output_config.enabled | default(false)
-
-        

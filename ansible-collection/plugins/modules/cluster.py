@@ -4,13 +4,7 @@
 """
 PX-Backup Cluster Management Module
 
-This Ansible module manages clusters in PX-Backup, providing operations for:
-- Creating clusters
-- Updating existing clusters
-- Deleting clusters
-- Inspecting clusters (single or all)
-- Managing cluster sharing and backup sharing
-- Managing cluster ownership
+This Ansible module ensures a cluster is present or absent in PX-Backup.
 """
 
 from __future__ import absolute_import, division, print_function
@@ -24,6 +18,7 @@ from dataclasses import dataclass
 
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.purepx.px_backup.plugins.module_utils.px_backup.api import PXBackupClient
+from ansible_collections.purepx.px_backup.plugins.module_utils.px_backup.cluster import inspect_cluster as inspect_cluster_util, find_cluster_by_name
 import requests
 import base64
 
@@ -31,33 +26,23 @@ DOCUMENTATION = r'''
 ---
 module: cluster
 
-short_description: Manage clusters in PX-Backup
+short_description: Ensure a cluster is present or absent in PX-Backup
 
 version_added: "2.9.0"
 
 description: 
-    - Manage clusters in PX-Backup using different operations
-    - Supports CRUD operations, sharing, and backup management
-    - Supports various cloud providers (AWS, Azure, Google, IBM, Rancher)
-    - Provides both single cluster and bulk inspection capabilities
-    - Handles cluster credentials and configurations securely
+    - Ensures a cluster is present (created or updated) or absent (deleted) in PX-Backup.
+    - This module is idempotent and will only make changes if the desired state is not met.
 
 options:
-    operation:
+    state:
         description:
-            - Operation to perform on the cluster
-            - "- CREATE: creates a new cluster"
-            - "- UPDATE: modifies an existing cluster"
-            - "- DELETE: removes a cluster"
-            - "- INSPECT_ONE: retrieves details of a specific cluster"
-            - "- INSPECT_ALL: lists all clusters"
-            - "- UPDATE_BACKUP_SHARE: updates backup sharing settings"
-            - "- SHARE_CLUSTER: shares cluster access with users/groups"
-            - "- UNSHARE_CLUSTER: removes shared access"
+            - "Whether the cluster should be `present` or `absent`."
+            - "`present` will create a new cluster or update an existing one."
+            - "`absent` will delete a cluster."
         required: true
         type: str
-        choices: ['CREATE', 'UPDATE', 'DELETE', 'INSPECT_ONE', 'INSPECT_ALL', 
-                 'UPDATE_BACKUP_SHARE', 'SHARE_CLUSTER', 'UNSHARE_CLUSTER']
+        choices: ['present', 'absent']
     api_url:
         description: PX-Backup API URL
         required: true
@@ -68,19 +53,12 @@ options:
         type: str
     name:
         description: 
-            - Name of the cluster
-            - Required for all operations except INSPECT_ALL
-        required: false
+            - Name of the cluster.
+        required: true
         type: str
     org_id:
         description: Organization ID
         required: true
-        type: str
-    uid:
-        description: 
-            - Unique identifier of the cluster
-            - Required for UPDATE, DELETE, INSPECT_ONE operations
-        required: false
         type: str
     px_config:
         description: Portworx configuration
@@ -143,40 +121,6 @@ options:
         description: Labels to attach to the cluster
         required: false
         type: dict
-    backup_share:
-        description: Backup sharing configuration
-        required: false
-        type: dict
-        suboptions:
-            collaborators:
-                description: List of users to share with
-                type: list
-                elements: str
-            groups:
-                description: List of groups to share with
-                type: list
-                elements: str
-            access_type:
-                description: Access type for sharing
-                type: str
-                choices: ['Invalid', 'View', 'Restorable', 'FullAccess']
-    cluster_share:
-        description: Cluster sharing configuration
-        required: false
-        type: dict
-        suboptions:
-            users:
-                description: List of users to share with
-                type: list
-                elements: str
-            groups:
-                description: List of groups to share with
-                type: list
-                elements: str
-            share_cluster_backups:
-                description: Whether to share existing backups
-                type: bool
-                default: false
 
     ownership:
         description: Cluster ownership and access control configuration
@@ -241,15 +185,10 @@ requirements:
     - requests
 
 notes:
-    - "Operation-specific required parameters:"
-    - "CREATE: name, org_id, (kubeconfig or teleport configuration)"
-    - "UPDATE: name, uid, org_id"
-    - "DELETE: name, org_id"
-    - "INSPECT_ONE: name, uid, org_id"
-    - "INSPECT_ALL: org_id"
-    - "UPDATE_BACKUP_SHARE: name, uid, org_id, backup_share"
-    - "SHARE_CLUSTER: name, uid, org_id, cluster_share"
-    - "UNSHARE_CLUSTER: name, uid, org_id, cluster_share"
+    - "When `state` is `present`, either `kubeconfig` or `px_config` must be provided if the cluster does not exist."
+    - "This module is idempotent. It will check the current state before making any changes."
+    - "For read-only operations, use the `cluster_info` module."
+    - "For managing cluster sharing, use the `cluster_share` module."
 '''
 
 # Configure logging
@@ -291,22 +230,6 @@ def encode_kubeconfig(kubeconfig: str) -> str:
     encoded_kubeconfig = base64.b64encode(kubeconfig.encode('utf-8')).decode('utf-8')
     return encoded_kubeconfig
 
-def validate_params(params: Dict[str, Any], operation: str, required_params: List[str]) -> None:
-    """
-    Validate parameters for the given operation
-    
-    Args:
-        params: Module parameters
-        operation: Operation being performed
-        required_params: List of required parameters
-
-    Raises:
-        ValidationError: If validation fails
-    """
-    missing = [param for param in required_params if not params.get(param)]
-    if missing:
-        raise ValidationError(f"Operation '{operation}' requires parameters: {', '.join(missing)}")
-
 def create_cluster(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict[str, Any], bool]:
     """Create a new cluster"""
     try:
@@ -344,7 +267,12 @@ def update_cluster(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict[
         cluster_request = build_cluster_request(params)
         cluster_request['metadata']['uid'] = params['uid']
         
-        current = inspect_cluster(module, client)
+        current = inspect_cluster_util(
+            client,
+            params['org_id'],
+            params['name'],
+            params['uid']
+        )
         if not needs_update(current, cluster_request):
             return current, False
             
@@ -357,156 +285,6 @@ def update_cluster(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict[
         
     except Exception as e:
         module.fail_json(msg=f"Failed to update cluster: {str(e)}")
-
-def update_backup_share(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict[str, Any], bool]:
-    """Update backup sharing settings"""
-    try:
-        # Map access types to enum values based on protobuf definition
-        access_type_map = {
-        'Invalid': 0,
-        'View': 1,
-        'Restorable': 2,
-        'FullAccess': 3
-        }
-        
-        request = {
-            "org_id": module.params['org_id'],
-            "name": module.params['name'],
-            "uid": module.params['uid'],
-        }
-
-        # Helper function to map access types
-        def map_access_type(items):
-            if not items:
-                return []
-            mapped_items = []
-            for item in items:
-                access_type = item.get('access')
-                if access_type not in access_type_map:
-                    module.fail_json(msg=f"Invalid access_type: {access_type}. Must be one of: {', '.join(access_type_map.keys())}")
-                mapped_items.append({
-                    "id": item["id"],
-                    "access": access_type_map[access_type]
-                })
-            return mapped_items
-
-        # Get backup share configuration from module params
-        if module.params.get('add_backup_share'):
-            add_backup_share = module.params.get('add_backup_share', {})    
-            # Process add and delete backup shares
-            add_backup_share = {
-                "groups": map_access_type(add_backup_share.get("groups", [])),
-                "collaborators": map_access_type(add_backup_share.get("collaborators", []))
-            }
-            request.update({
-                "add_backup_share": add_backup_share
-                })
-        
-        if module.params.get('del_backup_share'):
-            del_backup_share = module.params.get('del_backup_share', {})
-            del_backup_share = {
-                "groups": map_access_type(del_backup_share.get("groups", [])),
-                "collaborators": map_access_type(del_backup_share.get("collaborators", []))
-            }
-            request.update({
-                "del_backup_share": del_backup_share
-            })
-        
-        response = client.make_request(
-            method='PUT',
-            endpoint='v1/cluster/updatebackupshare',
-            data=request
-        )
-        return response, True
-        
-    except Exception as e:
-        module.fail_json(msg=f"Failed to update backup share: {str(e)}")
-
-def share_cluster(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict[str, Any], bool]:
-    """Share cluster with users/groups"""
-    try:
-        share_config = module.params.get('cluster_share', {})
-        request = {
-            "org_id": module.params['org_id'],
-            "cluster_ref": {
-                "name": module.params['name'],
-                "uid": module.params['uid']
-            },
-            "users": share_config.get('users', []),
-            "groups": share_config.get('groups', []),
-            "share_cluster_backups": share_config.get('share_cluster_backups', False)
-        }
-        
-        response = client.make_request(
-            method='PATCH',
-            endpoint='v1/sharecluster',
-            data=request
-        )
-        return response, True
-        
-    except Exception as e:
-        module.fail_json(msg=f"Failed to share cluster: {str(e)}")
-
-def unshare_cluster(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict[str, Any], bool]:
-    """Remove cluster sharing"""
-    try:
-        share_config = module.params.get('cluster_share', {})
-        request = {
-            "org_id": module.params['org_id'],
-            "cluster_ref": {
-                "name": module.params['name'],
-                "uid": module.params['uid']
-            },
-            "users": share_config.get('users', []),
-            "groups": share_config.get('groups', [])
-        }
-        
-        response = client.make_request(
-            method='PATCH',
-            endpoint='v1/unsharecluster',
-            data=request
-        )
-        return response, True
-        
-    except Exception as e:
-        module.fail_json(msg=f"Failed to unshare cluster: {str(e)}")
-
-def enumerate_clusters(module: AnsibleModule, client: PXBackupClient) -> List[Dict[str, Any]]:
-    """List all clusters"""
-    try:
-        params = {
-            'labels': module.params.get('labels', {}),
-            'include_secrets': module.params.get('include_secrets', False),
-            'only_backup_share': module.params.get('only_backup_share', False),
-            'cloud_credential_ref': module.params.get('cloud_credential_ref', {}),
-        }
-            
-        response = client.make_request(
-            method='GET',
-            endpoint=f"v1/cluster/{module.params['org_id']}",
-            params=params
-        )
-        return response.get('clusters', [])
-        
-    except Exception as e:
-        module.fail_json(msg=f"Failed to enumerate clusters: {str(e)}")
-
-def inspect_cluster(module: AnsibleModule, client: PXBackupClient) -> Dict[str, Any]:
-    """Get details of a specific cluster"""
-    try:
-        params = {
-            'include_secrets': module.params.get('include_secrets', False)
-        }
-        
-        response = client.make_request(
-            method='GET',
-            endpoint=f"v1/cluster/{module.params['org_id']}/{module.params['name']}/{module.params['uid']}",
-            params=params
-        )
-        return response
-        
-    except Exception as e:
-        module.fail_json(msg=f"Failed to inspect cluster: {str(e)}")
 
 def delete_cluster(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict[str, Any], bool]:
     """Delete a cluster"""
@@ -612,141 +390,18 @@ def needs_update(current: Dict[str, Any], desired: Dict[str, Any]) -> bool:
     desired_normalized = normalize_dict(desired)
     return current_normalized != desired_normalized
 
-def handle_api_error(e: Exception, operation: str) -> str:
-    """
-    Handle API errors and format error message
-    
-    Args:
-        e: Exception object
-        operation: Operation being performed
-    
-    Returns:
-        Formatted error message
-    """
-    error_msg = str(e)
-    if isinstance(e, requests.exceptions.RequestException) and hasattr(e, 'response'):
-        try:
-            error_detail = e.response.json()
-            error_msg = f"{error_msg}: {error_detail}"
-        except ValueError:
-            error_msg = f"{error_msg}: {e.response.text}"
-    return f"Failed to {operation.lower()} cluster: {error_msg}"
-
-def perform_operation(module: AnsibleModule, client: PXBackupClient, operation: str) -> OperationResult:
-    """
-    Perform the requested operation
-    
-    Args:
-        module: Ansible module instance
-        client: PX-Backup API client
-        operation: Operation to perform
-    
-    Returns:
-        OperationResult containing operation outcome
-    """
-    try:
-        if operation == 'CREATE':
-            cluster, changed = create_cluster(module, client)
-            return OperationResult(
-                success=True,
-                changed=changed,
-                data={'cluster': cluster},
-                message="Cluster created successfully"
-            )
-        
-        elif operation == 'UPDATE':
-            cluster, changed = update_cluster(module, client)
-            return OperationResult(
-                success=True,
-                changed=changed,
-                data={'cluster': cluster},
-                message="Cluster updated successfully"
-            )
-        
-        elif operation == 'INSPECT_ALL':
-            clusters = enumerate_clusters(module, client)
-            return OperationResult(
-                success=True,
-                changed=False,
-                data={'clusters': clusters},
-                message=f"Found {len(clusters)} clusters"
-            )
-            
-        elif operation == 'INSPECT_ONE':
-            cluster = inspect_cluster(module, client)
-            return OperationResult(
-                success=True,
-                changed=False,
-                data={'cluster': cluster},
-                message="Successfully retrieved cluster details"
-            )
-            
-        elif operation == 'DELETE':
-            cluster, changed = delete_cluster(module, client)
-            return OperationResult(
-                success=True,
-                changed=changed,
-                data={'cluster': cluster},
-                message="Cluster deleted successfully"
-            )
-            
-        elif operation == 'UPDATE_BACKUP_SHARE':
-            cluster, changed = update_backup_share(module, client)
-            return OperationResult(
-                success=True,
-                changed=changed,
-                data={'cluster': cluster},
-                message="Cluster backup share updated successfully"
-            )
-            
-        elif operation == 'SHARE_CLUSTER':
-            cluster, changed = share_cluster(module, client)
-            return OperationResult(
-                success=True,
-                changed=changed,
-                data={'cluster': cluster},
-                message="Cluster shared successfully"
-            )
-            
-        elif operation == 'UNSHARE_CLUSTER':
-            cluster, changed = unshare_cluster(module, client)
-            return OperationResult(
-                success=True,
-                changed=changed,
-                data={'cluster': cluster},
-                message="Cluster unshared successfully"
-            )
-            
-    except Exception as e:
-        logger.exception(f"Operation {operation} failed")
-        return OperationResult(
-            success=False,
-            changed=False,
-            error=handle_api_error(e, operation)
-        )
-
 def run_module():
     """Main module execution"""
     module_args = dict(
         api_url=dict(type='str', required=True),
         token=dict(type='str', required=True, no_log=True),
-        operation=dict(
+        state=dict(
             type='str',
             required=True,
-            choices=[
-                'CREATE',
-                'UPDATE',
-                'DELETE',
-                'INSPECT_ONE',
-                'INSPECT_ALL',
-                'UPDATE_BACKUP_SHARE',
-                'SHARE_CLUSTER',
-                'UNSHARE_CLUSTER'
-            ]
+            choices=['present', 'absent']
         ),
-        name=dict(type='str', required=False),
+        name=dict(type='str', required=True),
         org_id=dict(type='str', required=True),
-        uid=dict(type='str', required=False),
         px_config=dict(
             type='dict',
             required=False,
@@ -781,79 +436,6 @@ def run_module():
         delete_all_cluster_backups=dict(type='bool', required=False, default=False),
         validate_certs=dict(type='bool', default=True),
         labels=dict(type='dict', required=False),
-        backup_share=dict(
-            type='dict',
-            required=False,
-            options=dict(
-                add=dict(type='dict'),
-                delete=dict(type='dict')
-            )
-        ),
-        add_backup_share=dict(
-            type='dict',
-            required=False,
-            options=dict(
-                groups=dict(
-                    type='list',
-                    elements='dict',
-                    options=dict(
-                        id=dict(type='str'),
-                        access=dict(
-                            type='str',
-                            choices=['Invalid', 'View', 'Restorable', 'FullAccess']
-                        )
-                    )
-                ),
-                collaborators=dict(
-                    type='list',
-                    elements='dict',
-                    options=dict(
-                        id=dict(type='str'),
-                        access=dict(
-                            type='str',
-                            choices=['Invalid', 'View', 'Restorable', 'FullAccess']
-                        )
-                    )
-                ),
-            )
-        ),
-        del_backup_share=dict(
-            type='dict',
-            required=False,
-            options=dict(
-                groups=dict(
-                    type='list',
-                    elements='dict',
-                    options=dict(
-                        id=dict(type='str'),
-                        access=dict(
-                            type='str',
-                            choices=['Invalid', 'View', 'Restorable', 'FullAccess']
-                        )
-                    )
-                ),
-                collaborators=dict(
-                    type='list',
-                    elements='dict',
-                    options=dict(
-                        id=dict(type='str'),
-                        access=dict(
-                            type='str',
-                            choices=['Invalid', 'View', 'Restorable', 'FullAccess']
-                        )
-                    )
-                ),
-            )
-        ),
-        cluster_share=dict(
-            type='dict',
-            required=False,
-            options=dict(
-                users=dict(type='list', elements='str'),
-                groups=dict(type='list', elements='str'),
-                share_cluster_backups=dict(type='bool', default=False)
-            )
-        ),
         include_secrets=dict(type='bool', default=False),
          # metadata-related arguments
         ownership=dict(
@@ -896,59 +478,65 @@ def run_module():
         )
     )
 
-    # Define required parameters for each operation
-    operation_requirements = {
-        'CREATE': ['name', 'org_id'],
-        'UPDATE': ['name', 'uid', 'org_id'],
-        'DELETE': ['name', 'org_id'],
-        'INSPECT_ONE': ['name', 'uid', 'org_id'],
-        'INSPECT_ALL': ['org_id'],
-        'UPDATE_BACKUP_SHARE': ['name', 'uid', 'org_id'],
-        'SHARE_CLUSTER': ['name', 'uid', 'org_id', 'cluster_share'],
-        'UNSHARE_CLUSTER': ['name', 'uid', 'org_id', 'cluster_share']
-    }
-
     result = dict(
         changed=False,
         cluster={},
-        clusters=[],
         message=''
     )
 
     module = AnsibleModule(
         argument_spec=module_args,
-        supports_check_mode=True
-        #required_one_of=[['kubeconfig', 'teleport_cluster_id']]
+        supports_check_mode=True,
+        required_one_of=[['kubeconfig', 'px_config']]
     )
 
     try:
-        # Validate operation parameters
-        operation = module.params['operation']
-        validate_params(module.params, operation, operation_requirements[operation])
-
         if module.check_mode:
             module.exit_json(**result)
 
-        # Initialize client
         client = PXBackupClient(
             module.params['api_url'],
             module.params['token'],
             module.params['validate_certs']
         )
 
-        # Perform operation
-        operation_result = perform_operation(module, client, operation)
-        
-        if not operation_result.success:
-            module.fail_json(msg=operation_result.error)
-        
-        # Update result with operation outcome
-        result.update(
-            changed=operation_result.changed,
-            message=operation_result.message
-        )
-        if operation_result.data:
-            result.update(operation_result.data)
+        state = module.params['state']
+        name = module.params['name']
+        org_id = module.params['org_id']
+
+        existing_cluster = find_cluster_by_name(client, org_id, name)
+
+        if state == 'present':
+            if existing_cluster:
+                # Cluster exists, check for update
+                module.params['uid'] = existing_cluster['metadata']['uid']
+                cluster, changed = update_cluster(module, client)
+                result['cluster'] = cluster
+                result['changed'] = changed
+                if changed:
+                    result['message'] = "Cluster updated successfully."
+                else:
+                    result['message'] = "Cluster is already in the desired state."
+            else:
+                # Cluster does not exist, create it
+                if not module.params.get('kubeconfig') and not module.params.get('px_config'):
+                    module.fail_json(msg="Either 'kubeconfig' or 'px_config' is required to create a new cluster.")
+                cluster, changed = create_cluster(module, client)
+                result['cluster'] = cluster
+                result['changed'] = changed
+                result['message'] = "Cluster created successfully."
+
+        elif state == 'absent':
+            if existing_cluster:
+                # Cluster exists, delete it
+                module.params['uid'] = existing_cluster['metadata']['uid']
+                _, changed = delete_cluster(module, client)
+                result['changed'] = changed
+                result['message'] = "Cluster deleted successfully."
+            else:
+                # Cluster does not exist, already absent
+                result['changed'] = False
+                result['message'] = "Cluster is already absent."
 
     except ValidationError as e:
         module.fail_json(msg=str(e))
