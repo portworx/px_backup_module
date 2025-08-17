@@ -1,26 +1,29 @@
-- name: Share and Unshare Cluster Example
+---
+- name: Backup Share Example
   hosts: localhost
   gather_facts: no
   tasks:
-    - name: Ensure a cluster (referenced by uid) is shared with a user
+    - name: Ensure backup sharing permissions are present for a collaborator
       purepx.px_backup.cluster_share:
         state: present
-        share_target: cluster
-        api_url: "https://px-backup.example.com"
-        token: "{{ px_backup_token }}"
-        uid: "cluster-uid-123"
-        org_id: "default"
-        users:
-          - "user@example.com"
-
-    - name: Ensure a cluster (referenced by name) is not shared with a group
-      purepx.px_backup.cluster_share:
-        state: absent
-        share_target: cluster
+        share_target: backups
         api_url: "https://px-backup.example.com"
         token: "{{ px_backup_token }}"
         name: "prod-cluster"
+        uid: "cluster-uid-123"
         org_id: "default"
-        groups:
-          - "old-team"
+        backup_share:
+          collaborators:
+            - id: "viewer@example.com"
+              access: "View"
+
+    - name: Ensure all backup sharing is removed from a cluster
+      purepx.px_backup.cluster_share:
+        state: absent
+        share_target: backups
+        api_url: "https://px-backup.example.com"
+        token: "{{ px_backup_token }}"
+        name: "prod-cluster"
+        uid: "cluster-uid-123"
+        org_id: "default"
 

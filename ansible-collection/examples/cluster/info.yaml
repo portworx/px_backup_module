@@ -1,0 +1,19 @@
+- name: Get Cluster Information
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: List all clusters using the cluster_info module
+      purepx.px_backup.cluster_info:
+        api_url: "https://px-backup.example.com"
+        token: "{{ px_backup_token }}"
+        org_id: "default"
+      register: all_clusters
+
+    - name: Get details for a specific cluster using the cluster_info module
+      purepx.px_backup.cluster_info:
+        api_url: "https://px-backup.example.com"
+        token: "{{ px_backup_token }}"
+        name: "my-cluster"
+        org_id: "default"
+      register: cluster_details
+

@@ -1,0 +1,17 @@
+- name: Create and Update Cluster Example (Idempotent)
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Ensure a cluster is present with updated labels (updates if exists)
+      purepx.px_backup.cluster:
+        state: present
+        api_url: "https://px-backup.example.com"
+        token: "{{ px_backup_token }}"
+        name: "my-existing-cluster"
+        org_id: "default"
+        labels:
+          env: "production"
+        # NOTE: The 'cluster' module requires 'kubeconfig' or 'px_config' even for updates
+        # where it may not be strictly necessary for the API call itself.
+        kubeconfig: "{{ lookup('file', '/path/to/existing_cluster_kubeconfig') }}"
+
