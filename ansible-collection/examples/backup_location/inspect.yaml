@@ -8,14 +8,6 @@
     - "{{ inventory_dir }}/group_vars/backup_location/inspect.yaml"
 
   pre_tasks:
-    - name: Login and fetch Px-Backup token
-      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
-    - name: Debug variables
-      debug:
-        msg:
-          - "API URL: {{ px_backup_api_url }}"
-          - "Token: {{ px_backup_token }}"
-          - "Total backup locations to inspect: {{ backup_locations_inspect | length }}"
 
     - name: Validate required variables
       assert:
@@ -38,7 +30,11 @@
             uid: "{{ item.uid }}"
             org_id: "{{ org_id | default('default') }}"
             include_secrets: "{{ item.include_secrets | default(default_include_secrets) }}"
-            validate_certs: "{{ validate_certs }}"
+            # SSL Certificate Parameters
+            validate_certs: "{{ px_backup_validate_certs | default(true) }}"
+            ca_cert: "{{ px_backup_ca_cert | default(omit) }}"
+            client_cert: "{{ px_backup_client_cert | default(omit) }}"
+            client_key: "{{ px_backup_client_key | default(omit) }}"
           register: inspect_result
           loop: "{{ backup_locations_inspect }}"
           loop_control:

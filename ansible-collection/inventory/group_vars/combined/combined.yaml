@@ -20,7 +20,6 @@ backup_location:
   location_type: "S3"
   path: "example-path"
   validate_cloud_credential: true
-  validate_certs: true
   object_lock_enabled: false
   s3_config:
     region: "example-region"

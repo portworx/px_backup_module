@@ -49,6 +49,16 @@ The module supports the following operations:
 | ownership | Dictionary | varies   |           | Ownership information                                                                 |
 | labels    | string     | no       |           | Label for the cluster                                                                 |
 
+### SSL/TLS Configuration
+
+All modules support comprehensive SSL/TLS certificate management. See [SSL Certificate Configuration](../common/ssl_configuration.md) for:
+
+- SSL parameter reference
+- Configuration examples
+- Global SSL settings
+- Troubleshooting guide
+- Security best practices
+
 #### Ownership Parameters
 
 

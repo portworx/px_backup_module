@@ -16,4 +16,3 @@ backup_updates:
     #   collaborators:
     #     - id: "user1@example.com"
     #       access: "Read"
-    # validate_certs: true

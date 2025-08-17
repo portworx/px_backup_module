@@ -34,6 +34,3 @@ clusters_update:
       groups:
         - id: "dev-team"
           access: "Write"
-
-# Global update configuration
-validate_certs: false

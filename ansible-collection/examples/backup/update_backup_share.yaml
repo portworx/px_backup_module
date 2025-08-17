@@ -45,7 +45,11 @@
             name: "{{ item.name }}"
             uid: "{{ item.uid }}"
             backup_share: "{{ item.backup_share | default({}) }}"
-            validate_certs: "{{ item.validate_certs | default(true) }}"
+            # SSL Certificate Parameters
+            validate_certs: "{{ px_backup_validate_certs | default(true) }}"
+            ca_cert: "{{ px_backup_ca_cert | default(omit) }}"
+            client_cert: "{{ px_backup_client_cert | default(omit) }}"
+            client_key: "{{ px_backup_client_key | default(omit) }}"
           register: share_result
           loop: "{{ backup_share_updates }}"
           loop_control:

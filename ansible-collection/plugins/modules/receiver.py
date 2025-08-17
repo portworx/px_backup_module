@@ -117,6 +117,18 @@ options:
         description: Verify SSL certificates
         type: bool
         default: true
+    ca_cert:
+        description: Path to CA certificate file for SSL verification
+        required: false
+        type: path
+    client_cert:
+        description: Path to client certificate file for mutual TLS
+        required: false
+        type: path
+    client_key:
+        description: Path to client private key file
+        required: false
+        type: path
     include_secrets:
         description: Include sensitive information in response
         type: bool
@@ -416,7 +428,12 @@ def run_module():
                 auth_password=dict(type='str', no_log=True)
             )
         ),
+        # SSL cert implementation
         validate_certs=dict(type='bool', default=True),
+        ca_cert=dict(type='path', required=False, default=None),
+        client_cert=dict(type='path', required=False, default=None),
+        client_key=dict(type='path', required=False, default=None, no_log=True),
+
         include_secrets=dict(type='bool', default=False),
         labels=dict(type='dict', required=False),
         recipient_id=dict(type='list', elements='str', required=False)
@@ -442,6 +459,9 @@ def run_module():
     module = AnsibleModule(
         argument_spec=module_args,
         supports_check_mode=True,
+        required_together=[
+            ['client_cert', 'client_key']
+        ],
         required_if=[
             ('operation', 'CREATE', ['name', 'email_config']),
             ('operation', 'UPDATE', ['name', 'uid', 'email_config']),
@@ -459,9 +479,12 @@ def run_module():
             module.exit_json(**result)
 
         client = PXBackupClient(
-            module.params['api_url'],
-            module.params['token'],
-            module.params['validate_certs']
+            api_url=module.params['api_url'],
+            token=module.params['token'],
+            validate_certs=module.params['validate_certs'],
+            ca_cert=module.params.get('ca_cert'),
+            client_cert=module.params.get('client_cert'),
+            client_key=module.params.get('client_key')
         )
 
         try:

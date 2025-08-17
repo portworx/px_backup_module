@@ -29,6 +29,11 @@
           cluster_name_filter: "{{ enumerate_options.cluster_name_filter | default(omit) }}"
           cluster_uid_filter: "{{ enumerate_options.cluster_uid_filter | default(omit) }}"
           backup_object_type: "{{ enumerate_options.backup_object_type | default(omit) }}"
+        # SSL Certificate Parameters
+        validate_certs: "{{ px_backup_validate_certs | default(true) }}"
+        ca_cert: "{{ px_backup_ca_cert | default(omit) }}"
+        client_cert: "{{ px_backup_client_cert | default(omit) }}"
+        client_key: "{{ px_backup_client_key | default(omit) }}"
       register: backup_schedule_result
 
 

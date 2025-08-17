@@ -38,6 +38,16 @@ The resource collector module provides essential functionality for:
 | cluster_ref.name | string | yes      | Name of the cluster             |
 | cluster_ref.uid  | string | yes      | UID of the cluster              |
 
+### SSL/TLS Configuration
+
+All modules support comprehensive SSL/TLS certificate management. See [SSL Certificate Configuration](../common/ssl_configuration.md) for:
+
+- SSL parameter reference
+- Configuration examples
+- Global SSL settings
+- Troubleshooting guide
+- Security best practices
+
 ## Return Values
 
 

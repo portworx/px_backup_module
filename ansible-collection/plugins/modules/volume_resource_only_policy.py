@@ -111,6 +111,18 @@ options:
         description: Verify SSL certificates
         type: bool
         default: true
+    ca_cert:
+        description: Path to CA certificate file for SSL verification
+        required: false
+        type: path
+    client_cert:
+        description: Path to client certificate file for mutual TLS
+        required: false
+        type: path
+    client_key:
+        description: Path to client private key file
+        required: false
+        type: path
     labels:
         description: Labels to attach to the volume resource only policy
         required: false
@@ -699,7 +711,12 @@ def run_module():
         ),
         csi_drivers=dict(type='list', elements='str', required=False),
         nfs_servers=dict(type='list', elements='str', required=False),
+        # SSL cert implementation
         validate_certs=dict(type='bool', default=True),
+        ca_cert=dict(type='path', required=False, default=None),
+        client_cert=dict(type='path', required=False, default=None),
+        client_key=dict(type='path', required=False, default=None, no_log=True),
+        
         labels=dict(type='dict', required=False),
         enumerate_options=dict(
             type='dict',
@@ -776,7 +793,10 @@ def run_module():
 
     module = AnsibleModule(
         argument_spec=module_args,
-        supports_check_mode=True
+        supports_check_mode=True,
+        required_together=[
+            ['client_cert', 'client_key']
+        ]
     )
 
     try:
@@ -789,9 +809,12 @@ def run_module():
 
         # Initialize client
         client = PXBackupClient(
-            module.params['api_url'],
-            module.params['token'],
-            module.params['validate_certs']
+            api_url=module.params['api_url'],
+            token=module.params['token'],
+            validate_certs=module.params['validate_certs'],
+            ca_cert=module.params.get('ca_cert'),
+            client_cert=module.params.get('client_cert'),
+            client_key=module.params.get('client_key')
         )
 
         # Perform operation

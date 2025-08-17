@@ -22,6 +22,11 @@
             credential_type: "{{ cloud_credential.credential_type }}"
             owner: "{{ cloud_credential.owner }}"
             aws_config: "{{ cloud_credential.aws_config }}"
+            # SSL Certificate Parameters
+            validate_certs: "{{ px_backup_validate_certs | default(true) }}"
+            ca_cert: "{{ px_backup_ca_cert | default(omit) }}"
+            client_cert: "{{ px_backup_client_cert | default(omit) }}"
+            client_key: "{{ px_backup_client_key | default(omit) }}"
           register: cloudcred_result
 
         - name: Store cloud credential UID
@@ -55,7 +60,11 @@
             org_id: "{{ org_id }}"
             cloud_type: "{{ cluster.cloud_type }}"
             kubeconfig: "{{ cluster.kubeconfig }}"
-            validate_certs: "{{ validate_certs | default(omit) }}"
+            # SSL Certificate Parameters
+            validate_certs: "{{ px_backup_validate_certs | default(true) }}"
+            ca_cert: "{{ px_backup_ca_cert | default(omit) }}"
+            client_cert: "{{ px_backup_client_cert | default(omit) }}"
+            client_key: "{{ px_backup_client_key | default(omit) }}"
           register: cluster_result
 
         - name: Store cluster UID
@@ -94,13 +103,17 @@
               cloud_credential_uid: "{{ cloud_credential_uid }}"
             encryption_key: "{{ backup_location.encryption_key | default(omit) }}"
             validate_cloud_credential: "{{ backup_location.validate_cloud_credential | default(true) }}"
-            validate_certs: "{{ backup_location.validate_certs | default(true) }}"
             object_lock_enabled: "{{ backup_location.object_lock_enabled | default(false) }}"
             s3_config:
               region: "{{ backup_location.s3_config.region }}"
               endpoint: "{{ backup_location.s3_config.endpoint }}"
               disable_ssl: "{{ backup_location.s3_config.disable_ssl }}"
               disable_path_style: "{{ backup_location.s3_config.disable_path_style }}"
+            # SSL Certificate Parameters
+            validate_certs: "{{ px_backup_validate_certs | default(true) }}"
+            ca_cert: "{{ px_backup_ca_cert | default(omit) }}"
+            client_cert: "{{ px_backup_client_cert | default(omit) }}"
+            client_key: "{{ px_backup_client_key | default(omit) }}"
           register: backup_location_result
 
         - name: Store backup location UID
@@ -147,6 +160,11 @@
             skip_vm_auto_exec_rules: "{{ backups.skip_vm_auto_exec_rules | default(false) }}"
             volume_snapshot_class_mapping: "{{ backups.volume_snapshot_class_mapping | default(omit) }}"
             direct_kdmp: "{{ backups.direct_kdmp | default(false) }}"
+            # SSL Certificate Parameters
+            validate_certs: "{{ px_backup_validate_certs | default(true) }}"
+            ca_cert: "{{ px_backup_ca_cert | default(omit) }}"
+            client_cert: "{{ px_backup_client_cert | default(omit) }}"
+            client_key: "{{ px_backup_client_key | default(omit) }}"
           register: backup_result
 
         - name: Store backup UID
@@ -170,6 +188,11 @@
             name: "{{ backups.name }}"
             org_id: "{{ org_id }}"
             uid: "{{ backup_uid }}"
+            # SSL Certificate Parameters
+            validate_certs: "{{ px_backup_validate_certs | default(true) }}"
+            ca_cert: "{{ px_backup_ca_cert | default(omit) }}"
+            client_cert: "{{ px_backup_client_cert | default(omit) }}"
+            client_key: "{{ px_backup_client_key | default(omit) }}"
           register: backup_status
           until: backup_status.backup.backup_info.status.status not in ['Pending', 'InProgress']
           retries: 30

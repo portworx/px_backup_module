@@ -3,6 +3,3 @@
 backup_locations_delete:
   - name: "sample-backup-location-name"
     uid: "sample-backup-location-uid"
-
-# Global delete configuration
-validate_certs: false

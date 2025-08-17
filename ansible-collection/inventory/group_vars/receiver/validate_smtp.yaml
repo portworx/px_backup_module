@@ -2,7 +2,6 @@
 # Define SMTP configuration to validate
 smtp_configs:
   - name: "smtp_name"
-    validate_certs: true
     recipient_id: 
       - "recipient@example.com"
     email_config:
