@@ -46,7 +46,11 @@
             parallel_backup: "{{ item.parallel_backup | default(omit) }}"
             keep_cr_status: "{{ item.keep_cr_status | default(omit) }}"
             ownership: "{{ item.ownership | default(omit) }}"
-            validate_certs: "{{ item.validate_certs | default(true) }}"
+            # SSL Certificate Parameters
+            validate_certs: "{{ px_backup_validate_certs | default(true) }}"
+            ca_cert: "{{ px_backup_ca_cert | default(omit) }}"
+            client_cert: "{{ px_backup_client_cert | default(omit) }}"
+            client_key: "{{ px_backup_client_key | default(omit) }}"
           loop: "{{ backup_schedules }}"
           register: backup_result
           loop_control:

@@ -30,6 +30,3 @@ backup_schedule_ref:
 sort_option:
   sort_by: "Name"  
   sort_order: "Ascending"    
-
-# SSL verification
-validate_certs: true

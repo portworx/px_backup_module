@@ -32,7 +32,11 @@
             # Optional parameters
             include_resources: "{{ include_resources | default([]) }}"
             skip_vm_auto_exec_rules: "{{ skip_vm_auto_exec_rules | default(false) }}"
-            validate_certs: "{{ validate_certs | default(true) }}"
+            # SSL Certificate Parameters
+            validate_certs: "{{ px_backup_validate_certs | default(true) }}"
+            ca_cert: "{{ px_backup_ca_cert | default(omit) }}"
+            client_cert: "{{ px_backup_client_cert | default(omit) }}"
+            client_key: "{{ px_backup_client_key | default(omit) }}"
           register: backup_result
                 
       rescue:

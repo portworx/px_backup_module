@@ -17,25 +17,3 @@ backup_share_updates:
       # collaborators:
       #   - id: "user2"
       #     access: "View"
-
-# Global update configuration
-validate_certs: false
-
-# {
-#   "name": "px-source",
-#   "org_id": "default",
-#   "uid": "ba2a7fb9-9290-471b-a10e-2849439003b3",
-#   "add_backup_share": {
-#     "groups": [],
-#     "collaborators": [
-#       {
-#         "id": "951aa8a1-f230-4fb0-82bb-601cae834465",
-#         "access": 1
-#       }
-#     ]
-#   },
-#   "del_backup_share": {
-#     "groups": [],
-#     "collaborators": []
-#   }
-# }

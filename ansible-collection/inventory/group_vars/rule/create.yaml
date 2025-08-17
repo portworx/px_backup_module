@@ -4,7 +4,6 @@
 rules:
   # Example rule 1
   - name: "test-rule-1"
-    validate_certs: true
     labels:
       rule-label: "test-label"
     rules:
@@ -17,7 +16,6 @@ rules:
 
   # Example rule 2
   - name: "test-rule-2"
-    validate_certs: true
     rules:
       - pod_selector:
           app: app-2

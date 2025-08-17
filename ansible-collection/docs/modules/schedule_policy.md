@@ -45,6 +45,16 @@ The module supports the following operations:
 | owner           | string     | no       |         | Owner name                                     |                                            |
 | schedule_policy | string     | yes      |         | Schedule Policy configuration                  | `interval`, `daily`, `weekly`, `monthly`   |
 
+### SSL/TLS Configuration
+
+All modules support comprehensive SSL/TLS certificate management. See [SSL Certificate Configuration](../common/ssl_configuration.md) for:
+
+- SSL parameter reference
+- Configuration examples
+- Global SSL settings
+- Troubleshooting guide
+- Security best practices
+
 ### Ownership Parameters
 
 

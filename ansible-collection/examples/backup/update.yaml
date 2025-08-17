@@ -33,7 +33,11 @@
             # Optional update parameters
             labels: "{{ item.labels | default(omit) }}"
             ownership: "{{ item.ownership | default(omit) }}"
-            validate_certs: "{{ item.validate_certs | default(true) }}"
+            # SSL Certificate Parameters
+            validate_certs: "{{ px_backup_validate_certs | default(true) }}"
+            ca_cert: "{{ px_backup_ca_cert | default(omit) }}"
+            client_cert: "{{ px_backup_client_cert | default(omit) }}"
+            client_key: "{{ px_backup_client_key | default(omit) }}"
           register: backup_result
           loop: "{{ backup_updates }}"
           loop_control:

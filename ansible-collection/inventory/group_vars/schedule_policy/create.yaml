@@ -3,7 +3,6 @@
 schedule_policies:
   # Example policy 1
   - name: "test-policy-2"
-    validate_certs: true
     labels:
       policy-label: "test-label"
     schedule_policy:

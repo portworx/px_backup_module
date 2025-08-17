@@ -33,9 +33,13 @@
         skip_vm_auto_exec_rules: "{{ backup_schedules[0].skip_vm_auto_exec_rules | default(omit) }}"
         volume_snapshot_class_mapping: "{{ backup_schedules[0].volume_snapshot_class_mapping | default(omit) }}"
         direct_kdmp: "{{ backup_schedules[0].direct_kdmp | default(omit) }}"
-        validate_certs: "{{ backup_schedules[0].validate_certs | default(true) }}"
         labels: "{{ backup_schedules[0].labels | default(omit) }}"
         advanced_resource_label_selector: "{{ backup_schedules[0].advanced_resource_label_selector | default(omit) }}"
+        # SSL Certificate Parameters
+        validate_certs: "{{ px_backup_validate_certs | default(true) }}"
+        ca_cert: "{{ px_backup_ca_cert | default(omit) }}"
+        client_cert: "{{ px_backup_client_cert | default(omit) }}"
+        client_key: "{{ px_backup_client_key | default(omit) }}"
       register: backup_result
 
   rescue:

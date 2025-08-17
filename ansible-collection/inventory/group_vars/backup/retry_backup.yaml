@@ -12,6 +12,3 @@ include_resources:
     version: v1
 
 skip_vm_auto_exec_rules: true
-validate_certs: true
-
-

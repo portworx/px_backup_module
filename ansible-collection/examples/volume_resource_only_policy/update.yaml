@@ -37,7 +37,11 @@
             csi_drivers: "{{ item.csi_drivers | default(omit) }}"
             nfs_servers: "{{ item.nfs_servers | default(omit) }}"
             labels: "{{ item.labels | default(omit) }}"
-            validate_certs: "{{ item.validate_certs | default(true) }}"
+            # SSL Certificate Parameters
+            validate_certs: "{{ px_backup_validate_certs | default(true) }}"
+            ca_cert: "{{ px_backup_ca_cert | default(omit) }}"
+            client_cert: "{{ px_backup_client_cert | default(omit) }}"
+            client_key: "{{ px_backup_client_key | default(omit) }}"
           register: policy_result
           loop: "{{ volume_resource_only_policy_updates | selectattr('ownership', 'undefined') | list }}"
           loop_control:
@@ -54,7 +58,11 @@
             name: "{{ item.name }}"
             uid: "{{ item.uid }}"
             ownership: "{{ item.ownership }}"
-            validate_certs: "{{ item.validate_certs | default(true) }}"
+            # SSL Certificate Parameters
+            validate_certs: "{{ px_backup_validate_certs | default(true) }}"
+            ca_cert: "{{ px_backup_ca_cert | default(omit) }}"
+            client_cert: "{{ px_backup_client_cert | default(omit) }}"
+            client_key: "{{ px_backup_client_key | default(omit) }}"
           register: ownership_result
           loop: "{{ volume_resource_only_policy_updates | selectattr('ownership', 'defined') | list }}"
           loop_control:

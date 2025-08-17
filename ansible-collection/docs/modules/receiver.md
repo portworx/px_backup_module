@@ -43,6 +43,16 @@ The module supports the following operations:
 | uid           | string  | varies   |         | Receiver unique identifier (required for UPDATE, DELETE, and INSPECT_ONE)               |
 | validate_certs| boolean | no       | true    | Whether to validate SSL certificates                                                    |
 
+### SSL/TLS Configuration
+
+All modules support comprehensive SSL/TLS certificate management. See [SSL Certificate Configuration](../common/ssl_configuration.md) for:
+
+- SSL parameter reference
+- Configuration examples
+- Global SSL settings
+- Troubleshooting guide
+- Security best practices
+
 ### Email Configuration Parameters
 
 | Parameter               | Type    | Required | Default | Description                    |
