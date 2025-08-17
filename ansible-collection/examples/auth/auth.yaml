@@ -15,21 +15,25 @@
     username: "{{ pxcentral_username }}"
     password: "{{ pxcentral_password }}"
     token_duration: "{{ token_duration | default('7d') }}"
-    verify_ssl: "{{ pxcentral_verify_ssl | default(true) }}"
+    verify_ssl: "{{ pxcentral_validate_certs | default(true) }}"
+    # Add certificate parameters - they will be omitted if not defined in all.yaml
+    ca_cert: "{{ pxcentral_ca_cert | default(omit) }}"
+    client_cert: "{{ pxcentral_client_cert | default(omit) }}"
+    client_key: "{{ pxcentral_client_key | default(omit) }}"
   register: token_response
   check_mode: no
   when: px_backup_token is not defined # Fetch token only if it's not already set
-  no_log: true  # Hide sensitive information in logs
+  no_log: True  # Hide sensitive information in logs
 
 # Set token fact only if we got a valid response
 - name: Set token fact
   set_fact:
     px_backup_token: "{{ token_response.access_token }}"
-  when: 
-    - token_response is defined 
+  when:
+    - token_response is defined
     - token_response.access_token is defined
     - token_response.access_token | length > 0
-  no_log: true  # Hide sensitive information in logs
+  no_log: True  # Hide sensitive information in logs
 
 # Verify we have a valid token
 - name: Verify token is set

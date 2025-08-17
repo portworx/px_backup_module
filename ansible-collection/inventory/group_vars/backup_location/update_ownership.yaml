@@ -48,5 +48,4 @@ backup_ownership_updates:
 
 
 # Global update configuration
-validate_certs: false
 backup_configs: true

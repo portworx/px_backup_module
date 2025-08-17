@@ -12,7 +12,6 @@ restores:
     # namespace_mapping: 
     #   "pvcsix": "pvcsix11178"
     replace_policy: "Retain"
-    validate_certs: true
     rancher_project_mapping:
       key: "c-m-b9x5wwqs:p-knzw9"
       value: "c-m-b9x5wwqs:p-knzw9"

@@ -36,7 +36,11 @@
             platform_credential_ref: "{{ item.platform_credential_ref | default(omit) }}"
             px_config: "{{ item.px_config | default(omit) }}"
             service_token: "{{ item.service_token | default(omit) }}"
-            validate_certs: "{{ item.validate_certs | default(false) }}"
+            # SSL Certificate Parameters
+            validate_certs: "{{ px_backup_validate_certs | default(true) }}"
+            ca_cert: "{{ px_backup_ca_cert | default(omit) }}"
+            client_cert: "{{ px_backup_client_cert | default(omit) }}"
+            client_key: "{{ px_backup_client_key | default(omit) }}"
           loop: "{{ clusters }}"
           register: cluster_result
           loop_control:
@@ -92,6 +96,11 @@
             direct_kdmp: "{{ item.direct_kdmp }}"
             owner: "{{ item.owner | default('admin') }}"
             exclude_resource_types: "{{ item.exclude_resource_types | default(omit) }}"
+            # SSL Certificate Parameters
+            validate_certs: "{{ px_backup_validate_certs | default(true) }}"
+            ca_cert: "{{ px_backup_ca_cert | default(omit) }}"
+            client_cert: "{{ px_backup_client_cert | default(omit) }}"
+            client_key: "{{ px_backup_client_key | default(omit) }}"
           loop: "{{ backup_schedules }}"
           register: backup_result
           loop_control:

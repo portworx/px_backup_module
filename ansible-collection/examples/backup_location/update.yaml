@@ -33,7 +33,11 @@
             uid: "{{ item.uid }}"
             org_id: "{{ org_id | default('default') }}"
             include_secrets: "{{ item.include_secrets | default('false') }}"
-            validate_certs: "{{ validate_certs }}"
+            # SSL Certificate Parameters
+            validate_certs: "{{ px_backup_validate_certs | default(true) }}"
+            ca_cert: "{{ px_backup_ca_cert | default(omit) }}"
+            client_cert: "{{ px_backup_client_cert | default(omit) }}"
+            client_key: "{{ px_backup_client_key | default(omit) }}"
           register: current_configs
           loop: "{{ backup_locations_update }}"
           loop_control:
@@ -62,11 +66,15 @@
             validate_cloud_credential: "{{ item.validate_cloud_credential | default(true) }}"
             object_lock_enabled: "{{ item.object_lock_enabled | default(false) }}"
             labels: "{{ item.labels | default(omit) }}"
-            validate_certs: "{{ validate_certs }}"
             s3_config: "{{ item.s3_config | default(omit) }}"
             google_config: "{{ item.google_config | default(omit) }}"
             azure_config: "{{ item.azure_config | default(omit) }}"
             nfs_config: "{{ item.nfs_config | default(omit) }}"
+            # SSL Certificate Parameters
+            validate_certs: "{{ px_backup_validate_certs | default(true) }}"
+            ca_cert: "{{ px_backup_ca_cert | default(omit) }}"
+            client_cert: "{{ px_backup_client_cert | default(omit) }}"
+            client_key: "{{ px_backup_client_key | default(omit) }}"
           register: update_result
           loop: "{{ backup_locations_update }}"
           loop_control:
@@ -89,7 +97,11 @@
         org_id: "{{ org_id | default('default') }}"
         name: "{{ item.name }}"
         uid: "{{ item.uid }}"
-        validate_certs: "{{ validate_certs }}"
+        # SSL Certificate Parameters
+        validate_certs: "{{ px_backup_validate_certs | default(true) }}"
+        ca_cert: "{{ px_backup_ca_cert | default(omit) }}"
+        client_cert: "{{ px_backup_client_cert | default(omit) }}"
+        client_key: "{{ px_backup_client_key | default(omit) }}"
       register: final_validation
       loop: "{{ backup_locations_update }}"
       loop_control:

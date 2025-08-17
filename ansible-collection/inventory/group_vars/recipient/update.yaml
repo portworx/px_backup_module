@@ -13,4 +13,3 @@ recipients_to_update:
       uid: "receiver-uuid"
     severity: "CRITICAL" 
     active: true
-    validate_certs: true

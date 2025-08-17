@@ -45,6 +45,15 @@ The module handles authentication operations:
 | token_duration | string  | no       | `7d`       | Duration for which token remains valid |
 | verify_ssl     | bool    | no       | `true`     | Enable SSL verification                |
 
+### SSL/TLS Configuration
+
+All modules support comprehensive SSL/TLS certificate management. See [SSL Certificate Configuration](../common/ssl_configuration.md) for:
+
+- SSL parameter reference
+- Configuration examples
+- Global SSL settings
+- Troubleshooting guide
+- Security best practices
 
 ## Error Handling
 

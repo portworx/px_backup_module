@@ -8,7 +8,6 @@ backup_locations:
     cloud_credential_ref: 
       cloud_credential_name: "s3-credentials"
       cloud_credential_uid: "s3-cred-123456"
-    validate_certs: true
     encryption_key: "{{ encryption_key }}"
     validate_cloud_credential: true
     object_lock_enabled: "{{ object_lock }}"
@@ -27,7 +26,6 @@ backup_locations:
     cloud_credential_ref: 
       cloud_credential_name: "gcp-credentials" 
       cloud_credential_uid: "{{ cloud_cred_uid }}"
-    validate_certs: true
     encryption_key: "{{ encryption_key }}"
     validate_cloud_credential: true
     object_lock_enabled: "{{ object_lock }}"
@@ -39,7 +37,6 @@ backup_locations:
     cloud_credential_ref:
       cloud_credential_name: "azure-credentials"
       cloud_credential_uid: "{{ cloud_cred_uid }}"
-    validate_certs: true
     encryption_key: "{{ encryption_key }}"
     validate_cloud_credential: true
     object_lock_enabled: "{{ object_lock }}"
@@ -50,7 +47,6 @@ backup_locations:
   - name: "nfs-backup"
     location_type: "NFS"
     path: "/backups"
-    validate_certs: true
     encryption_key: "{{ encryption_key }}"
     validate_cloud_credential: true
     object_lock_enabled: "{{ object_lock }}"

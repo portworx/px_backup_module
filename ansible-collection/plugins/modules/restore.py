@@ -159,6 +159,18 @@ options:
         description: Verify SSL certificates
         type: bool
         default: true
+    ca_cert:
+        description: Path to CA certificate file for SSL verification
+        required: false
+        type: path
+    client_cert:
+        description: Path to client certificate file for mutual TLS
+        required: false
+        type: path
+    client_key:
+        description: Path to client private key file
+        required: false
+        type: path
 
 requirements:
     - python >= 3.9
@@ -703,7 +715,11 @@ def run_module():
         owners=dict(type='list', elements='str', required=False),
         status=dict(type='list', elements='str', required=False),
 
-        validate_certs=dict(type='bool', default=True)
+        # SSL cert implementation
+        validate_certs=dict(type='bool', default=True),
+        ca_cert=dict(type='path', required=False, default=None),
+        client_cert=dict(type='path', required=False, default=None),
+        client_key=dict(type='path', required=False, default=None, no_log=True)
     )
 
     result = dict(
@@ -727,6 +743,9 @@ def run_module():
     module = AnsibleModule(
         argument_spec=module_args,
         supports_check_mode=True,
+        required_together=[
+            ['client_cert', 'client_key']
+        ],
         required_if=[
             ('operation', 'CREATE', [
              'name', 'backup_ref', 'cluster_ref']),
@@ -750,9 +769,12 @@ def run_module():
 
         # Initialize client
         client = PXBackupClient(
-            module.params['api_url'],
-            module.params['token'],
-            module.params['validate_certs']
+            api_url=module.params['api_url'],
+            token=module.params['token'],
+            validate_certs=module.params['validate_certs'],
+            ca_cert=module.params.get('ca_cert'),
+            client_cert=module.params.get('client_cert'),
+            client_key=module.params.get('client_key')
         )
 
         # Perform operation

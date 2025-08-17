@@ -3,7 +3,6 @@
 roles:
   # Example role 1
   - name: "test-role-1"
-    validate_certs: true
     labels:
       role-label: "test-label"
     rules:
@@ -20,7 +19,6 @@ roles:
 
   # Example role 2
   - name: "test-role-2"
-    validate_certs: true
     rules:
       - services: ['role']
         apis: ['inspect*', 'enumerate*']

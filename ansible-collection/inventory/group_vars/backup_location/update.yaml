@@ -37,7 +37,6 @@ backup_locations_update:
     uid: "nfs-bl-uid"
     location_type: "NFS"
     path: "/mnt/nfs-share"
-    validate_certs: true
     encryption_key: "{{ encryption_key }}"
     validate_cloud_credential: true
     object_lock_enabled: "{{ object_lock }}"
@@ -55,7 +54,6 @@ backup_locations_update:
     cloud_credential_ref: 
       cloud_credential_name: "gcp-cred-name" 
       cloud_credential_uid: "gcp-cred-uid"
-    validate_certs: true
     encryption_key: "{{ encryption_key }}"
     validate_cloud_credential: true
     object_lock_enabled: "{{ object_lock }}"
@@ -84,7 +82,6 @@ backup_locations_update:
     cloud_credential_ref:
       cloud_credential_name: "azure"
       cloud_credential_uid: "azure-cred-uid"
-    validate_certs: true
     encryption_key: "{{ encryption_key }}"
     validate_cloud_credential: true
     object_lock_enabled: "{{ object_lock }}"
@@ -99,5 +96,4 @@ backup_locations_update:
 
 
 # Global update configuration
-validate_certs: false
 backup_configs: true

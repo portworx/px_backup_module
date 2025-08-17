@@ -90,4 +90,3 @@ volume_resource_only_policies:
     labels:
       environment: "test"
       team: "qa"
-    validate_certs: false
