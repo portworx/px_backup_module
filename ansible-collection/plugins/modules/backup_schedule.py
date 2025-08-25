@@ -468,6 +468,13 @@ options:
             all_clusters:
                 description: Boolean flag to apply the operation to all clusters
                 type: bool
+    # New in 2.10.0
+    missing_namespaces:
+        description: Namespaces that were unavailable in the cluster at the time of the last scheduled backup
+        required: false
+        type: list
+        elements: str
+        version_added: '2.10.0'
 
 requirements:
     - python >= 3.9
@@ -761,6 +768,7 @@ def backup_schedule_request_body(module):
         "direct_kdmp": module.params['direct_kdmp'],
         "parallel_backup": module.params['parallel_backup'],
         "keep_cr_status": module.params['keep_cr_status'],
+        "missing_namespaces": module.params['missing_namespaces'],
     }
 
     # Add Object References
@@ -1045,6 +1053,8 @@ def run_module():
                 all_clusters=dict(type='bool')
             )
         ),
+        # New in 2.10.0 - Missing Namespaces support
+        missing_namespaces=dict(type='list', elements='str', required=False),
     )
 
     result = dict(

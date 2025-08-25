@@ -78,14 +78,15 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 ### Resource Selection Parameters
 
 
-| Parameter              | Type   | Required | Default | Description                            |
-| ------------------------ | -------- | ---------- | --------- | ---------------------------------------- |
-| namespaces             | list   | no       |         | List of namespaces to backup           |
-| resource_types         | list   | no       |         | List of resource types to include      |
-| exclude_resource_types | list   | no       |         | Resource types to exclude              |
-| label_selectors        | dict   | no       |         | Label selectors for resource filtering |
-| ns_label_selectors     | string | no       |         | Namespace label selectors              |
-| include_resources      | list   | no       |         | Specific resources to include          |
+| Parameter              | Type   | Required | Default | Description                                                                                        |
+| ------------------------ | -------- | ---------- | --------- | ---------------------------------------------------------------------------------------------------- |
+| namespaces             | list   | no       |         | List of namespaces to backup                                                                       |
+| missing_namespaces     | list   | no       |         | Namespaces that were unavailable in the cluster at the time of the last scheduled backup (2.10.0+) |
+| resource_types         | list   | no       |         | List of resource types to include                                                                  |
+| exclude_resource_types | list   | no       |         | Resource types to exclude                                                                          |
+| label_selectors        | dict   | no       |         | Label selectors for resource filtering                                                             |
+| ns_label_selectors     | string | no       |         | Namespace label selectors                                                                          |
+| include_resources      | list   | no       |         | Specific resources to include                                                                      |
 
 #### include_resources Entry Format
 
@@ -480,9 +481,9 @@ The module implements comprehensive error handling:
    - Storage requirements
 5. **Version Considerations**
 
-   - Features marked with (2.9.0+) require PX-Backup version 2.9.0 or later
    - Use INSPECT_ALL_POST_REQUEST for advanced filtering capabilities
    - Cluster scope operations are available in 2.9.0+
+   - Missing namespaces tracking is available in 2.10.0+
 
 ## Troubleshooting
 

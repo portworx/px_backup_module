@@ -432,6 +432,13 @@ options:
         type: list
         elements: str
         required: false
+    # New in 2.10.0
+    missing_namespaces:
+        description: In order to capture namespaces missing when the backup is initiated
+        required: false
+        type: list
+        elements: str
+        version_added: '2.10.0'
 
 requirements:
     - python >= 3.9
@@ -754,6 +761,7 @@ def build_backup_request(params: Dict[str, Any]) -> Dict[str, Any]:
         "label_selectors": params.get('label_selectors', {}),
         "include_resources": params.get('include_resources', []),
         "resource_types": params.get('resource_types', []),
+        "missing_namespaces": params.get('missing_namespaces', []),
     })
 
     # Add backup type if provided
@@ -1200,7 +1208,8 @@ def needs_update(current: Dict[str, Any], desired: Dict[str, Any]) -> bool:
         'backup_info.label_selectors',
         'backup_info.namespaces',
         'backup_info.include_resources',
-        'backup_info.resource_types'
+        'backup_info.resource_types',
+        'backup_info.missing_namespaces'
     ]
 
     current_normalized = normalize_dict(current)

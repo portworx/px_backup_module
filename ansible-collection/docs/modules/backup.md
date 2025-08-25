@@ -72,6 +72,7 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 | post_exec_rule_ref               | dictionary | no       |          | Reference to post exec rule                                                 |
 | backup_type                      | string     | no       | 'Normal' | Type of backup ('Generic' or 'Normal')                                      |
 | namespaces                       | list       | no       |          | List of namespaces to backup                                                |
+| missing_namespaces               | list       | no       |          | In order to capture namespaces missing when the backup is initiated         |
 | label_selectors                  | dictionary | no       |          | Label selectors to choose resources                                         |
 | resource_types                   | list       | no       |          | List of resource types to backup                                            |
 | exclude_resource_types           | list       | no       |          | List of resource types to exclude                                           |
