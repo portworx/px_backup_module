@@ -17,15 +17,16 @@ ansible-galaxy collection install purepx.px_backup
 ```
 
 For development and reference setup:
+
 ```bash
 git clone https://github.com/portworx/px_backup_module.git
 cd px_backup_module
 ```
 
-
 ## Quick Start
 
 1. Configure your PX-Backup authentication:
+
 ```yaml
 # inventory/group_vars/common/all.yml
 px_backup_api_url: "https://your-px-backup-instance-api-url"
@@ -58,6 +59,7 @@ output_config:
 ```
 
 2. Create a backup location:
+
 ```yaml
 ---
 - name: Configure PX-Backup S3 Backup Location
@@ -80,10 +82,84 @@ output_config:
       endpoint: "s3.amazonaws.com"
 ```
 
+## SSL/TLS Configuration
+
+All modules support comprehensive SSL/TLS certificate management through a unified `ssl_config` parameter. This provides secure communication with PX-Backup API servers and PXCentral authentication.
+
+### Quick SSL Setup
+
+Add SSL configuration to your inventory variables:
+
+```yaml
+# inventory/group_vars/common/all.yml
+
+# SSL Certificate Configuration
+ssl_config:
+  # SSL Certificate Configuration (optional)
+  # Uncomment and set these if you need custom SSL certificates for PX-Backup API
+  px_backup:
+    validate_certs: false                    # Enable/disable SSL certificate validation
+    ca_cert: "{{ playbook_dir | dirname | dirname }}/certs/new/invalid.pem"         # Custom CA certificate file
+    # ca_cert: "{{ playbook_dir | dirname | dirname }}/certs/new/appspwx-ocp-56-241pwxpurestoragecom_include_chain.pem"         # Custom CA certificate file
+    # client_cert: "/path/to/client-cert.pem" # Client certificate for mutual TLS
+    # client_key: "/path/to/client-key.pem"   # Client private key for mutual TLS
+
+  # SSL Certificate Configuration for PXCentral Auth (optional)
+  # Use these if PXCentral auth server requires custom SSL certificates
+  pxcentral:
+    validate_certs: false
+    ca_cert: "{{ playbook_dir | dirname | dirname }}/certs/new/invalid.pem"         # Custom CA certificate file
+    # ca_cert: "{{ playbook_dir | dirname | dirname }}/certs/new/appspwx-ocp-56-241pwxpurestoragecom_include_chain.pem"
+    # client_cert: "/path/to/pxcentral-client-cert.pem"
+    # client_key: "/path/to/pxcentral-client-key.pem"
+```
+
+### Using SSL Configuration in Playbooks
+
+All modules automatically use the SSL configuration when provided:
+
+```yaml
+- name: Create backup with SSL configuration
+  backup:
+    operation: CREATE
+    api_url: "{{ px_backup_api_url }}"
+    token: "{{ px_backup_token }}"
+    ssl_config: "{{ ssl_config.px_backup | default({}) }}"
+    name: "secure-backup"
+    # ... other parameters
+
+- name: Authenticate with SSL configuration
+  auth:
+    auth_url: "{{ pxcentral_auth_url }}"
+    client_id: "{{ pxcentral_client_id }}"
+    username: "{{ pxcentral_username }}"
+    password: "{{ pxcentral_password }}"
+    ssl_config: "{{ ssl_config.pxcentral | default({}) }}"
+  register: auth_result
+```
+
+### SSL Configuration Options
+
+
+| Parameter        | Type    | Default | Description                                                                                         |
+| ------------------ | --------- | --------- | ----------------------------------------------------------------------------------------------------- |
+| `validate_certs` | boolean | `true`  | Enable SSL certificate validation. Set to`false` only for development with self-signed certificates |
+| `ca_cert`        | path    | -       | Path to custom CA certificate file for validating server certificates                               |
+| `client_cert`    | path    | -       | Path to client certificate file for mutual TLS authentication                                       |
+| `client_key`     | path    | -       | Path to client private key file. Required if`client_cert` is provided                               |
+
+### SSL Documentation
+
+For detailed SSL configuration, troubleshooting, and security best practices, see:
+
+- [SSL Certificate Configuration Guide](docs/common/ssl_configuration.md)
+
 ### Configuration Files
+
 The collection includes important configuration files for optimal operation:
 
 #### Ansible Configuration (`ansible.cfg`)
+
 ```ini
 [defaults]
 library = ./plugins/modules
@@ -100,6 +176,7 @@ vars_plugins_paths = inventory/group_vars
 ```
 
 Key settings:
+
 - **callback_result_format = yaml**: Forces Ansible to display task results in YAML format for better readability and consistency with the output configuration
 - **library/module_utils**: Points to the collection's custom modules and utilities
 - **hash_behaviour = merge**: Enables variable merging for complex configurations
@@ -110,7 +187,7 @@ Key settings:
 The collection includes output configuration in the `all.yml` file that provides flexible output handling for better debugging and result tracking:
 
 - **enabled**: Master switch to enable/disable output handling globally
-- **display.console**: Controls whether output is displayed to console/stdout  
+- **display.console**: Controls whether output is displayed to console/stdout
 - **display.format**: Default format for console output (`yaml` or `json`)
 - **file.enabled**: Enable/disable saving output to files
 - **file.formats**: List of formats to save (supports `yaml` and `json`)
@@ -122,6 +199,7 @@ Output files are automatically saved to `ansible-collection/output/` with timest
 ## Documentation
 
 Detailed documentation is available in the following locations:
+
 - [Module Documentation (GITHUB LINK)](https://github.com/portworx/px_backup_module/blob/main/ansible-collection/docs/README.md)
 - [Example Playbooks (GITHUB LINK)](https://github.com/portworx/px_backup_module/tree/main/ansible-collection/examples)
 - [PX-Backup Documentation](https://docs.portworx.com/portworx-backup-on-prem)

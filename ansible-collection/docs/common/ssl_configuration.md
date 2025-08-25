@@ -1,131 +1,200 @@
 # SSL Certificate Configuration
 
-All PX-Backup modules support comprehensive SSL/TLS certificate management for secure communication with PX-Backup API servers.
+All PX-Backup modules support comprehensive SSL/TLS certificate management for secure communication with PX-Backup API servers and PXCentral authentication.
 
-## 📋 Parameters
+## 📋 SSL Configuration Structure
 
-### 🔧 PX-Backup API SSL Parameters
+SSL configuration is now organized under a single `ssl_config` variable with separate sections for different services:
 
-| Parameter                  | Type    | Required | Default | Description                                                                                                    |
-|----------------------------|---------|----------|---------|----------------------------------------------------------------------------------------------------------------|
-| `px_backup_validate_certs` | boolean | no       | `true`  | Enable SSL certificate validation for PX-Backup API. Set to `false` only for development                     |
-| `px_backup_ca_cert`        | path    | no       | -       | Path to custom CA certificate file for validating PX-Backup API server certificates                          |
-| `px_backup_client_cert`    | path    | no       | -       | Path to client certificate file for mutual TLS authentication with PX-Backup API                             |
-| `px_backup_client_key`     | path    | no       | -       | Path to client private key file for PX-Backup API. Required if `px_backup_client_cert` is provided           |
+```yaml
+ssl_config:
+  # SSL Certificate Configuration (optional)
+  # Uncomment and set these if you need custom SSL certificates for PX-Backup API
+  px_backup:
+    validate_certs: false                    # Enable/disable SSL certificate validation
+    ca_cert: "{{ playbook_dir | dirname | dirname }}/certs/new/invalid.pem"         # Custom CA certificate file
+    # ca_cert: "{{ playbook_dir | dirname | dirname }}/certs/new/appspwx-ocp-56-241pwxpurestoragecom_include_chain.pem"         # Custom CA certificate file
+    # client_cert: "/path/to/client-cert.pem" # Client certificate for mutual TLS
+    # client_key: "/path/to/client-key.pem"   # Client private key for mutual TLS
 
-### 🔐 PXCentral Auth SSL Parameters
+  # SSL Certificate Configuration for PXCentral Auth (optional)
+  # Use these if PXCentral auth server requires custom SSL certificates
+  pxcentral:
+    validate_certs: false
+    ca_cert: "{{ playbook_dir | dirname | dirname }}/certs/new/invalid.pem"         # Custom CA certificate file
+    # ca_cert: "{{ playbook_dir | dirname | dirname }}/certs/new/appspwx-ocp-56-241pwxpurestoragecom_include_chain.pem"
+    # client_cert: "/path/to/pxcentral-client-cert.pem"
+    # client_key: "/path/to/pxcentral-client-key.pem"
+```
 
-| Parameter                   | Type    | Required | Default | Description                                                                                                    |
-|-----------------------------|---------|----------|---------|----------------------------------------------------------------------------------------------------------------|
-| `pxcentral_validate_certs`      | boolean | no       | `true`  | Enable SSL certificate validation for PXCentral Auth. Set to `false` only for development                    |
-| `pxcentral_ca_cert`         | path    | no       | -       | Path to custom CA certificate file for validating PXCentral Auth server certificates                         |
-| `pxcentral_client_cert`     | path    | no       | -       | Path to client certificate file for mutual TLS authentication with PXCentral Auth                            |
-| `pxcentral_client_key`      | path    | no       | -       | Path to client private key file for PXCentral Auth. Required if `pxcentral_client_cert` is provided          |
+## 📋 SSL Configuration Parameters
+
+### 🔧 PX-Backup API SSL Parameters (`ssl_config.px_backup`)
+
+
+| Parameter        | Type    | Required | Default | Description                                                                             |
+| ------------------ | --------- | ---------- | --------- | ----------------------------------------------------------------------------------------- |
+| `validate_certs` | boolean | no       | `true`  | Enable SSL certificate validation for PX-Backup API. Set to`false` only for development |
+| `ca_cert`        | path    | no       | -       | Path to custom CA certificate file for validating PX-Backup API server certificates     |
+| `client_cert`    | path    | no       | -       | Path to client certificate file for mutual TLS authentication with PX-Backup API        |
+| `client_key`     | path    | no       | -       | Path to client private key file for PX-Backup API. Required if`client_cert` is provided |
+
+### 🔐 PXCentral Auth SSL Parameters (`ssl_config.pxcentral`)
+
+
+| Parameter        | Type    | Required | Default | Description                                                                              |
+| ------------------ | --------- | ---------- | --------- | ------------------------------------------------------------------------------------------ |
+| `validate_certs` | boolean | no       | `true`  | Enable SSL certificate validation for PXCentral Auth. Set to`false` only for development |
+| `ca_cert`        | path    | no       | -       | Path to custom CA certificate file for validating PXCentral Auth server certificates     |
+| `client_cert`    | path    | no       | -       | Path to client certificate file for mutual TLS authentication with PXCentral Auth        |
+| `client_key`     | path    | no       | -       | Path to client private key file for PXCentral Auth. Required if`client_cert` is provided |
+
+## 🔧 Configuration Examples
+
+### Basic SSL Configuration
+
+```yaml
+# Disable SSL verification (development only)
+ssl_config:
+  px_backup:
+    validate_certs: false
+  pxcentral:
+    validate_certs: false
+```
+
+### Custom CA Certificate
+
+```yaml
+# Use custom CA certificate for both services
+ssl_config:
+  px_backup:
+    validate_certs: true
+    ca_cert: "/etc/ssl/certs/custom-ca.pem"
+  pxcentral:
+    validate_certs: true
+    ca_cert: "/etc/ssl/certs/custom-ca.pem"
+```
+
+### Mutual TLS Authentication
+
+```yaml
+# Full mutual TLS setup
+ssl_config:
+  px_backup:
+    validate_certs: true
+    ca_cert: "/etc/ssl/certs/custom-ca.pem"
+    client_cert: "/etc/ssl/certs/px-backup-client.pem"
+    client_key: "/etc/ssl/private/px-backup-client.key"
+  pxcentral:
+    validate_certs: true
+    ca_cert: "/etc/ssl/certs/custom-ca.pem"
+    client_cert: "/etc/ssl/certs/pxcentral-client.pem"
+    client_key: "/etc/ssl/private/pxcentral-client.key"
+```
 
 ## 🔧 SSL Configuration Combinations
 
 ### 🔧 PX-Backup API SSL Combinations
 
-| Configuration Type | Parameters | Use Case |
-|-------------------|------------|----------|
-| **Default Validation** | `px_backup_validate_certs: true` | Uses system's trusted CA certificates |
-| **Custom CA Validation** | `px_backup_validate_certs: true` + `px_backup_ca_cert` | Validates against your private CA |
-| **Mutual TLS** | `px_backup_client_cert` + `px_backup_client_key` | Provides client authentication to server |
-| **No Validation** | `px_backup_validate_certs: false` | ⚠️ Disables validation (development only!) |
+
+| Configuration Type       | Parameters                                                                   | Use Case                                     |
+| -------------------------- | ------------------------------------------------------------------------------ | ---------------------------------------------- |
+| **Default Validation**   | `ssl_config.px_backup.validate_certs: true`                                  | Uses system's trusted CA certificates        |
+| **Custom CA Validation** | `ssl_config.px_backup.validate_certs: true` + `ssl_config.px_backup.ca_cert` | Validates against your private CA            |
+| **Mutual TLS**           | `ssl_config.px_backup.client_cert` + `ssl_config.px_backup.client_key`       | Provides client authentication to server     |
+| **No Validation**        | `ssl_config.px_backup.validate_certs: false`                                 | ⚠️ Disables validation (development only!) |
 
 ### 🔐 PXCentral Auth SSL Combinations
 
-| Configuration Type | Parameters | Use Case |
-|-------------------|------------|----------|
-| **Default Validation** | `pxcentral_validate_certs: true` | Uses system's trusted CA certificates |
-| **Custom CA Validation** | `pxcentral_validate_certs: true` + `pxcentral_ca_cert` | Validates against your private CA |
-| **Mutual TLS** | `pxcentral_client_cert` + `pxcentral_client_key` | Provides client authentication to auth server |
-| **No Validation** | `pxcentral_validate_certs: false` | ⚠️ Disables validation (development only!) |
+
+| Configuration Type       | Parameters                                                                   | Use Case                                      |
+| -------------------------- | ------------------------------------------------------------------------------ | ----------------------------------------------- |
+| **Default Validation**   | `ssl_config.pxcentral.validate_certs: true`                                  | Uses system's trusted CA certificates         |
+| **Custom CA Validation** | `ssl_config.pxcentral.validate_certs: true` + `ssl_config.pxcentral.ca_cert` | Validates against your private CA             |
+| **Mutual TLS**           | `ssl_config.pxcentral.client_cert` + `ssl_config.pxcentral.client_key`       | Provides client authentication to auth server |
+| **No Validation**        | `ssl_config.pxcentral.validate_certs: false`                                 | ⚠️ Disables validation (development only!)  |
 
 ## ⚠️ Important Notes
 
 ### 🔧 PX-Backup API SSL Notes
-- **`px_backup_ca_cert`** is for validating the **PX-Backup API server's** certificate
-- **`px_backup_client_cert`/`px_backup_client_key`** are for authenticating **YOUR CLIENT** to the PX-Backup API
-- Both `px_backup_client_cert` and `px_backup_client_key` must be provided together for mutual TLS
+
+- **`ssl_config.px_backup.ca_cert`** is for validating the **PX-Backup API server's** certificate
+- **`ssl_config.px_backup.client_cert`/`ssl_config.px_backup.client_key`** are for authenticating **YOUR CLIENT** to the PX-Backup API
+- Both `ssl_config.px_backup.client_cert` and `ssl_config.px_backup.client_key` must be provided together for mutual TLS
 
 ### 🔐 PXCentral Auth SSL Notes
-- **`pxcentral_ca_cert`** is for validating the **PXCentral Auth server's** certificate
-- **`pxcentral_client_cert`/`pxcentral_client_key`** are for authenticating **YOUR CLIENT** to the PXCentral Auth server
-- Both `pxcentral_client_cert` and `pxcentral_client_key` must be provided together for mutual TLS
+
+- **`ssl_config.pxcentral.ca_cert`** is for validating the **PXCentral Auth server's** certificate
+- **`ssl_config.pxcentral.client_cert`/`ssl_config.pxcentral.client_key`** are for authenticating **YOUR CLIENT** to the PXCentral Auth server
+- Both `ssl_config.pxcentral.client_cert` and `ssl_config.pxcentral.client_key` must be provided together for mutual TLS
 
 ### 🚨 General SSL Notes
+
 - These configurations are **independent**: you can have custom CA validation without mutual TLS, or vice versa
-- Setting `*_validate_certs: false` or `*_verify_ssl: false` disables **ALL** server certificate validation (insecure!)
+- Setting `ssl_config.*.validate_certs: false` disables **ALL** server certificate validation (insecure!)
 - **PX-Backup API SSL** is used for all backup operations (backup, restore, schedule, etc.)
 - **PXCentral Auth SSL** is used only for authentication when obtaining tokens
 
 ## 🌐 Global Configuration (Recommended)
 
-Configure SSL settings globally in your inventory. There are **two separate SSL configurations** for different services:
-
-### 🔧 PX-Backup API SSL Configuration
+Configure SSL settings globally in your inventory using the new `ssl_config` structure:
 
 ```yaml
 # inventory/group_vars/common/all.yaml
 
-# SSL Certificate Configuration for PX-Backup API (backup operations)
-px_backup_validate_certs: true                      # Enable/disable SSL certificate validation
-# px_backup_ca_cert: "/path/to/ca-cert.pem"         # Custom CA certificate file
-# px_backup_client_cert: "/path/to/client-cert.pem" # Client certificate for mutual TLS
-# px_backup_client_key: "/path/to/client-key.pem"   # Client private key for mutual TLS
-```
+# SSL Certificate Configuration
+ssl_config:
+  # SSL Certificate Configuration (optional)
+  # Uncomment and set these if you need custom SSL certificates for PX-Backup API
+  px_backup:
+    validate_certs: false                    # Enable/disable SSL certificate validation
+    ca_cert: "{{ playbook_dir | dirname | dirname }}/certs/new/invalid.pem"         # Custom CA certificate file
+    # ca_cert: "{{ playbook_dir | dirname | dirname }}/certs/new/appspwx-ocp-56-241pwxpurestoragecom_include_chain.pem"         # Custom CA certificate file
+    # client_cert: "/path/to/client-cert.pem" # Client certificate for mutual TLS
+    # client_key: "/path/to/client-key.pem"   # Client private key for mutual TLS
 
-### 🔐 PXCentral Auth SSL Configuration
-
-```yaml
-# SSL Certificate Configuration for PXCentral Auth (authentication)
-pxcentral_validate_certs: true                          # Enable/disable SSL certificate validation for auth
-# pxcentral_ca_cert: "/path/to/pxcentral-ca-cert.pem"     # Custom CA certificate for auth server
-# pxcentral_client_cert: "/path/to/pxcentral-client-cert.pem" # Client certificate for auth mutual TLS
-# pxcentral_client_key: "/path/to/pxcentral-client-key.pem"   # Client private key for auth mutual TLS
+  # SSL Certificate Configuration for PXCentral Auth (optional)
+  # Use these if PXCentral auth server requires custom SSL certificates
+  pxcentral:
+    validate_certs: false
+    ca_cert: "{{ playbook_dir | dirname | dirname }}/certs/new/invalid.pem"         # Custom CA certificate file
+    # ca_cert: "{{ playbook_dir | dirname | dirname }}/certs/new/appspwx-ocp-56-241pwxpurestoragecom_include_chain.pem"
+    # client_cert: "/path/to/pxcentral-client-cert.pem"
+    # client_key: "/path/to/pxcentral-client-key.pem"
 ```
 
 > **✅ Best Practice**: All playbooks will automatically use these settings, ensuring consistent SSL configuration across your entire deployment.
 
 > **ℹ️ Note**:
+>
 > - **PX-Backup API SSL** is used for all backup operations (backup, restore, schedule, etc.)
 > - **PXCentral Auth SSL** is used only for authentication when obtaining tokens
 
-## 📚 Configuration Examples
+## 📚 Usage in Playbooks
 
-### 🔒 Using System CA Certificates (Default)
+### 🔒 Using SSL Config in Auth Module
 
 ```yaml
-- name: Create backup with system CAs (both services use system CAs)
+- name: Get authentication token with SSL config
+  auth:
+    auth_url: "{{ pxcentral_auth_url }}"
+    client_id: "{{ pxcentral_client_id }}"
+    username: "{{ pxcentral_username }}"
+    password: "{{ pxcentral_password }}"
+    ssl_config: "{{ ssl_config.pxcentral | default({}) }}"
+  register: auth_result
+```
+
+### 🌐 Using SSL Config in Backup Operations
+
+```yaml
+- name: Create backup with SSL config
   backup:
     operation: CREATE
-    api_url: "https://px-backup.example.com"
+    api_url: "{{ px_backup_api_url }}"
     token: "{{ px_backup_token }}"
-    # PX-Backup API uses system CAs (default)
-    validate_certs: true  # or omit, as true is default
+    ssl_config: "{{ ssl_config.px_backup | default({}) }}"
     # ... other parameters
-```
-
-### 🌐 Complete SSL Configuration Example
-
-```yaml
-# inventory/group_vars/common/all.yaml
-# Complete SSL configuration for both services
-
-# PX-Backup API SSL Configuration
-px_backup_validate_certs: true
-px_backup_ca_cert: "/etc/ssl/certs/px-backup-ca.pem"
-px_backup_client_cert: "/etc/ssl/certs/px-backup-client.pem"
-px_backup_client_key: "/etc/ssl/private/px-backup-client-key.pem"
-
-# PXCentral Auth SSL Configuration
-pxcentral_validate_certs: true
-pxcentral_ca_cert: "/etc/ssl/certs/pxcentral-ca.pem"
-pxcentral_client_cert: "/etc/ssl/certs/pxcentral-client.pem"
-pxcentral_client_key: "/etc/ssl/private/pxcentral-client-key.pem"
-```
-
 ### 🏢 Using Custom CA Certificate
 
 ```yaml
@@ -134,8 +203,9 @@ pxcentral_client_key: "/etc/ssl/private/pxcentral-client-key.pem"
     operation: CREATE
     api_url: "https://px-backup.example.com"
     token: "{{ px_backup_token }}"
-    validate_certs: true
-    ca_cert: "/etc/ssl/certs/company-ca.pem"
+    ssl_config:
+      validate_certs: true
+      ca_cert: "/etc/ssl/certs/company-ca.pem"
     # ... other parameters
 ```
 
@@ -147,10 +217,11 @@ pxcentral_client_key: "/etc/ssl/private/pxcentral-client-key.pem"
     operation: CREATE
     api_url: "https://px-backup.example.com"
     token: "{{ px_backup_token }}"
-    validate_certs: true
-    ca_cert: "/etc/ssl/certs/company-ca.pem"
-    client_cert: "/etc/ssl/certs/client.pem"
-    client_key: "/etc/ssl/private/client-key.pem"
+    ssl_config:
+      validate_certs: true
+      ca_cert: "/etc/ssl/certs/company-ca.pem"
+      client_cert: "/etc/ssl/certs/client.pem"
+      client_key: "/etc/ssl/private/client-key.pem"
     # ... other parameters
 ```
 
@@ -162,11 +233,12 @@ pxcentral_client_key: "/etc/ssl/private/pxcentral-client-key.pem"
     operation: CREATE
     api_url: "https://px-backup-dev.example.com"
     token: "{{ px_backup_token }}"
-    validate_certs: false  # Only for development!
+    ssl_config:
+      validate_certs: false  # Only for development!
     # ... other parameters
 ```
 
-> **⚠️ Warning**: Only use `validate_certs: false` in development environments. Never disable SSL validation in production!
+> **⚠️ Warning**: Only use `ssl_config.validate_certs: false` in development environments. Never disable SSL validation in production!
 
 ## 🔧 Troubleshooting SSL Issues
 

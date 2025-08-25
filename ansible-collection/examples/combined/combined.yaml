@@ -23,10 +23,7 @@
             owner: "{{ cloud_credential.owner }}"
             aws_config: "{{ cloud_credential.aws_config }}"
             # SSL Certificate Parameters
-            validate_certs: "{{ px_backup_validate_certs | default(true) }}"
-            ca_cert: "{{ px_backup_ca_cert | default(omit) }}"
-            client_cert: "{{ px_backup_client_cert | default(omit) }}"
-            client_key: "{{ px_backup_client_key | default(omit) }}"
+            ssl_config: "{{ ssl_config.px_backup | default({}) }}"
           register: cloudcred_result
 
         - name: Store cloud credential UID
@@ -61,10 +58,7 @@
             cloud_type: "{{ cluster.cloud_type }}"
             kubeconfig: "{{ cluster.kubeconfig }}"
             # SSL Certificate Parameters
-            validate_certs: "{{ px_backup_validate_certs | default(true) }}"
-            ca_cert: "{{ px_backup_ca_cert | default(omit) }}"
-            client_cert: "{{ px_backup_client_cert | default(omit) }}"
-            client_key: "{{ px_backup_client_key | default(omit) }}"
+            ssl_config: "{{ ssl_config.px_backup | default({}) }}"
           register: cluster_result
 
         - name: Store cluster UID
@@ -110,10 +104,7 @@
               disable_ssl: "{{ backup_location.s3_config.disable_ssl }}"
               disable_path_style: "{{ backup_location.s3_config.disable_path_style }}"
             # SSL Certificate Parameters
-            validate_certs: "{{ px_backup_validate_certs | default(true) }}"
-            ca_cert: "{{ px_backup_ca_cert | default(omit) }}"
-            client_cert: "{{ px_backup_client_cert | default(omit) }}"
-            client_key: "{{ px_backup_client_key | default(omit) }}"
+            ssl_config: "{{ ssl_config.px_backup | default({}) }}"
           register: backup_location_result
 
         - name: Store backup location UID
@@ -161,10 +152,7 @@
             volume_snapshot_class_mapping: "{{ backups.volume_snapshot_class_mapping | default(omit) }}"
             direct_kdmp: "{{ backups.direct_kdmp | default(false) }}"
             # SSL Certificate Parameters
-            validate_certs: "{{ px_backup_validate_certs | default(true) }}"
-            ca_cert: "{{ px_backup_ca_cert | default(omit) }}"
-            client_cert: "{{ px_backup_client_cert | default(omit) }}"
-            client_key: "{{ px_backup_client_key | default(omit) }}"
+            ssl_config: "{{ ssl_config.px_backup | default({}) }}"
           register: backup_result
 
         - name: Store backup UID
@@ -189,10 +177,7 @@
             org_id: "{{ org_id }}"
             uid: "{{ backup_uid }}"
             # SSL Certificate Parameters
-            validate_certs: "{{ px_backup_validate_certs | default(true) }}"
-            ca_cert: "{{ px_backup_ca_cert | default(omit) }}"
-            client_cert: "{{ px_backup_client_cert | default(omit) }}"
-            client_key: "{{ px_backup_client_key | default(omit) }}"
+            ssl_config: "{{ ssl_config.px_backup | default({}) }}"
           register: backup_status
           until: backup_status.backup.backup_info.status.status not in ['Pending', 'InProgress']
           retries: 30
