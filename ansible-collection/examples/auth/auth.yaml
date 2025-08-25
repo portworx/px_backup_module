@@ -15,11 +15,7 @@
     username: "{{ pxcentral_username }}"
     password: "{{ pxcentral_password }}"
     token_duration: "{{ token_duration | default('7d') }}"
-    verify_ssl: "{{ pxcentral_validate_certs | default(true) }}"
-    # Add certificate parameters - they will be omitted if not defined in all.yaml
-    ca_cert: "{{ pxcentral_ca_cert | default(omit) }}"
-    client_cert: "{{ pxcentral_client_cert | default(omit) }}"
-    client_key: "{{ pxcentral_client_key | default(omit) }}"
+    ssl_config: "{{ ssl_config.px_central | default({}) }}"
   register: token_response
   check_mode: no
   when: px_backup_token is not defined # Fetch token only if it's not already set

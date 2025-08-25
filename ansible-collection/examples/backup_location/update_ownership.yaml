@@ -30,10 +30,7 @@
             uid: "{{ item.uid }}"
             ownership: "{{ item.ownership }}"
             # SSL Certificate Parameters
-            validate_certs: "{{ px_backup_validate_certs | default(true) }}"
-            ca_cert: "{{ px_backup_ca_cert | default(omit) }}"
-            client_cert: "{{ px_backup_client_cert | default(omit) }}"
-            client_key: "{{ px_backup_client_key | default(omit) }}"
+            ssl_config: "{{ ssl_config.px_backup | default({}) }}"
           loop: "{{ backup_ownership_updates }}"
           register: ownership_result
           loop_control:

@@ -59,37 +59,36 @@ options:
         required: false
         type: str
         default: "7d"
-    verify_ssl:
-        description: 
-            - Enable SSL verification
-            - Can be set to false for self-signed certificates
-            - Overridden by ca_cert if provided
-        required: false
-        type: bool
-        default: true
-    ca_cert:
+    ssl_config:
         description:
-            - Path to CA certificate file to verify SSL certificates
-            - If provided, this CA certificate will be used instead of system CA certificates
-            - Takes precedence over verify_ssl setting
+            - SSL configuration dictionary containing certificate settings
+            - Contains validate_certs, ca_cert, client_cert, and client_key options
+            - If not provided, defaults to standard SSL verification
         required: false
-        type: path
-        version_added: "2.10.0"
-    client_cert:
-        description:
-            - Path to client certificate file for mutual TLS authentication
-            - Must be used together with client_key
-        required: false
-        type: path
-        version_added: "2.10.0"
-    client_key:
-        description:
-            - Path to client key file for mutual TLS authentication
-            - Required if client_cert is provided
-            - File permissions should be restricted (e.g., 600)
-        required: false
-        type: path
-        no_log: true
+        type: dict
+        default: {}
+        options:
+            validate_certs:
+                description:
+                    - Enable SSL verification
+                type: bool
+                default: true
+            ca_cert:
+                description:
+                    - Path to CA certificate file to verify SSL certificates
+                    - If provided, this CA certificate will be used instead of system CA certificates
+                type: path
+            client_cert:
+                description:
+                    - Path to client certificate file for mutual TLS authentication
+                    - Must be used together with client_key
+                type: path
+            client_key:
+                description:
+                    - Path to client key file for mutual TLS authentication
+                    - Required if client_cert is provided
+                    - File permissions should be restricted (e.g., 600)
+                type: path
         version_added: "2.10.0"
 
 requirements:
@@ -124,14 +123,16 @@ EXAMPLES = r'''
     password: "{{ admin_password }}"
     token_duration: "1h"
 
-# Generate token with custom CA certificate
-- name: Get token with custom CA
+# Generate token with custom SSL configuration
+- name: Get token with SSL config
   auth:
     auth_url: "https://px-backup-auth.example.com"
     client_id: "px-backup"
     username: "admin"
     password: "{{ admin_password }}"
-    ca_cert: "/etc/ssl/certs/custom-ca.pem"
+    ssl_config:
+      validate_certs: false
+      ca_cert: "/etc/ssl/certs/custom-ca.pem"
 
 # Generate token with mutual TLS authentication
 - name: Get token with client certificates
@@ -140,10 +141,12 @@ EXAMPLES = r'''
     client_id: "px-backup"
     username: "admin"
     password: "{{ admin_password }}"
-    ca_cert: "/etc/ssl/certs/custom-ca.pem"
-    client_cert: "/etc/ssl/certs/client.pem"
-    client_key: "/etc/ssl/private/client.key"
-    
+    ssl_config:
+      validate_certs: true
+      ca_cert: "/etc/ssl/certs/custom-ca.pem"
+      client_cert: "/etc/ssl/certs/client.pem"
+      client_key: "/etc/ssl/private/client.key"
+
 # Generate and store token for later use
 - name: Get and store token
   auth:
@@ -151,9 +154,7 @@ EXAMPLES = r'''
     client_id: "{{ px_backup_client_id }}"
     username: "{{ px_backup_username }}"
     password: "{{ px_backup_password }}"
-    ca_cert: "{{ px_backup_ca_cert | default(omit) }}"
-    client_cert: "{{ px_backup_client_cert | default(omit) }}"
-    client_key: "{{ px_backup_client_key | default(omit) }}"
+    ssl_config: "{{ ssl_config.pxcentral | default({}) }}"
   register: auth_result
 
 - name: Use generated token
@@ -181,16 +182,16 @@ changed:
 from ansible.module_utils.basic import AnsibleModule
 import requests
 
-def request_bearer_token(auth_url, grant_type, client_id, username, password, 
-                        token_duration, verify_ssl, ca_cert=None, client_cert=None, client_key=None):
+def request_bearer_token(auth_url, grant_type, client_id, username, password,
+                        token_duration, ssl_config=None):
     """Send request to retrieve the bearer token."""
     headers = {'Content-Type': 'application/x-www-form-urlencoded'}
 
     # Add protocol if not present
     if not auth_url.startswith(('http://', 'https://')):
-        auth_url = f"http://{auth_url}" 
+        auth_url = f"http://{auth_url}"
     url = f"{auth_url}/auth/realms/master/protocol/openid-connect/token"
-    
+
     data = {
         'grant_type': grant_type,
         'client_id': client_id,
@@ -198,7 +199,16 @@ def request_bearer_token(auth_url, grant_type, client_id, username, password,
         'password': password,
         'token-duration': token_duration
     }
-    
+
+    # Extract SSL configuration with defaults
+    if ssl_config is None:
+        ssl_config = {}
+
+    verify_ssl = ssl_config.get('validate_certs', True)
+    ca_cert = ssl_config.get('ca_cert')
+    client_cert = ssl_config.get('client_cert')
+    client_key = ssl_config.get('client_key')
+
     # Determine certificate verification
     # certificate verification logic
     if not verify_ssl:
@@ -247,10 +257,17 @@ def run_module():
         username=dict(type='str', required=True, no_log=False),
         password=dict(type='str', required=True, no_log=False),
         token_duration=dict(type='str', required=False, default="7d"),
-        verify_ssl=dict(type='bool', required=False, default=True),
-        ca_cert=dict(type='path'),
-        client_cert=dict(type='path'),
-        client_key=dict(type='path', no_log=False), 
+        ssl_config=dict(
+            type='dict',
+            required=False,
+            default={},
+            options=dict(
+                validate_certs=dict(type='bool', default=True),
+                ca_cert=dict(type='path'),
+                client_cert=dict(type='path'),
+                client_key=dict(type='path', no_log=False)
+            )
+        ),
     )
 
     result = dict(
@@ -261,12 +278,8 @@ def run_module():
 
     # Initialize the module
     module = AnsibleModule(
-        argument_spec=module_args, 
-        supports_check_mode=False,
-        # Add mutual exclusion or dependencies if needed
-        required_together=[
-            ['client_cert', 'client_key']  # If client_cert is provided, client_key must also be provided
-        ]
+        argument_spec=module_args,
+        supports_check_mode=False
     )
 
     # Collect input arguments
@@ -276,33 +289,34 @@ def run_module():
     username = module.params['username']
     password = module.params['password']
     token_duration = module.params['token_duration']
-    verify_ssl = module.params['verify_ssl']
-    ca_cert = module.params.get('ca_cert')
-    client_cert = module.params.get('client_cert')
-    client_key = module.params.get('client_key')
+    ssl_config = module.params.get('ssl_config', {})
 
-    # Validate certificate files exist if provided
-    for cert_param, cert_path in [('ca_cert', ca_cert), ('client_cert', client_cert), ('client_key', client_key)]:
+    # Validate certificate files exist if provided in ssl_config
+    import os
+    for cert_param in ['ca_cert', 'client_cert', 'client_key']:
+        cert_path = ssl_config.get(cert_param)
         if cert_path:
-            import os
             if not os.path.exists(cert_path):
-                module.fail_json(msg=f"{cert_param} file not found: {cert_path}")
+                module.fail_json(msg=f"ssl_config.{cert_param} file not found: {cert_path}")
             if not os.access(cert_path, os.R_OK):
-                module.fail_json(msg=f"{cert_param} file not readable: {cert_path}")
+                module.fail_json(msg=f"ssl_config.{cert_param} file not readable: {cert_path}")
+
+    # Validate that if client_cert is provided, client_key must also be provided
+    if ssl_config.get('client_cert') and not ssl_config.get('client_key'):
+        module.fail_json(msg="ssl_config.client_key is required when ssl_config.client_cert is provided")
+    if ssl_config.get('client_key') and not ssl_config.get('client_cert'):
+        module.fail_json(msg="ssl_config.client_cert is required when ssl_config.client_key is provided")
 
     try:
         # Make the API request to get the token with certificate support
         token_response = request_bearer_token(
-            auth_url, 
-            grant_type, 
-            client_id, 
-            username, 
-            password, 
-            token_duration, 
-            verify_ssl,
-            ca_cert,
-            client_cert,
-            client_key
+            auth_url,
+            grant_type,
+            client_id,
+            username,
+            password,
+            token_duration,
+            ssl_config
         )
         
         # Extract the access token from the response

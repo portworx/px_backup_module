@@ -34,10 +34,7 @@
             org_id: "{{ org_id | default('default') }}"
             include_secrets: "{{ item.include_secrets | default('false') }}"
             # SSL Certificate Parameters
-            validate_certs: "{{ px_backup_validate_certs | default(true) }}"
-            ca_cert: "{{ px_backup_ca_cert | default(omit) }}"
-            client_cert: "{{ px_backup_client_cert | default(omit) }}"
-            client_key: "{{ px_backup_client_key | default(omit) }}"
+            ssl_config: "{{ ssl_config.px_backup | default({}) }}"
           register: current_configs
           loop: "{{ backup_locations_update }}"
           loop_control:
@@ -71,10 +68,7 @@
             azure_config: "{{ item.azure_config | default(omit) }}"
             nfs_config: "{{ item.nfs_config | default(omit) }}"
             # SSL Certificate Parameters
-            validate_certs: "{{ px_backup_validate_certs | default(true) }}"
-            ca_cert: "{{ px_backup_ca_cert | default(omit) }}"
-            client_cert: "{{ px_backup_client_cert | default(omit) }}"
-            client_key: "{{ px_backup_client_key | default(omit) }}"
+            ssl_config: "{{ ssl_config.px_backup | default({}) }}"
           register: update_result
           loop: "{{ backup_locations_update }}"
           loop_control:
@@ -98,10 +92,7 @@
         name: "{{ item.name }}"
         uid: "{{ item.uid }}"
         # SSL Certificate Parameters
-        validate_certs: "{{ px_backup_validate_certs | default(true) }}"
-        ca_cert: "{{ px_backup_ca_cert | default(omit) }}"
-        client_cert: "{{ px_backup_client_cert | default(omit) }}"
-        client_key: "{{ px_backup_client_key | default(omit) }}"
+        ssl_config: "{{ ssl_config.px_backup | default({}) }}"
       register: final_validation
       loop: "{{ backup_locations_update }}"
       loop_control:
