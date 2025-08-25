@@ -42,10 +42,7 @@
             nfs_servers: "{{ nfs_servers_list }}"
             labels: "{{ nfs_vro_labels }}"
             # SSL Certificate Parameters
-            validate_certs: "{{ px_backup_validate_certs | default(true) }}"
-            ca_cert: "{{ px_backup_ca_cert | default(omit) }}"
-            client_cert: "{{ px_backup_client_cert | default(omit) }}"
-            client_key: "{{ px_backup_client_key | default(omit) }}"
+            ssl_config: "{{ ssl_config.px_backup | default({}) }}"
           register: vro_policy_result
 
       rescue:
@@ -147,10 +144,7 @@
             cluster_scope: "{{ item.cluster_scope | default(omit) }}"
             labels: "{{ item.labels | default(omit) }}"
             # SSL Certificate Parameters
-            validate_certs: "{{ px_backup_validate_certs | default(true) }}"
-            ca_cert: "{{ px_backup_ca_cert | default(omit) }}"
-            client_cert: "{{ px_backup_client_cert | default(omit) }}"
-            client_key: "{{ px_backup_client_key | default(omit) }}"
+            ssl_config: "{{ ssl_config.px_backup | default({}) }}"
           register: schedule_update_result
           loop: "{{ backup_schedules_to_update }}"
           loop_control:

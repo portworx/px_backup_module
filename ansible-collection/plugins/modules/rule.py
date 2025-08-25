@@ -80,22 +80,38 @@ options:
         description: Labels to attach to the rule
         required: false
         type: dict
-    validate_certs:
-        description: Verify SSL certificates
-        type: bool
-        default: true
-    ca_cert:
-        description: Path to CA certificate file for SSL verification
+    ssl_config:
+        description:
+            - SSL configuration dictionary containing certificate settings
+            - Contains validate_certs, ca_cert, client_cert, and client_key options
+            - If not provided, defaults to standard SSL verification
         required: false
-        type: path
-    client_cert:
-        description: Path to client certificate file for mutual TLS
-        required: false
-        type: path
-    client_key:
-        description: Path to client private key file
-        required: false
-        type: path
+        type: dict
+        default: {}
+        options:
+            validate_certs:
+                description:
+                    - Verify SSL certificates
+                    - Can be set to false for self-signed certificates
+                type: bool
+                default: true
+            ca_cert:
+                description:
+                    - Path to CA certificate file for SSL verification
+                    - If provided, this CA certificate will be used instead of system CA certificates
+                type: path
+            client_cert:
+                description:
+                    - Path to client certificate file for mutual TLS authentication
+                    - Must be used together with client_key
+                type: path
+            client_key:
+                description:
+                    - Path to client private key file for mutual TLS authentication
+                    - Required if client_cert is provided
+                    - File permissions should be restricted (e.g., 600)
+                type: path
+        version_added: "2.10.0"
     rules:
         description: 
             - List of rules to apply
@@ -547,10 +563,17 @@ def run_module():
             )
         ),
         # SSL cert implementation
-        validate_certs=dict(type='bool', default=True),
-        ca_cert=dict(type='path', required=False, default=None),
-        client_cert=dict(type='path', required=False, default=None),
-        client_key=dict(type='path', required=False, default=None, no_log=True),
+        ssl_config=dict(
+            type='dict',
+            required=False,
+            default={},
+            options=dict(
+                validate_certs=dict(type='bool', default=True),
+                ca_cert=dict(type='path'),
+                client_cert=dict(type='path'),
+                client_key=dict(type='path', no_log=False)
+            )
+        ),
     )
 
     result = dict(
@@ -572,10 +595,7 @@ def run_module():
 
     module = AnsibleModule(
         argument_spec=module_args,
-        supports_check_mode=True,
-        required_together=[
-            ['client_cert', 'client_key']
-        ]
+        supports_check_mode=True
     )
 
     try:
@@ -586,14 +606,33 @@ def run_module():
         if module.check_mode:
             module.exit_json(**result)
 
+        # Get SSL configuration
+        ssl_config = module.params.get('ssl_config', {})
+
+        # Validate certificate files exist if provided in ssl_config
+        import os
+        for cert_param in ['ca_cert', 'client_cert', 'client_key']:
+            cert_path = ssl_config.get(cert_param)
+            if cert_path:
+                if not os.path.exists(cert_path):
+                    module.fail_json(msg=f"ssl_config.{cert_param} file not found: {cert_path}")
+                if not os.access(cert_path, os.R_OK):
+                    module.fail_json(msg=f"ssl_config.{cert_param} file not readable: {cert_path}")
+
+        # Validate that if client_cert is provided, client_key must also be provided
+        if ssl_config.get('client_cert') and not ssl_config.get('client_key'):
+            module.fail_json(msg="ssl_config.client_key is required when ssl_config.client_cert is provided")
+        if ssl_config.get('client_key') and not ssl_config.get('client_cert'):
+            module.fail_json(msg="ssl_config.client_cert is required when ssl_config.client_key is provided")
+
         # Initialize client
         client = PXBackupClient(
             api_url=module.params['api_url'],
             token=module.params['token'],
-            validate_certs=module.params['validate_certs'],
-            ca_cert=module.params.get('ca_cert'),
-            client_cert=module.params.get('client_cert'),
-            client_key=module.params.get('client_key')
+            validate_certs=ssl_config.get('validate_certs', True),
+            ca_cert=ssl_config.get('ca_cert'),
+            client_cert=ssl_config.get('client_cert'),
+            client_key=ssl_config.get('client_key')
         )
 
         # Perform operation

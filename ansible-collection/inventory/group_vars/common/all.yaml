@@ -9,22 +9,23 @@ pxcentral_username: "username"
 pxcentral_password: "password"
 token_duration: "365d"
 
-# SSL Certificate Configuration (optional)
-# 1. API SSL
-# Uncomment and set these if you need custom SSL certificates for PX-Backup API
-px_backup_validate_certs: true                    # Enable/disable SSL certificate validation
-# px_backup_ca_cert: "{{ playbook_dir | dirname | dirname }}/path/to/ca-cert.pem"         # Custom CA certificate file
-# px_backup_client_cert: "{{ playbook_dir | dirname | dirname }}/path/to/client-cert.pem" # Client certificate for mutual TLS
-# px_backup_client_key: "{{ playbook_dir | dirname | dirname }}/path/to/client-key.pem"   # Client private key for mutual TLS
-
-# 2. AUTH SSL
-# SSL Certificate Configuration for PXCentral Auth (optional)
-# Use these if PXCentral auth server requires custom SSL certificates
-pxcentral_validate_certs: true
-# pxcentral_ca_cert: "{{ playbook_dir | dirname | dirname }}/path/to/pxcentral-ca-cert.pem"
-# pxcentral_client_cert: "{{ playbook_dir | dirname | dirname }}/path/to/pxcentral-client-cert.pem"
-# pxcentral_client_key: "{{ playbook_dir | dirname | dirname }}/path/to/pxcentral-client-key.pem"
-
+# SSL Certificate Configuration
+ssl_config:
+  # SSL Certificate Configuration (optional)
+  # Uncomment and set these if you need custom SSL certificates for PX-Backup API
+  px_backup:
+    validate_certs: true                    # Enable/disable SSL certificate validation
+    ca_cert: "{{ playbook_dir | dirname | dirname }}/certs/ca-cert.pem"         # Custom CA certificate file
+    # client_cert: "/path/to/client-cert.pem" # Client certificate for mutual TLS
+    # client_key: "/path/to/client-key.pem"   # Client private key for mutual TLS
+  
+  # SSL Certificate Configuration for PXCentral Auth (optional)
+  # Use these if PXCentral auth server requires custom SSL certificates
+  px_central:
+    validate_certs: true
+    ca_cert: "{{ playbook_dir | dirname | dirname }}/certs/ca-cert.pem"         # Custom CA certificate file
+    # client_cert: "/path/to/pxcentral-client-cert.pem"
+    # client_key: "/path/to/pxcentral-client-key.pem"
 
 # Output configuration
 output_config:
