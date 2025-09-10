@@ -24,7 +24,7 @@ import os
 os.environ['PYTHONUNBUFFERED'] = '1'
 
 from ansible.module_utils.basic import AnsibleModule
-from ansible_collections.purepx.px_backup.plugins.module_utils.px_backup.api import PXBackupClient
+from ansible.module_utils.px_backup.api import PXBackupClient
 import requests
 import sys
 

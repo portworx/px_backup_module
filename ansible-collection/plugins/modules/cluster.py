@@ -23,7 +23,7 @@ import logging
 from dataclasses import dataclass
 
 from ansible.module_utils.basic import AnsibleModule
-from ansible_collections.purepx.px_backup.plugins.module_utils.px_backup.api import PXBackupClient
+from ansible.module_utils.px_backup.api import PXBackupClient
 import requests
 import base64
 
