@@ -1,8 +1,7 @@
 ---
 # Policies to update
 schedule_policy_ownership_updates:
-  - name: "test-policy-1"
-    uid: "test-policy-1-uid"
+  - name: "test-policy-2"
     ownership:
       owner: "owner-name"
       groups:

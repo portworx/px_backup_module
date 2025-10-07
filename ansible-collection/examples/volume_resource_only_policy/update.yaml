@@ -31,7 +31,7 @@
             token: "{{ px_backup_token }}"
             org_id: "{{ org_id }}"
             name: "{{ item.name }}"
-            uid: "{{ item.uid }}"
+            uid: "{{ item.uid | default(omit) }}"
             # Optional update parameters
             volume_types: "{{ item.volume_types | default(omit) }}"
             csi_drivers: "{{ item.csi_drivers | default(omit) }}"
@@ -53,7 +53,7 @@
             token: "{{ px_backup_token }}"
             org_id: "{{ org_id }}"
             name: "{{ item.name }}"
-            uid: "{{ item.uid }}"
+            uid: "{{ item.uid | default(omit) }}"
             ownership: "{{ item.ownership }}"
             # SSL Certificate Parameters
             ssl_config: "{{ ssl_config.px_backup | default({}) }}"

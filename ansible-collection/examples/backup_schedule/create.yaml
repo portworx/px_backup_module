@@ -35,7 +35,7 @@
             backup_type: "{{ item.backup_type }}"
             ns_label_selectors: "{{ item.ns_label_selectors | default(omit) }}"
             cluster_ref: "{{ item.cluster_ref }}"
-            backup_object_type: "{{ item.backup_object_type }}"
+            backup_object_type: "{{ item.backup_object_type | default(omit) }}"
             skip_vm_auto_exec_rules: "{{ item.skip_vm_auto_exec_rules | default(omit) }}"
             volume_snapshot_class_mapping: "{{ item.volume_snapshot_class_mapping | default(omit) }}"
             direct_kdmp: "{{ item.direct_kdmp | default(omit) }}"

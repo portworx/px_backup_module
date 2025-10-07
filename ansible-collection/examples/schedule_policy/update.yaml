@@ -28,7 +28,7 @@
             token: "{{ px_backup_token }}"
             org_id: "{{ org_id }}"
             name: "{{ item.name }}"
-            uid: "{{ item.uid }}"
+            uid: "{{ item.uid | default(omit) }}"
             schedule_policy: "{{ item.schedule_policy }}"
             # Optional update parameters
             labels: "{{ item.labels | default(omit) }}"

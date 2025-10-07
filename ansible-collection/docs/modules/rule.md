@@ -20,13 +20,13 @@ The rule module manages rules in PX-Backup, enabling management of pre-exec and 
 The module supports the following operations:
 
 
-| Operation        | Description                          |
-| ------------------ | -------------------------------------- |
-| CREATE           | Create a new rule        |
-| UPDATE           | Modify existing rule     |
-| DELETE           | Remove a rule            |
+| Operation        | Description                    |
+| ------------------ | -------------------------------- |
+| CREATE           | Create a new rule              |
+| UPDATE           | Modify existing rule           |
+| DELETE           | Remove a rule                  |
 | INSPECT_ONE      | Get details of a specific rule |
-| INSPECT_ALL      | List all rules           |
+| INSPECT_ALL      | List all rules                 |
 | UPDATE_OWNERSHIP | Update rule ownership settings |
 
 ## Parameters
@@ -34,18 +34,18 @@ The module supports the following operations:
 ### Common Parameters
 
 
-| Parameter       | Type       | Required | Default | Description                                    | Choices                                    |
-| ----------------- | ------------ | ---------- | --------- | ------------------------------------------------ | -------------------------------------------- |
-| api_url         | string     | yes      |         | PX-Backup API URL                              |                                            |
-| token           | string     | yes      |         | Authentication token                           |                                            |
-| operation       | string     | yes      | CREATE  | Operation to perform                           |                                            |
-| name            | string     | varies   |         | Name of the rule                               |                                            |
-| org_id          | string     | yes      |         | Organization ID                                |                                            |
-| uid             | string     | varies   |         | Unique identifier (required for update/delete) |                                            |
-| owner           | string     | no       |         | Owner name                                     |                                            |
-| rules           | list       | varies   |         | List of rules                                  |                                            |
-| labels          | dictionary | no       |         | Label for the rule                             |                                            |
-| validate_certs  | boolean    | no       | `true`  | Whether to validate SSL certificates           |                                            |
+| Parameter      | Type       | Required | Default | Description                          | Choices |
+| ---------------- | ------------ | ---------- | --------- | -------------------------------------- | --------- |
+| api_url        | string     | yes      |         | PX-Backup API URL                    |         |
+| token          | string     | yes      |         | Authentication token                 |         |
+| operation      | string     | yes      | CREATE  | Operation to perform                 |         |
+| name           | string     | varies   |         | Name of the rule                     |         |
+| org_id         | string     | yes      |         | Organization ID                      |         |
+| uid            | string     | varies   |         | Unique identifier                    |         |
+| owner          | string     | no       |         | Owner name                           |         |
+| rules          | list       | varies   |         | List of rules                        |         |
+| labels         | dictionary | no       |         | Label for the rule                   |         |
+| validate_certs | boolean    | no       | `true`  | Whether to validate SSL certificates |         |
 
 ### SSL/TLS Configuration
 
@@ -62,7 +62,7 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 
 | Parameter                        | Type   | Required | Choices          | Description               |
 | ---------------------------------- | -------- | ---------- | ------------------ | --------------------------- |
-| ownership.owner                  | string | no       |                  | Owner of the rule   |
+| ownership.owner                  | string | no       |                  | Owner of the rule         |
 | ownership.groups[].id            | string | yes      |                  | Group identifier          |
 | ownership.groups[].access        | string | yes      | Read/Write/Admin | Group access level        |
 | ownership.collaborators[].id     | string | yes      |                  | Collaborator identifier   |
@@ -72,13 +72,13 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 ### Rules Parameters
 
 
-| Parameter                        | Type   | Required | Choices          | Description               |
-| ---------------------------------- | -------- | ---------- | ------------------ | --------------------------- |
-| rules.pod_selector                   | dictionary | yes     |                  | Identify target pods   |
-| rules.actions[].background           | string     | no      | true/false       | Indicates if the action runs in the background          |
-| rules.actions[].run_in_single_pod    | string     | no      | true/false       | Indicates if the action is limited to a single pod        |
-| rules.actions[].value                | string     | yes     |                  | Action to perform   |
-| rules.container                      | string     | no      |                  | Container name where the action is applied|
+| Parameter                         | Type       | Required | Choices    | Description                                        |
+| ----------------------------------- | ------------ | ---------- | ------------ | ---------------------------------------------------- |
+| rules.pod_selector                | dictionary | yes      |            | Identify target pods                               |
+| rules.actions[].background        | string     | no       | true/false | Indicates if the action runs in the background     |
+| rules.actions[].run_in_single_pod | string     | no       | true/false | Indicates if the action is limited to a single pod |
+| rules.actions[].value             | string     | yes      |            | Action to perform                                  |
+| rules.container                   | string     | no       |            | Container name where the action is applied         |
 
 ## Error Handling
 
@@ -104,7 +104,6 @@ The module implements comprehensive error handling:
    - Token security
    - SSL certificate validation
    - Secret key protection
-
 2. **Best Practices**
 
    - Regular credential rotation
@@ -112,7 +111,7 @@ The module implements comprehensive error handling:
    - Access control review
    - Audit logging
    - Encryption at rest
-4. **Limitations**
+3. **Limitations**
 
    - Permission boundaries
    - Update constraints

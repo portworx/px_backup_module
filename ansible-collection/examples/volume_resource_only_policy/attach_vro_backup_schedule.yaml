@@ -102,7 +102,7 @@
       set_fact:
         vro_policy_ref:
           name: "{{ policy_to_use.metadata.name }}"
-          uid: "{{ policy_to_use.metadata.uid }}"
+          uid: "{{ policy_to_use.metadata.uid | default(omit) }}"
       vars:
         policy_to_use: >-
           {{
@@ -148,7 +148,7 @@
           register: schedule_update_result
           loop: "{{ backup_schedules_to_update }}"
           loop_control:
-            label: "{{ item.name | default(item.uid) }}"
+            label: "{{ item.name }}"
 
         - name: Extract update results
           set_fact:
@@ -160,7 +160,7 @@
           debug:
             msg:
               - "=== BACKUP SCHEDULE UPDATE FAILED ==="
-              - "Failed schedule: {{ item.item.name | default(item.item.uid) }}"
+              - "Failed schedule: {{ item.item.name }}"
               - "Error: {{ item.msg }}"
           loop: "{{ failed_updates | default([]) }}"
           when: failed_updates is defined and failed_updates | length > 0
@@ -173,13 +173,13 @@
       debug:
         msg:
           - "=== BACKUP SCHEDULE UPDATE SUCCESS ==="
-          - "Schedule: {{ item.item.name | default(item.item.uid) }}"
-          - "VRO Policy Applied: {{ vro_policy_ref.name }} ({{ vro_policy_ref.uid }})"
+          - "Schedule: {{ item.item.name }}"
+          - "VRO Policy Applied: {{ vro_policy_ref.name }} }})"
           - "Update Status: Success"
           - "---"
       loop: "{{ successful_updates }}"
       loop_control:
-        label: "{{ item.item.name | default(item.item.uid) }}"
+        label: "{{ item.item.name }}"
       when: 
         - successful_updates is defined 
         - successful_updates | length > 0
@@ -191,7 +191,6 @@
           - ""
           - "Volume Resource Only Policy:"
           - "  Name: {{ vro_policy_ref.name }}"
-          - "  UID: {{ vro_policy_ref.uid }}"
           - "  Volume Type: NFS"
           - "  NFS Servers: {{ nfs_servers_list | join(', ') }}"
           - ""

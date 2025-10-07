@@ -2,7 +2,6 @@
 # Clusters to update
 backup_share_updates:
   - name: "px-source"
-    uid: "ba2a7fb9-9290-471b-a10e-2849439003b3"
     add_backup_share:
       groups:
         - id: "group1"

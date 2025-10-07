@@ -13,7 +13,6 @@
         that:
           - px_backup_api_url is defined
           - recipient_name is defined
-          - recipient_uid is defined
         fail_msg: "Required variables must be defined"
 
   tasks:
@@ -29,7 +28,7 @@
             token: "{{ px_backup_token }}"
             org_id: "{{ org_id | default('default') }}"
             name: "{{ recipient_name }}"
-            uid: "{{ recipient_uid }}"
+            uid: "{{ recipient_uid  | default(omit) }}"
             # SSL Certificate Parameters
             ssl_config: "{{ ssl_config.px_backup | default({}) }}"
           register: recipient_info

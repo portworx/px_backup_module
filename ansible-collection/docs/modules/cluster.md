@@ -38,16 +38,16 @@ The module supports the following operations:
 ### Common Parameters
 
 
-| Parameter | Type       | Required | Default   | Description                                                                           |
-| ----------- | ------------ | ---------- | ----------- | --------------------------------------------------------------------------------------- |
-| api_url   | string     | yes      |           | PX-Backup API URL                                                                     |
-| token     | string     | yes      |           | Authentication token                                                                  |
-| name      | string     | yes      |           | Name of the cluster                                                                   |
-| org_id    | string     | yes      | `default` | Organization ID                                                                       |
-| operation | string     | yes      |           | Operation to perform                                                                  |
-| uid       | string     | varies   |           | Cluster unique identifier (required for all operations except CREATE and INSPECT_ALL) |
-| ownership | Dictionary | varies   |           | Ownership information                                                                 |
-| labels    | string     | no       |           | Label for the cluster                                                                 |
+| Parameter | Type       | Required | Default   | Description               |
+| ----------- | ------------ | ---------- | ----------- | --------------------------- |
+| api_url   | string     | yes      |           | PX-Backup API URL         |
+| token     | string     | yes      |           | Authentication token      |
+| name      | string     | yes      |           | Name of the cluster       |
+| org_id    | string     | yes      | `default` | Organization ID           |
+| operation | string     | yes      |           | Operation to perform      |
+| uid       | string     | varies   |           | Cluster unique identifier |
+| ownership | Dictionary | varies   |           | Ownership information     |
+| labels    | string     | no       |           | Label for the cluster     |
 
 ### SSL/TLS Configuration
 
@@ -95,7 +95,7 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 | Parameter                 | Type   | Required | Description                  |
 | --------------------------- | -------- | ---------- | ------------------------------ |
 | cloud_credential_ref.name | string | yes      | Name of the cloud credential |
-| cloud_credential_ref.uid  | string | yes      | UID of the cloud credential  |
+| cloud_credential_ref.uid  | string | no       | UID of the cloud credential  |
 
 #### platform_credential_ref
 
@@ -103,7 +103,7 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 | Parameter                    | Type   | Required | Description                     |
 | ------------------------------ | -------- | ---------- | --------------------------------- |
 | platform_credential_ref.name | string | yes      | Name of the platform credential |
-| platform_credential_ref.uid  | string | yes      | UID of the platform credential  |
+| platform_credential_ref.uid  | string | no       | UID of the platform credential  |
 
 #### px_config
 

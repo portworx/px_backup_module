@@ -77,7 +77,6 @@ options:
     uid:
         description: 
             - Unique identifier of the backup location
-            - Required for UPDATE, DELETE, VALIDATE, INSPECT_ONE, and UPDATE_OWNERSHIP operations
         required: false
         type: str
     location_type:
@@ -410,7 +409,9 @@ def update_backup_location(module: AnsibleModule, client: PXBackupClient) -> Tup
         # Build request using module.params
         params = dict(module.params)
         backup_location_request = build_backup_location_request(params)
-        backup_location_request['metadata']['uid'] = params['uid']
+
+        if params.get('uid'):
+            backup_location_request['metadata']['uid'] = params['uid']
         
         # Get current state for comparison
         current = inspect_backup_location(module, client)
@@ -434,7 +435,7 @@ def update_ownership(module, client):
         "org_id": module.params['org_id'],
         "name": module.params['name'],
         "ownership": module.params['ownership'],
-        "uid": module.params['uid']
+        "uid": module.params.get('uid', '')
     }
     
     try:
@@ -448,7 +449,7 @@ def validate_backup_location(module, client):
     validate_request = {
         "org_id": module.params['org_id'],
         "name": module.params['name'],
-        "uid": module.params['uid']
+        "uid": module.params.get('uid', '')
     }
     
     try:
@@ -465,11 +466,15 @@ def enumerate_backup_locations(module, client):
         'include_validation_state': True
     }
     
-    if module.params.get('cloud_credential_name') and module.params.get('cloud_credential_uid'):
-        params['cloud_credential_ref'] = {
-            'name': module.params['cloud_credential_name'],
-            'uid': module.params['cloud_credential_uid']
-        }
+    if module.params.get('cloud_credential_ref'):
+        cloud_cred_ref = {}
+        if module.params['cloud_credential_ref'].get('cloud_credential_name'):
+            cloud_cred_ref['name'] = module.params['cloud_credential_ref']['cloud_credential_name']
+        if module.params['cloud_credential_ref'].get('cloud_credential_uid'):
+            cloud_cred_ref['uid'] = module.params['cloud_credential_ref']['cloud_credential_uid']
+
+        if cloud_cred_ref:
+            params['cloud_credential_ref'] = cloud_cred_ref
     
     try:
         response = client.make_request('GET', f"v1/backuplocation/{module.params['org_id']}", params=params)
@@ -480,28 +485,40 @@ def enumerate_backup_locations(module, client):
 def inspect_backup_location(module, client):
     """Get details of a specific backup location"""
     params = {
-        'include_secrets': module.params.get('include_secrets', False)
+        'include_secrets': module.params.get('include_secrets', False),
+        'uid': module.params.get('uid', '')
     }
+
     
     try:
+        url = f"v1/backuplocation/{module.params['org_id']}/{module.params['name']}"
+        
         response = client.make_request(
-            'GET',
-            f"v1/backuplocation/{module.params['org_id']}/{module.params['name']}/{module.params['uid']}",
-            params=params
+            method='GET',
+            endpoint=url,
+            params=params  # uid passed as query parameter if provided
         )
-        return response
+        return response.get('backup_location', {})
+        
     except Exception as e:
         module.fail_json(msg=f"Failed to inspect backup location: {str(e)}")
 
 def delete_backup_location(module, client):
     """Delete a backup location"""
+    params = {
+        'uid': module.params.get('uid', '')
+    }
+    
     try:
+        url = f"v1/backuplocation/{module.params['org_id']}/{module.params['name']}"
+        
         response = client.make_request(
-            'DELETE',
-            f"v1/backuplocation/{module.params['org_id']}/{module.params['name']}/{module.params['uid']}",
-            params={}
+            method='DELETE',
+            endpoint=url,
+            params=params  # uid passed as query parameter if provided
         )
         return response, True
+        
     except Exception as e:
         module.fail_json(msg=f"Failed to delete backup location: {str(e)}")
 
@@ -537,12 +554,16 @@ def build_backup_location_request(params: Dict[str, Any]) -> Dict[str, Any]:
     if params.get('ownership'):
         request['metadata']['ownership'] = params['ownership']
 
-    # Construct cloud_credential_ref dynamically if the keys are provided
+    # Handle cloud credential reference
     if params.get('cloud_credential_ref'):
-        request['backup_location']['cloud_credential_ref'] = {
-            "name": params['cloud_credential_ref']['cloud_credential_name'],
-            "uid": params['cloud_credential_ref']['cloud_credential_uid']
-    }
+        cloud_cred_ref = {}
+        if params['cloud_credential_ref'].get('cloud_credential_name'):
+            cloud_cred_ref['name'] = params['cloud_credential_ref']['cloud_credential_name']
+        if params['cloud_credential_ref'].get('cloud_credential_uid'):
+            cloud_cred_ref['uid'] = params['cloud_credential_ref']['cloud_credential_uid']
+
+        if cloud_cred_ref:
+            request['backup_location']['cloud_credential_ref'] = cloud_cred_ref
 
     # Add location-specific configuration based on type
     location_type = params.get('location_type')
@@ -732,7 +753,7 @@ def run_module():
             required=False,
             options=dict(
                 cloud_credential_name=dict(type='str', required=True),
-                cloud_credential_uid=dict(type='str', required=True)
+                cloud_credential_uid=dict(type='str', required=False)
             )
         ),
         
@@ -821,12 +842,12 @@ def run_module():
     # Define required parameters for each operation
     operation_requirements = {
         'CREATE': ['name', 'location_type', 'path'],
-        'UPDATE': ['name', 'uid', 'location_type', 'path'],
-        'DELETE': ['name', 'uid'],
-        'VALIDATE': ['name', 'uid'],
-        'INSPECT_ONE': ['name', 'uid'],
+        'UPDATE': ['name', 'location_type', 'path'],
+        'DELETE': ['name'],
+        'VALIDATE': ['name'],
+        'INSPECT_ONE': ['name'],
         'INSPECT_ALL': ['org_id'],
-        'UPDATE_OWNERSHIP': ['name', 'uid', 'ownership']
+        'UPDATE_OWNERSHIP': ['name', 'ownership']
     }
 
     module = AnsibleModule(

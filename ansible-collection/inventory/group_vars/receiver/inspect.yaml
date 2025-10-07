@@ -1,7 +1,6 @@
 ---
 # Receiver details for inspection
 receiver_name: "generic_receiver"  # Name of the receiver to inspect
-receiver_uid: "00000000-0000-0000-0000-000000000000"  # UID of the receiver to inspect
 
 # Optional parameters
 include_secrets: false  # Set to true to include sensitive information

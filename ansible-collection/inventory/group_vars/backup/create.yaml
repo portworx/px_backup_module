@@ -5,10 +5,8 @@ backups:
   - name: "app-backup"
     backup_location_ref:
       name: "s3-backup"
-      uid: "backup-loc-123"
     cluster_ref:
       name: "prod-cluster"
-      uid: "cluster-456"
     namespaces: 
       - "app1"
       - "app2"
@@ -24,16 +22,13 @@ backups:
     advanced_resource_label_selector: "env=prod"
     volume_resource_only_policy_ref:
       name: "volume-resource-only-policy"
-      uid: "volume-resource-only-policy-uid"
 
   # Example backup 2: VM backup
   - name: "vm-backup"
     backup_location_ref:
       name: "azure-backup"
-      uid: "backup-loc-789"
     cluster_ref:
       name: "vm-cluster"
-      uid: "cluster-012"
     backup_type: "Normal"
     backup_object_type:
       type: "VirtualMachine"
@@ -45,19 +40,15 @@ backups:
   - name: "ns-backup"
     backup_location_ref:
       name: "gcp-backup"
-      uid: "backup-loc-345"
     cluster_ref:
       name: "staging-cluster"
-      uid: "cluster-678"
     namespaces:
       - "staging"
     ns_label_selectors: "environment=staging"
     pre_exec_rule_ref:
       name: "pre-backup-rule"
-      uid: "rule-123"
     post_exec_rule_ref:
       name: "post-backup-rule"
-      uid: "rule-456"
     backup_type: "Normal"
 
     advanced_resource_label_selector: "env=prod"

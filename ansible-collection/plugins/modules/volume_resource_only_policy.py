@@ -88,7 +88,6 @@ options:
     uid:
         description:
             - Unique identifier of the volume resource only policy
-            - Required for UPDATE, DELETE, INSPECT_ONE, and UPDATE_OWNERSHIP operations
         required: false
         type: str
     volume_types:
@@ -227,11 +226,11 @@ requirements:
 notes:
     - "Operation-specific required parameters:"
     - "CREATE: name, org_id"
-    - "UPDATE: name, uid, org_id"
-    - "DELETE: name, uid, org_id"
-    - "INSPECT_ONE: name, uid, org_id"
+    - "UPDATE: name, org_id"
+    - "DELETE: name, org_id"
+    - "INSPECT_ONE: name, org_id"
     - "INSPECT_ALL: org_id"
-    - "UPDATE_OWNERSHIP: name, uid, org_id, ownership"
+    - "UPDATE_OWNERSHIP: name, org_id, ownership"
 '''
 
 EXAMPLES = r'''
@@ -506,7 +505,7 @@ def update_ownership(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dic
         "org_id": module.params['org_id'],
         "name": module.params['name'],
         "ownership": module.params['ownership'],
-        "uid": module.params['uid']
+        "uid": module.params.get('uid', '')
     }
     
     try:
@@ -566,7 +565,7 @@ def inspect_volume_resource_only_policy(module: AnsibleModule, client: PXBackupC
     try:
         response = client.make_request(
             'GET',
-            f"v1/volumeresourceonlypolicy/{module.params['org_id']}/{module.params['name']}/{module.params['uid']}"
+            f"v1/volumeresourceonlypolicy/{module.params['org_id']}/{module.params['name']}"
         )
         return response
     except Exception as e:
@@ -577,7 +576,7 @@ def delete_volume_resource_only_policy(module: AnsibleModule, client: PXBackupCl
     try:
         response = client.make_request(
             'DELETE',
-            f"v1/volumeresourceonlypolicy/{module.params['org_id']}/{module.params['name']}/{module.params['uid']}"
+            f"v1/volumeresourceonlypolicy/{module.params['org_id']}/{module.params['name']}"
         )
         return response, True
     except Exception as e:
@@ -807,11 +806,11 @@ def run_module():
     # Define required parameters for each operation
     operation_requirements = {
         'CREATE': ['name'],
-        'UPDATE': ['name', 'uid'],
-        'DELETE': ['name', 'uid'],
-        'INSPECT_ONE': ['name', 'uid'],
+        'UPDATE': ['name'],
+        'DELETE': ['name'],
+        'INSPECT_ONE': ['name'],
         'INSPECT_ALL': ['org_id'],
-        'UPDATE_OWNERSHIP': ['name', 'uid', 'ownership']
+        'UPDATE_OWNERSHIP': ['name', 'ownership']
     }
 
     module = AnsibleModule(

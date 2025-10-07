@@ -1,7 +1,6 @@
 ---
 # Optional filter parameters
 cluster_name_filter: "px-source"  # Filter backups by cluster name
-cluster_uid_filter: "e73b9a4b-e64e-4873-8257-61186a868c3e"
 name_filter: ""         # Filter backups by backup name
 labels: {}             # Filter by labels
   # environment: prod    # Example label filter

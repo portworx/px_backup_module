@@ -79,7 +79,6 @@ options:
     uid:
         description: 
             - Unique identifier of the cluster
-            - Required for UPDATE, DELETE, INSPECT_ONE operations
         required: false
         type: str
     px_config:
@@ -271,13 +270,13 @@ requirements:
 notes:
     - "Operation-specific required parameters:"
     - "CREATE: name, org_id, (kubeconfig or teleport configuration)"
-    - "UPDATE: name, uid, org_id"
+    - "UPDATE: name, org_id"
     - "DELETE: name, org_id"
-    - "INSPECT_ONE: name, uid, org_id"
+    - "INSPECT_ONE: name, org_id"
     - "INSPECT_ALL: org_id"
-    - "UPDATE_BACKUP_SHARE: name, uid, org_id, backup_share"
-    - "SHARE_CLUSTER: name, uid, org_id, cluster_share"
-    - "UNSHARE_CLUSTER: name, uid, org_id, cluster_share"
+    - "UPDATE_BACKUP_SHARE: name, org_id, backup_share"
+    - "SHARE_CLUSTER: name, org_id, cluster_share"
+    - "UNSHARE_CLUSTER: name, org_id, cluster_share"
 '''
 
 # Configure logging
@@ -370,7 +369,8 @@ def update_cluster(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict[
     try:
         params = dict(module.params)
         cluster_request = build_cluster_request(params)
-        cluster_request['metadata']['uid'] = params['uid']
+        if params.get('uid'):
+            cluster_request['metadata']['uid'] = params['uid']
         
         current = inspect_cluster(module, client)
         if not needs_update(current, cluster_request):
@@ -399,9 +399,11 @@ def update_backup_share(module: AnsibleModule, client: PXBackupClient) -> Tuple[
         
         request = {
             "org_id": module.params['org_id'],
-            "name": module.params['name'],
-            "uid": module.params['uid'],
+            "name": module.params['name']
         }
+
+        if module.params.get('uid'):
+            request['uid'] = module.params['uid']
 
         # Helper function to map access types
         def map_access_type(items):
@@ -458,7 +460,7 @@ def share_cluster(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict[s
             "org_id": module.params['org_id'],
             "cluster_ref": {
                 "name": module.params['name'],
-                "uid": module.params['uid']
+                "uid": module.params.get('uid','')
             },
             "users": share_config.get('users', []),
             "groups": share_config.get('groups', []),
@@ -483,7 +485,7 @@ def unshare_cluster(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict
             "org_id": module.params['org_id'],
             "cluster_ref": {
                 "name": module.params['name'],
-                "uid": module.params['uid']
+                "uid": module.params.get('uid','')
             },
             "users": share_config.get('users', []),
             "groups": share_config.get('groups', [])
@@ -523,16 +525,17 @@ def inspect_cluster(module: AnsibleModule, client: PXBackupClient) -> Dict[str, 
     """Get details of a specific cluster"""
     try:
         params = {
-            'include_secrets': module.params.get('include_secrets', False)
+            'include_secrets': module.params.get('include_secrets', False),
+            'uid': module.params.get('uid', '')
         }
-        
+
         response = client.make_request(
             method='GET',
-            endpoint=f"v1/cluster/{module.params['org_id']}/{module.params['name']}/{module.params['uid']}",
+            endpoint=f"v1/cluster/{module.params['org_id']}/{module.params['name']}",
             params=params
         )
         return response
-        
+
     except Exception as e:
         module.fail_json(msg=f"Failed to inspect cluster: {str(e)}")
 
@@ -541,7 +544,7 @@ def delete_cluster(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict[
     try:
         params = {
             'delete_restores': module.params['delete_restores'],
-            'uid': module.params['uid'],
+            'uid': module.params.get('uid',''),
             'delete_all_cluster_backups': module.params['delete_all_cluster_backups']
         }
         
@@ -594,13 +597,13 @@ def build_cluster_request(params: Dict[str, Any]) -> Dict[str, Any]:
         if cloud_type in ['AWS', 'AZURE', 'GOOGLE', 'IBM'] and params.get('cloud_credential_ref'):
             request['cloud_credential_ref'] = {
                     'name': params['cloud_credential_ref'].get('name'),
-                    'uid': params['cloud_credential_ref'].get('uid')
+                    'uid': params['cloud_credential_ref'].get('uid', '')
                 }
     
     if params.get('platform_credential_ref'):
         request['platform_credential_ref'] = {   
             'name': params['platform_credential_ref'].get('name'),
-            'uid': params['platform_credential_ref'].get('uid')
+            'uid': params['platform_credential_ref'].get('uid','')
         }
     
     if params.get('service_token'):
@@ -793,7 +796,7 @@ def run_module():
             required=False,
             options=dict(
                 name=dict(type='str', required=True),
-                uid=dict(type='str', required=True)
+                uid=dict(type='str', required=False)
             )
         ),
         platform_credential_ref=dict(
@@ -801,7 +804,7 @@ def run_module():
             required=False,
             options=dict(
                 name=dict(type='str', required=True),
-                uid=dict(type='str', required=True)
+                uid=dict(type='str', required=False)
             )
         ),
         service_token=dict(type='str', required=False, no_log=True),
@@ -939,13 +942,13 @@ def run_module():
     # Define required parameters for each operation
     operation_requirements = {
         'CREATE': ['name', 'org_id'],
-        'UPDATE': ['name', 'uid', 'org_id'],
+        'UPDATE': ['name', 'org_id'],
         'DELETE': ['name', 'org_id'],
-        'INSPECT_ONE': ['name', 'uid', 'org_id'],
+        'INSPECT_ONE': ['name', 'org_id'],
         'INSPECT_ALL': ['org_id'],
-        'UPDATE_BACKUP_SHARE': ['name', 'uid', 'org_id'],
-        'SHARE_CLUSTER': ['name', 'uid', 'org_id', 'cluster_share'],
-        'UNSHARE_CLUSTER': ['name', 'uid', 'org_id', 'cluster_share']
+        'UPDATE_BACKUP_SHARE': ['name','org_id'],
+        'SHARE_CLUSTER': ['name','org_id', 'cluster_share'],
+        'UNSHARE_CLUSTER': ['name', 'org_id', 'cluster_share']
     }
 
     result = dict(

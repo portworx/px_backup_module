@@ -36,7 +36,7 @@ The resource collector module provides essential functionality for:
 | ------------------ | -------- | ---------- | --------------------------------- |
 | cluster_ref      | dict   | yes      | Reference to the target cluster |
 | cluster_ref.name | string | yes      | Name of the cluster             |
-| cluster_ref.uid  | string | yes      | UID of the cluster              |
+| cluster_ref.uid  | string | no       | UID of the cluster              |
 
 ### SSL/TLS Configuration
 

@@ -20,28 +20,30 @@ The receiver module provides comprehensive management of PX-Backup alert receive
 
 The module supports the following operations:
 
-| Operation      | Description                           |
-|---------------|---------------------------------------|
-| CREATE        | Create a new receiver                 |
-| UPDATE        | Modify existing receiver              |
-| DELETE        | Remove a receiver                     |
-| VALIDATE_SMTP | Validate SMTP configuration           |
-| INSPECT_ONE   | Get details of a specific receiver    |
-| INSPECT_ALL   | List all receivers                    |
+
+| Operation     | Description                        |
+| --------------- | ------------------------------------ |
+| CREATE        | Create a new receiver              |
+| UPDATE        | Modify existing receiver           |
+| DELETE        | Remove a receiver                  |
+| VALIDATE_SMTP | Validate SMTP configuration        |
+| INSPECT_ONE   | Get details of a specific receiver |
+| INSPECT_ALL   | List all receivers                 |
 
 ## Parameters
 
 ### Common Parameters
 
-| Parameter      | Type    | Required | Default | Description                                                                             |
-|---------------|---------|----------|---------|-----------------------------------------------------------------------------------------|
-| api_url       | string  | yes      |         | PX-Backup API URL                                                                       |
-| token         | string  | yes      |         | Authentication token                                                                    |
-| name          | string  | varies   |         | Name of the receiver (required for all operations except INSPECT_ALL)                   |
-| org_id        | string  | yes      |         | Organization ID                                                                         |
-| operation     | string  | yes      |         | Operation to perform                                                                    |
-| uid           | string  | varies   |         | Receiver unique identifier (required for UPDATE, DELETE, and INSPECT_ONE)               |
-| validate_certs| boolean | no       | true    | Whether to validate SSL certificates                                                    |
+
+| Parameter      | Type    | Required | Default | Description                                                           |
+| ---------------- | --------- | ---------- | --------- | ----------------------------------------------------------------------- |
+| api_url        | string  | yes      |         | PX-Backup API URL                                                     |
+| token          | string  | yes      |         | Authentication token                                                  |
+| name           | string  | varies   |         | Name of the receiver (required for all operations except INSPECT_ALL) |
+| org_id         | string  | yes      |         | Organization ID                                                       |
+| operation      | string  | yes      |         | Operation to perform                                                  |
+| uid            | string  | varies   |         | Receiver unique identifier                                            |
+| validate_certs | boolean | no       | true    | Whether to validate SSL certificates                                  |
 
 ### SSL/TLS Configuration
 
@@ -55,23 +57,25 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 
 ### Email Configuration Parameters
 
-| Parameter               | Type    | Required | Default | Description                    |
-|------------------------|---------|----------|---------|--------------------------------|
-| receiver_type          | string  | no       | EMAIL   | Type of receiver              |
-| email_config.from      | string  | yes      |         | Sender email address          |
-| email_config.host      | string  | yes      |         | SMTP host address             |
-| email_config.port      | string  | yes      |         | SMTP port                     |
-| email_config.encryption_ssl     | boolean | no       | false   | Enable SSL encryption          |
-| email_config.encryption_starttls| boolean | no       | false   | Enable STARTTLS encryption    |
-| email_config.authentication    | boolean | no       | false   | Enable SMTP authentication    |
-| email_config.auth_username     | string  | no       |         | SMTP authentication username  |
-| email_config.auth_password     | string  | no       |         | SMTP authentication password  |
+
+| Parameter                        | Type    | Required | Default | Description                  |
+| ---------------------------------- | --------- | ---------- | --------- | ------------------------------ |
+| receiver_type                    | string  | no       | EMAIL   | Type of receiver             |
+| email_config.from                | string  | yes      |         | Sender email address         |
+| email_config.host                | string  | yes      |         | SMTP host address            |
+| email_config.port                | string  | yes      |         | SMTP port                    |
+| email_config.encryption_ssl      | boolean | no       | false   | Enable SSL encryption        |
+| email_config.encryption_starttls | boolean | no       | false   | Enable STARTTLS encryption   |
+| email_config.authentication      | boolean | no       | false   | Enable SMTP authentication   |
+| email_config.auth_username       | string  | no       |         | SMTP authentication username |
+| email_config.auth_password       | string  | no       |         | SMTP authentication password |
 
 ### SMTP Validation Parameters
 
-| Parameter    | Type    | Required | Default | Description                      |
-|-------------|---------|----------|---------|----------------------------------|
-| recipient_id| list    | no       |         | List of test recipient addresses |
+
+| Parameter    | Type | Required | Default | Description                      |
+| -------------- | ------ | ---------- | --------- | ---------------------------------- |
+| recipient_id | list | no       |         | List of test recipient addresses |
 
 ## Examples
 
@@ -139,23 +143,24 @@ Common error scenarios:
 ## Notes
 
 1. **Security Considerations**
+
    - Secure password management
    - Authentication settings
    - Access control
-
 2. **SMTP Configuration Considerations**
+
    - Port selection
    - Encryption options
    - Authentication requirements
    - Server restrictions
-
 3. **Best Practices**
+
    - Regular validation testing
    - Proper error handling
    - Monitoring delivery success
    - Configuration backups
-
 4. **Limitations**
+
    - Currently supports only EMAIL type receivers
    - Operation-specific requirements
    - SMTP server restrictions
@@ -165,12 +170,13 @@ Common error scenarios:
 
 The module returns the following information:
 
-| Key      | Type   | Description                            |
-|----------|--------|----------------------------------------|
-| changed  | bool   | Whether the operation changed state    |
-| receiver | dict   | Details of the affected receiver       |
-| receivers| list   | List of receivers (for INSPECT_ALL)    |
-| message  | string | Operation status message               |
+
+| Key       | Type   | Description                         |
+| ----------- | -------- | ------------------------------------- |
+| changed   | bool   | Whether the operation changed state |
+| receiver  | dict   | Details of the affected receiver    |
+| receivers | list   | List of receivers (for INSPECT_ALL) |
+| message   | string | Operation status message            |
 
 The receiver object structure includes:
 

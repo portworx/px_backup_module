@@ -5,10 +5,8 @@ restores:
   - name: "restore-from-rancher-to-rancher-ansible"
     backup_ref:
       name: "rancher-backup"
-      uid: "58090922-fdb5-41dc-82f9-6ce7973d7b1b"
     cluster_ref:
       name: "destination-rancher"
-      uid: "b4eeaabc-bd5d-4337-9ab1-c9e59a751439"
     # namespace_mapping: 
     #   "pvcsix": "pvcsix11178"
     replace_policy: "Retain"
@@ -16,7 +14,7 @@ restores:
       key: "c-m-b9x5wwqs:p-knzw9"
       value: "c-m-b9x5wwqs:p-knzw9"
     rancher_project_name_mapping:
-      key: "snigdha=source"
-      value: "snigdha=source"
+      key: ""
+      value: ""
     # storage_class_mapping:
     #   "px-db": "px-db"

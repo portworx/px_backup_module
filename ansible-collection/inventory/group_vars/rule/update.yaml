@@ -1,7 +1,6 @@
 # List of rules to update
 rule_updates:
   - name: "test-rule-1"
-    uid: "test-rule-1-uid"
     rules:
       - container: null
         actions:

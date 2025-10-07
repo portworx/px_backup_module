@@ -34,7 +34,7 @@
             api_url: "{{ px_backup_api_url }}"
             token: "{{ px_backup_token }}"
             name: "{{ item.name }}"
-            uid: "{{ item.uid }}"
+            uid: "{{ item.uid | default(omit) }}"
             org_id: "{{ org_id | default('default') }}"
             include_secrets: "{{ item.include_secrets | default(default_include_secrets) }}"
             # SSL Certificate Parameters

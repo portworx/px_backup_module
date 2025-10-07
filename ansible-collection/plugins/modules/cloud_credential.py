@@ -252,7 +252,8 @@ def update_cloud_credential(module: AnsibleModule, client: PXBackupClient) -> tu
     """Update an existing Cloud Credential"""
     try:    
         cloud_credential_request = cloud_credential_request_body(module)
-        cloud_credential_request['metadata']['uid'] = module.params['uid']
+        if module.params.get('uid'):
+            cloud_credential_request['metadata']['uid'] = module.params['uid']
         
         response = client.make_request('PUT', 'v1/cloudcredential', cloud_credential_request)
         return response, True
@@ -266,8 +267,9 @@ def update_ownership(module, client):
         "org_id": module.params['org_id'],
         "name": module.params['name'],
         "ownership": module.params['ownership'],
-        "uid": module.params['uid']
     }
+    if module.params.get('uid'):
+        ownership_request['uid'] = module.params['uid']
     try:
         response = client.make_request('PUT', 'v1/cloudcredential/updateownership', ownership_request)
         return response, True
@@ -293,7 +295,7 @@ def inspect_cloud_credentials(module, client):
     try:
         response = client.make_request(
             'GET',
-            f"v1/cloudcredential/{module.params['org_id']}/{module.params['name']}/{module.params['uid']}",
+            f"v1/cloudcredential/{module.params['org_id']}/{module.params['name']}",
             params=params
         )
         return response['cloud_credential']
@@ -305,7 +307,7 @@ def delete_cloud_credentials(module, client):
     try:
         response = client.make_request(
             'DELETE',
-            f"v1/cloudcredential/{module.params['org_id']}/{module.params['name']}/{module.params['uid']}"
+            f"v1/cloudcredential/{module.params['org_id']}/{module.params['name']}"
         )
         return response, True
     except Exception as e:
@@ -471,10 +473,10 @@ def run_module():
             ('credential_type', 'IBM', ['ibm_config']),
             ('credential_type', 'Rancher', ['rancher_config']),
             ('operation', 'CREATE', ['name', 'credential_type']),
-            ('operation', 'UPDATE', ['name', 'uid', 'credential_type']),
-            ('operation', 'DELETE', ['name', 'uid']),
-            ('operation', 'INSPECT_ONE', ['name', 'uid']),
-            ('operation', 'UPDATE_OWNERSHIP', ['name', 'uid', 'ownership'])
+            ('operation', 'UPDATE', ['name', 'credential_type']),
+            ('operation', 'DELETE', ['name']),
+            ('operation', 'INSPECT_ONE', ['name']),
+            ('operation', 'UPDATE_OWNERSHIP', ['name', 'ownership'])
         ]
     )
 
