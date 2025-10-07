@@ -37,15 +37,15 @@ The module supports the following operations:
 ### Common Parameters
 
 
-| Parameter      | Type    | Required | Default | Description                                                                                                  |
-| ---------------- | --------- | ---------- | --------- | -------------------------------------------------------------------------------------------------------------- |
-| api_url        | string  | yes      |         | PX-Backup API URL                                                                                            |
-| token          | string  | yes      |         | Authentication token                                                                                         |
-| name           | string  | varies   |         | Name of the backup location (required for all operations except INSPECT_ALL)                                 |
-| org_id         | string  | yes      |         | Organization ID                                                                                              |
-| operation      | string  | yes      |         | Operation to perform                                                                                         |
-| uid            | string  | varies   |         | Backup location unique identifier (required for UPDATE, DELETE, VALIDATE, INSPECT_ONE, and UPDATE_OWNERSHIP) |
-| validate_certs | boolean | no       | true    | Whether to validate SSL certificates                                                                         |
+| Parameter      | Type    | Required | Default | Description                                                                  |
+| ---------------- | --------- | ---------- | --------- | ------------------------------------------------------------------------------ |
+| api_url        | string  | yes      |         | PX-Backup API URL                                                            |
+| token          | string  | yes      |         | Authentication token                                                         |
+| name           | string  | varies   |         | Name of the backup location (required for all operations except INSPECT_ALL) |
+| org_id         | string  | yes      |         | Organization ID                                                              |
+| operation      | string  | yes      |         | Operation to perform                                                         |
+| uid            | string  | varies   |         | Backup location unique identifier                                            |
+| validate_certs | boolean | no       | true    | Whether to validate SSL certificates                                         |
 
 ### SSL/TLS Configuration
 
@@ -75,7 +75,7 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 | Parameter                                  | Type   | Required | Description                  |
 | -------------------------------------------- | -------- | ---------- | ------------------------------ |
 | cloud_credential_ref.cloud_credential_name | string | yes      | Name of the cloud credential |
-| cloud_credential_ref.cloud_credential_uid  | string | yes      | UID of the cloud credential  |
+| cloud_credential_ref.cloud_credential_uid  | string | no       | UID of the cloud credential  |
 
 ### Storage Provider Configurations
 

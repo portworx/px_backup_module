@@ -39,17 +39,17 @@ The module supports the following operations:
 ### Common Parameters
 
 
-| Parameter      | Type    | Required | Default | Description                                    |
-| ---------------- | --------- | ---------- | --------- | ------------------------------------------------ |
-| api_url        | string  | yes      |         | PX-Backup API URL                              |
-| token          | string  | yes      |         | Authentication token                           |
-| operation      | string  | yes      |         | Operation to perform                           |
-| name           | string  | yes      |         | Name of the backup schedule                    |
-| org_id         | string  | yes      |         | Organization ID                                |
-| uid            | string  | varies   |         | Unique identifier (required for update/delete) |
-| owner          | string  | no       |         | Owner name or uid                              |
-| validate_certs | boolean | no       | true    | Verify SSL certificates                        |
-| labels         | dict    | no       |         | Labels to attach to the Backup Schedule        |
+| Parameter      | Type    | Required | Default | Description                             |
+| ---------------- | --------- | ---------- | --------- | ----------------------------------------- |
+| api_url        | string  | yes      |         | PX-Backup API URL                       |
+| token          | string  | yes      |         | Authentication token                    |
+| operation      | string  | yes      |         | Operation to perform                    |
+| name           | string  | yes      |         | Name of the backup schedule             |
+| org_id         | string  | yes      |         | Organization ID                         |
+| uid            | string  | varies   |         | Unique identifier                       |
+| owner          | string  | no       |         | Owner name or uid                       |
+| validate_certs | boolean | no       | true    | Verify SSL certificates                 |
+| labels         | dict    | no       |         | Labels to attach to the Backup Schedule |
 
 ### SSL/TLS Configuration
 
@@ -116,7 +116,7 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 | Parameter                | Type   | Required | Description                 |
 | -------------------------- | -------- | ---------- | ----------------------------- |
 | schedule_policy_ref.name | string | yes      | Name of the schedule policy |
-| schedule_policy_ref.uid  | string | yes      | UID of the schedule policy  |
+| schedule_policy_ref.uid  | string | no       | UID of the schedule policy  |
 
 #### cluster_ref
 
@@ -124,7 +124,7 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 | Parameter        | Type   | Required | Description         |
 | ------------------ | -------- | ---------- | --------------------- |
 | cluster_ref.name | string | yes      | Name of the cluster |
-| cluster_ref.uid  | string | yes      | UID of the cluster  |
+| cluster_ref.uid  | string | no       | UID of the cluster  |
 
 #### backup_location_ref
 
@@ -132,7 +132,7 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 | Parameter                | Type   | Required | Description                 |
 | -------------------------- | -------- | ---------- | ----------------------------- |
 | backup_location_ref.name | string | yes      | Name of the backup location |
-| backup_location_ref.uid  | string | yes      | UID of the backup location  |
+| backup_location_ref.uid  | string | no       | UID of the backup location  |
 
 #### pre_exec_rule_ref
 
@@ -140,7 +140,7 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 | Parameter              | Type   | Required | Description               |
 | ------------------------ | -------- | ---------- | --------------------------- |
 | pre_exec_rule_ref.name | string | yes      | Name of the pre exec rule |
-| pre_exec_rule_ref.uid  | string | yes      | UID of the pre exec rule  |
+| pre_exec_rule_ref.uid  | string | no       | UID of the pre exec rule  |
 
 #### post_exec_rule_ref
 
@@ -148,7 +148,7 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 | Parameter               | Type   | Required | Description                |
 | ------------------------- | -------- | ---------- | ---------------------------- |
 | post_exec_rule_ref.name | string | yes      | Name of the post exec rule |
-| post_exec_rule_ref.uid  | string | yes      | UID of the post exec rule  |
+| post_exec_rule_ref.uid  | string | no       | UID of the post exec rule  |
 
 #### volume_resource_only_policy_ref
 
@@ -156,7 +156,7 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 | Parameter                            | Type   | Required | Description                             |
 | -------------------------------------- | -------- | ---------- | ----------------------------------------- |
 | volume_resource_only_policy_ref.name | string | yes      | Name of the Volume Resource Only policy |
-| volume_resource_only_policy_ref.uid  | string | yes      | UID of the Volume Resource Only policy  |
+| volume_resource_only_policy_ref.uid  | string | no       | UID of the Volume Resource Only policy  |
 
 ### Backup Object Configuration
 
@@ -202,7 +202,7 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 | Parameter | Type   | Required | Description |
 | ----------- | -------- | ---------- | ------------- |
 | name      | string | yes      | Policy name |
-| uid       | string | yes      | Policy UID  |
+| uid       | string | no       | Policy UID  |
 
 #### include_objects / exclude_objects Entry Format
 
@@ -210,7 +210,7 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 | Parameter | Type   | Required | Description   |
 | ----------- | -------- | ---------- | --------------- |
 | name      | string | yes      | Schedule name |
-| uid       | string | yes      | Schedule UID  |
+| uid       | string | no       | Schedule UID  |
 
 ### Cluster Scope Configuration (2.9.0+)
 
@@ -227,7 +227,7 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 | Parameter | Type   | Required | Description         |
 | ----------- | -------- | ---------- | --------------------- |
 | name      | string | yes      | Name of the cluster |
-| uid       | string | yes      | Cluster UID         |
+| uid       | string | no       | Cluster UID         |
 
 ### Enumeration Options
 

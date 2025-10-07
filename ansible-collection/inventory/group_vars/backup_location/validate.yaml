@@ -2,19 +2,15 @@
 # Backup locations to validate
 backup_locations_validate:
   - name: "bl-1"
-    uid: "bl-1-uid"
     include_secrets: false
 
   - name: "bl-2"
-    uid: "bl-2-uid"
     include_secrets: false
   
   - name: "bl-3"
-    uid: "bl-3-uid"
     include_secrets: false
   
   - name: "bl-4"
-    uid: "bl-4-uid"
     include_secrets: false
   
 # Global inspect configuration

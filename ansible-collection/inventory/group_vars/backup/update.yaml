@@ -2,8 +2,7 @@
 ---
 # List of backups to update
 backup_updates:
-  - name: "ansible-bkp1"  # Use the actual backup name
-    uid: "d2768c2f-ca68-4f70-8af8-0700ac98dff9"      # Use the actual backup UID
+  - name: "test-g-c1897a0-interval-2025-09-04-054335"  # Use the actual backup name
 # Optional updates - only include fields you want to update
     labels:
       environment: "production"

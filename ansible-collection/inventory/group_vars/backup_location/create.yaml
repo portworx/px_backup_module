@@ -7,7 +7,6 @@ backup_locations:
     path: "my-backup-bucket"
     cloud_credential_ref: 
       cloud_credential_name: "s3-credentials"
-      cloud_credential_uid: "s3-cred-123456"
     encryption_key: "{{ encryption_key }}"
     validate_cloud_credential: true
     object_lock_enabled: "{{ object_lock }}"
@@ -25,7 +24,6 @@ backup_locations:
     path: "my-gcp-backup-bucket"
     cloud_credential_ref: 
       cloud_credential_name: "gcp-credentials" 
-      cloud_credential_uid: "{{ cloud_cred_uid }}"
     encryption_key: "{{ encryption_key }}"
     validate_cloud_credential: true
     object_lock_enabled: "{{ object_lock }}"
@@ -36,7 +34,6 @@ backup_locations:
     path: "my-azure-container"
     cloud_credential_ref:
       cloud_credential_name: "azure-credentials"
-      cloud_credential_uid: "{{ cloud_cred_uid }}"
     encryption_key: "{{ encryption_key }}"
     validate_cloud_credential: true
     object_lock_enabled: "{{ object_lock }}"

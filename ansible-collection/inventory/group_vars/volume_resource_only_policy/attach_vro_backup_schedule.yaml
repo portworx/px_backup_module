@@ -19,15 +19,12 @@ backup_schedules_to_update:
   - name: "example-backup-schedule"
     cluster_ref:
       name: "example-cluster"
-      uid: "00000000-0000-0000-0000-000000000000"
     backup_object_type:
       type: "All"
     schedule_policy_ref:
       name: "example-policy"
-      uid: "11111111-1111-1111-1111-111111111111"
     backup_location_ref:
       name: "example-location"
-      uid: "22222222-2222-2222-2222-222222222222"
     suspend: false
     # Optional: preserve other existing settings
     # pre_exec_rule_ref: {}

@@ -22,6 +22,7 @@ The volume_resource_only_policy module provides comprehensive management of PX-B
 
 The module supports the following operations:
 
+
 | Operation        | Description                              |
 | ------------------ | ------------------------------------------ |
 | CREATE           | Create a new volume resource only policy |
@@ -35,15 +36,16 @@ The module supports the following operations:
 
 ### Common Parameters
 
-| Parameter      | Type    | Required | Default | Description                                                                               |
-| ---------------- | --------- | ---------- | --------- | ------------------------------------------------------------------------------------------- |
-| api_url        | string  | yes      |         | PX-Backup API URL                                                                         |
-| token          | string  | yes      |         | Authentication token                                                                      |
-| name           | string  | varies   |         | Name of the policy (required for all operations except INSPECT_ALL)                       |
-| org_id         | string  | yes      |         | Organization ID                                                                           |
-| operation      | string  | yes      |         | Operation to perform                                                                      |
-| uid            | string  | varies   |         | Policy unique identifier (required for UPDATE, DELETE, INSPECT_ONE, and UPDATE_OWNERSHIP) |
-| validate_certs | boolean | no       | true    | Whether to validate SSL certificates                                                      |
+
+| Parameter      | Type    | Required | Default | Description                                                         |
+| ---------------- | --------- | ---------- | --------- | --------------------------------------------------------------------- |
+| api_url        | string  | yes      |         | PX-Backup API URL                                                   |
+| token          | string  | yes      |         | Authentication token                                                |
+| name           | string  | varies   |         | Name of the policy (required for all operations except INSPECT_ALL) |
+| org_id         | string  | yes      |         | Organization ID                                                     |
+| operation      | string  | yes      |         | Operation to perform                                                |
+| uid            | string  | varies   |         | Policy unique identifier                                            |
+| validate_certs | boolean | no       | true    | Whether to validate SSL certificates                                |
 
 ### SSL/TLS Configuration
 
@@ -57,6 +59,7 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 
 ### Policy Configuration Parameters
 
+
 | Parameter    | Type | Required | Default | Description                                                             |
 | -------------- | ------ | ---------- | --------- | ------------------------------------------------------------------------- |
 | volume_types | list | no       |         | List of volume types to skip for volume data backup                     |
@@ -64,6 +67,7 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 | nfs_servers  | list | no       |         | List of NFS servers that should skip volume data backup for NFS volumes |
 
 #### volume_types Values
+
 
 | Value    | Description                               |
 | ---------- | ------------------------------------------- |
@@ -74,32 +78,37 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 
 ### Metadata Parameters
 
-| Parameter | Type       | Required | Description                    |
-| ----------- | ------------ | ---------- | -------------------------------- |
-| ownership | dictionary | no       | Ownership and access control   |
+
+| Parameter | Type       | Required | Description                  |
+| ----------- | ------------ | ---------- | ------------------------------ |
+| ownership | dictionary | no       | Ownership and access control |
 
 ### Enumeration Parameters
 
-| Parameter        | Type       | Required | Description                                              |
-| ------------------ | ------------ | ---------- | ---------------------------------------------------------- |
+
+| Parameter         | Type       | Required | Description                                                     |
+| ------------------- | ------------ | ---------- | ----------------------------------------------------------------- |
 | enumerate_options | dictionary | no       | Options for controlling enumeration behavior (INSPECT_ALL only) |
 
 #### enumerate_options Structure
 
-| Parameter                              | Type       | Required | Description                                                                          |
-| ---------------------------------------- | ------------ | ---------- | -------------------------------------------------------------------------------------- |
-| enumerate_options.generic_enumerate_options | dictionary | no       | Common enumeration options for filtering and pagination                              |
+
+| Parameter                                   | Type       | Required | Description                                             |
+| --------------------------------------------- | ------------ | ---------- | --------------------------------------------------------- |
+| enumerate_options.generic_enumerate_options | dictionary | no       | Common enumeration options for filtering and pagination |
 
 #### generic_enumerate_options Structure
 
-| Parameter                                          | Type       | Required | Description                                                                    |
-| ---------------------------------------------------- | ------------ | ---------- | -------------------------------------------------------------------------------- |
-| generic_enumerate_options.labels                   | dictionary | no       | Key-value pairs for filtering policies by labels                               |
-| generic_enumerate_options.max_objects              | integer    | no       | Maximum number of policies to return (useful for pagination)                  |
-| generic_enumerate_options.name_filter              | string     | no       | Filter policies by name using substring matching (case-sensitive)             |
-| generic_enumerate_options.object_index             | integer    | no       | Starting index for pagination (zero-based, used with max_objects)             |
+
+| Parameter                              | Type       | Required | Description                                                       |
+| ---------------------------------------- | ------------ | ---------- | ------------------------------------------------------------------- |
+| generic_enumerate_options.labels       | dictionary | no       | Key-value pairs for filtering policies by labels                  |
+| generic_enumerate_options.max_objects  | integer    | no       | Maximum number of policies to return (useful for pagination)      |
+| generic_enumerate_options.name_filter  | string     | no       | Filter policies by name using substring matching (case-sensitive) |
+| generic_enumerate_options.object_index | integer    | no       | Starting index for pagination (zero-based, used with max_objects) |
 
 ### Ownership Configuration
+
 
 | Parameter               | Type       | Required | Description                                |
 | ------------------------- | ------------ | ---------- | -------------------------------------------- |
@@ -110,6 +119,7 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 | ownership.public        | dictionary | no       | Public access configuration                |
 
 #### Ownership Access Configuration
+
 
 | Parameter | Type   | Required | Choices                  | Description                      |
 | ----------- | -------- | ---------- | -------------------------- | ---------------------------------- |
@@ -416,22 +426,23 @@ When dealing with large numbers of policies, use pagination:
 The module implements comprehensive error handling:
 
 1. **Parameter Validation**
+
    - Required parameter checks
    - Valid enum value validation
    - Format validation
    - Enumeration option validation
-
 2. **API Communication Errors**
+
    - Connection failures
    - Authentication errors
    - API response parsing
-
 3. **Resource State Validation**
+
    - Policy existence checks
    - Update conflict detection
    - Dependency validation
-
 4. **Permission Checks**
+
    - Access control validation
    - Ownership verification
 

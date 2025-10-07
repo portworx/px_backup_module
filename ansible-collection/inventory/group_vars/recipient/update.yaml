@@ -2,7 +2,6 @@
 # Define recipients to update
 recipients_to_update:
   - name: "recipient-uuid"  
-    uid: "recipient-uuid"  # Replace with actual UID
     recipient_type: "EMAIL"
     recipient_ids:
       - "recipient1@example.com"
@@ -10,6 +9,5 @@ recipients_to_update:
       - "recipient3@example.com"  # Adding a new recipient
     receiver_ref:
       name: "smtp"
-      uid: "receiver-uuid"
     severity: "CRITICAL" 
     active: true

@@ -320,15 +320,12 @@ def inspect_backup(module: AnsibleModule, client: PXBackupClient, backup: Any) -
     try:
         # Validate input
         backup_name = backup.get('name')
-        backup_uid = backup.get('uid')
         
         if not backup_name:
             module.fail_json(msg="Backup 'name' is required but not provided.")
-        if not backup_uid:
-            module.fail_json(msg="Backup 'uid' is required but not provided.")
         
         # Build request params
-        params = {"uid": backup_uid}  # Include the UID in the request parameters
+        params = {"uid": backup.get('uid', '')}  # Include the UID in the request parameters
 
         # Make the API request
         response = client.make_request(
@@ -341,7 +338,7 @@ def inspect_backup(module: AnsibleModule, client: PXBackupClient, backup: Any) -
         module.debug(f"API Response: {response}")
 
         if not response:
-            module.fail_json(msg=f"No backup found with name {backup_name} and uid {backup_uid}")
+            module.fail_json(msg=f"No backup found with name {backup_name}")
 
         # Return the processed response
         return {
@@ -370,7 +367,7 @@ def build_restore_request(params: Dict[str, Any], module: AnsibleModule, client:
     metadata = {
         "name": params.get('name'),
         "org_id": params.get('org_id'),
-        "uid": params.get('uid')  # Include UID for updates
+        "uid": params.get('uid', '')  # Include UID for updates
     }
 
     # Create request structure
@@ -655,7 +652,7 @@ def run_module():
             required=False,
             options=dict(
                 name=dict(type='str', required=True),
-                uid=dict(type='str', required=True)
+                uid=dict(type='str', required=False)
             )
         ),
 

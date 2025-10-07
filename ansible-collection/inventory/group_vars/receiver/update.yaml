@@ -2,7 +2,6 @@
 # Define receivers to update
 receivers_to_update:
   - name: "smtp"  # Name of the receiver to update
-    uid: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"  # UID of the receiver
     receiver_type: "EMAIL"
     email_config:
       from_address: "example+1@example.com"

@@ -20,32 +20,32 @@ The role module manages roles in PX-Backup, enabling management of admin or user
 The module supports the following operations:
 
 
-| Operation        | Description                          |
-| ------------------ | -------------------------------------- |
-| CREATE           | Create a new role        |
-| UPDATE           | Modify existing role     |
-| DELETE           | Remove a role            |
-| INSPECT_ONE      | Get details of a specific role |
-| INSPECT_ALL      | List all roles           |
-| PERMISSION       | List all permissions for a role |
+| Operation   | Description                     |
+| ------------- | --------------------------------- |
+| CREATE      | Create a new role               |
+| UPDATE      | Modify existing role            |
+| DELETE      | Remove a role                   |
+| INSPECT_ONE | Get details of a specific role  |
+| INSPECT_ALL | List all roles                  |
+| PERMISSION  | List all permissions for a role |
 
 ## Parameters
 
 ### Common Parameters
 
 
-| Parameter       | Type       | Required | Default | Description                                    | Choices                                    |
-| ----------------- | ------------ | ---------- | --------- | ------------------------------------------------ | -------------------------------------------- |
-| api_url         | string     | yes      |         | PX-Backup API URL                              |                                            |
-| token           | string     | yes      |         | Authentication token                           |                                            |
-| operation       | string     | yes      | CREATE  | Operation to perform                           |                                            |
-| name            | string     | varies   |         | Name of the role                               |                                            |
-| org_id          | string     | yes      |         | Organization ID                                |                                            |
-| uid             | string     | varies   |         | Unique identifier (required for update/delete) |                                            |
-| owner           | string     | no       |         | Owner name                                     |                                            |
-| rules           | list       | varies   |         | List of rules                                  |                                            |
-| labels          | dictionary | no       |         | Label for the role                             |                                            |
-| validate_certs  | boolean    | no       | `true`  | Whether to validate SSL certificates           |                                            |
+| Parameter      | Type       | Required | Default | Description                          | Choices |
+| ---------------- | ------------ | ---------- | --------- | -------------------------------------- | --------- |
+| api_url        | string     | yes      |         | PX-Backup API URL                    |         |
+| token          | string     | yes      |         | Authentication token                 |         |
+| operation      | string     | yes      | CREATE  | Operation to perform                 |         |
+| name           | string     | varies   |         | Name of the role                     |         |
+| org_id         | string     | yes      |         | Organization ID                      |         |
+| uid            | string     | varies   |         | Unique identifier                    |         |
+| owner          | string     | no       |         | Owner name                           |         |
+| rules          | list       | varies   |         | List of rules                        |         |
+| labels         | dictionary | no       |         | Label for the role                   |         |
+| validate_certs | boolean    | no       | `true`  | Whether to validate SSL certificates |         |
 
 ### SSL/TLS Configuration
 
@@ -62,7 +62,7 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 
 | Parameter                        | Type   | Required | Choices          | Description               |
 | ---------------------------------- | -------- | ---------- | ------------------ | --------------------------- |
-| ownership.owner                  | string | no       |                  | Owner of the role   |
+| ownership.owner                  | string | no       |                  | Owner of the role         |
 | ownership.groups[].id            | string | yes      |                  | Group identifier          |
 | ownership.groups[].access        | string | yes      | Read/Write/Admin | Group access level        |
 | ownership.collaborators[].id     | string | yes      |                  | Collaborator identifier   |
@@ -72,10 +72,10 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 ### Rules Parameters
 
 
-| Parameter                        | Type   | Required | Choices          | Description               |
-| ---------------------------------- | -------- | ---------- | ------------------ | --------------------------- |
-| rules.services              | list(string)     | yes     |                  | Services that the role has access to   |
-| rules.apis                      | list(string)     | yes      |                  | API actions that the role can perform |
+| Parameter      | Type         | Required | Choices | Description                           |
+| ---------------- | -------------- | ---------- | --------- | --------------------------------------- |
+| rules.services | list(string) | yes      |         | Services that the role has access to  |
+| rules.apis     | list(string) | yes      |         | API actions that the role can perform |
 
 ## Error Handling
 
@@ -101,7 +101,6 @@ The module implements comprehensive error handling:
    - Token security
    - SSL certificate validation
    - Secret key protection
-
 2. **Best Practices**
 
    - Regular credential rotation
@@ -109,7 +108,7 @@ The module implements comprehensive error handling:
    - Access control review
    - Audit logging
    - Encryption at rest
-4. **Limitations**
+3. **Limitations**
 
    - Permission boundaries
    - Update constraints

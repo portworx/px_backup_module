@@ -41,15 +41,15 @@ The module supports the following operations:
 ### Common Parameters
 
 
-| Parameter      | Type    | Required | Default | Description                                                                                                                                   |
-| ---------------- | --------- | ---------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| api_url        | string  | yes      |         | PX-Backup API URL                                                                                                                             |
-| token          | string  | yes      |         | Authentication token                                                                                                                          |
-| name           | string  | varies   |         | Name of the backup (required for all operations except INSPECT_ALL)                                                                           |
-| org_id         | string  | yes      |         | Organization ID                                                                                                                               |
-| operation      | string  | yes      |         | Operation to perform                                                                                                                          |
-| uid            | string  | varies   |         | Backup unique identifier (required for UPDATE, DELETE, INSPECT_ONE, UPDATE_BACKUP_SHARE, GET_BACKUP_RESOURCE_DETAILS, RETRY_BACKUP_RESOURCES) |
-| validate_certs | boolean | no       | true    | Whether to validate SSL certificates                                                                                                          |
+| Parameter      | Type    | Required | Default | Description                                                         |
+| ---------------- | --------- | ---------- | --------- | --------------------------------------------------------------------- |
+| api_url        | string  | yes      |         | PX-Backup API URL                                                   |
+| token          | string  | yes      |         | Authentication token                                                |
+| name           | string  | varies   |         | Name of the backup (required for all operations except INSPECT_ALL) |
+| org_id         | string  | yes      |         | Organization ID                                                     |
+| operation      | string  | yes      |         | Operation to perform                                                |
+| uid            | string  | varies   |         | Unique identifier of the backup                                     |
+| validate_certs | boolean | no       | true    | Whether to validate SSL certificates                                |
 
 ### SSL/TLS Configuration
 
@@ -234,7 +234,7 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 | Parameter | Type   | Required | Description                                 |
 | ----------- | -------- | ---------- | --------------------------------------------- |
 | name      | string | yes      | Name of the schedule policy/backup schedule |
-| uid       | string | yes      | UID of the schedule policy/backup schedule  |
+| uid       | string | no       | UID of the schedule policy/backup schedule  |
 
 #### Sort Option Format
 

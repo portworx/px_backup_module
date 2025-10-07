@@ -32,7 +32,7 @@
             recipient_ids: "{{ item.recipient_ids }}"
             receiver_ref:
               name: "{{ item.receiver_ref.name }}"
-              uid: "{{ item.receiver_ref.uid }}"
+              uid: "{{ item.receiver_ref.uid |default(omit) }}"
             severity: "{{ item.severity | default('CRITICAL') }}"
             active: "{{ item.active | default(true) }}"
             # SSL Certificate Parameters

@@ -68,7 +68,7 @@ options:
         required: false
         type: str
     uid:
-        description: Unique identifier of the schedule policy (required for update/delete)
+        description: Unique identifier of the schedule policy
         required: false
         type: str
     ssl_config:
@@ -272,7 +272,7 @@ def update_schedule_policy(module: AnsibleModule, client: PXBackupClient) -> tup
     """Update an existing Schedule Policy"""
     try:    
         schedule_policy_request = schedule_policy_request_body(module)
-        schedule_policy_request['metadata']['uid'] = module.params['uid']
+        schedule_policy_request['metadata']['uid'] = module.params.get('uid', '')
         
         response = client.make_request('PUT', 'v1/schedulepolicy', schedule_policy_request)
         return response, True
@@ -286,7 +286,7 @@ def update_ownership(module, client):
         "org_id": module.params['org_id'],
         "name": module.params['name'],
         "ownership": module.params['ownership'],
-        "uid": module.params['uid']
+        "uid": module.params.get('uid', '')
     }
     try:
         response = client.make_request('PUT', 'v1/schedulepolicy/updateownership', ownership_request)
@@ -313,7 +313,7 @@ def inspect_schedule_policies(module, client):
     try:
         response = client.make_request(
             'GET',
-            f"v1/schedulepolicy/{module.params['org_id']}/{module.params['name']}/{module.params['uid']}",
+            f"v1/schedulepolicy/{module.params['org_id']}/{module.params['name']}",
             params=params
         )
         return response['schedule_policy']
@@ -325,7 +325,7 @@ def delete_schedule_policies(module, client):
     try:
         response = client.make_request(
             'DELETE',
-            f"v1/schedulepolicy/{module.params['org_id']}/{module.params['name']}/{module.params['uid']}"
+            f"v1/schedulepolicy/{module.params['org_id']}/{module.params['name']}"
         )
         return response, True
     except Exception as e:
@@ -528,10 +528,10 @@ def run_module():
         supports_check_mode=True,
         required_if=[
             ('operation', 'CREATE', ['name', 'schedule_policy']),
-            ('operation', 'UPDATE', ['name', 'uid', 'schedule_policy']),
-            ('operation', 'DELETE', ['name', 'uid']),
-            ('operation', 'INSPECT_ONE', ['name', 'uid']),
-            ('operation', 'UPDATE_OWNERSHIP', ['name', 'uid', 'ownership'])
+            ('operation', 'UPDATE', ['name','schedule_policy']),
+            ('operation', 'DELETE', ['name']),
+            ('operation', 'INSPECT_ONE', ['name']),
+            ('operation', 'UPDATE_OWNERSHIP', ['name', 'ownership'])
         ]
     )
 

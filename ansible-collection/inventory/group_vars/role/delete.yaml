@@ -1,7 +1,5 @@
 # Roles to delete
 roles_delete:
   - name: "test-role-1"
-    uid: "test-role-1-uid"
 
   - name: "test-role-2"
-    uid: "test-role-2-uid"

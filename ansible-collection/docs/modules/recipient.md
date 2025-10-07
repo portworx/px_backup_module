@@ -22,27 +22,29 @@ The recipient module provides comprehensive management of alert recipients in PX
 
 The module supports the following operations:
 
-| Operation    | Description                          |
-|-------------|--------------------------------------|
-| CREATE      | Create a new recipient               |
-| UPDATE      | Modify existing recipient            |
-| DELETE      | Remove a recipient                   |
-| INSPECT_ONE | Get details of a specific recipient  |
-| INSPECT_ALL | List all recipients                  |
+
+| Operation   | Description                         |
+| ------------- | ------------------------------------- |
+| CREATE      | Create a new recipient              |
+| UPDATE      | Modify existing recipient           |
+| DELETE      | Remove a recipient                  |
+| INSPECT_ONE | Get details of a specific recipient |
+| INSPECT_ALL | List all recipients                 |
 
 ## Parameters
 
 ### Common Parameters
 
-| Parameter      | Type    | Required | Default | Description                                                                |
-|---------------|---------|----------|---------|----------------------------------------------------------------------------|
-| api_url       | string  | yes      |         | PX-Backup API URL                                                          |
-| token         | string  | yes      |         | Authentication token                                                       |
-| name          | string  | varies   |         | Name of the recipient (required for all operations except INSPECT_ALL)     |
-| org_id        | string  | yes      |         | Organization ID                                                            |
-| operation     | string  | yes      |         | Operation to perform                                                       |
-| uid           | string  | varies   |         | Recipient unique identifier (required for UPDATE, DELETE, and INSPECT_ONE) |
-| validate_certs| boolean | no       | true    | Whether to validate SSL certificates                                       |
+
+| Parameter      | Type    | Required | Default | Description                                                            |
+| ---------------- | --------- | ---------- | --------- | ------------------------------------------------------------------------ |
+| api_url        | string  | yes      |         | PX-Backup API URL                                                      |
+| token          | string  | yes      |         | Authentication token                                                   |
+| name           | string  | varies   |         | Name of the recipient (required for all operations except INSPECT_ALL) |
+| org_id         | string  | yes      |         | Organization ID                                                        |
+| operation      | string  | yes      |         | Operation to perform                                                   |
+| uid            | string  | varies   |         | Recipient unique identifier                                            |
+| validate_certs | boolean | no       | true    | Whether to validate SSL certificates                                   |
 
 ### SSL/TLS Configuration
 
@@ -56,56 +58,67 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 
 ### Recipient Configuration Parameters
 
-| Parameter      | Type    | Required | Description                        | Choices                              |
-|---------------|---------|----------|------------------------------------|--------------------------------------|
-| recipient_type| string  | no       | Type of recipient                  | 'EMAIL'                              |
-| recipient_ids | list    | varies   | List of recipient email addresses  |                                      |
-| active        | boolean | no       | Whether the recipient is active    |                                      |
-| severity      | string  | no       | Alert severity level               | 'UNKNOWN', 'CRITICAL', 'WARNING'     |
+
+| Parameter      | Type    | Required | Description                       | Choices                          |
+| ---------------- | --------- | ---------- | ----------------------------------- | ---------------------------------- |
+| recipient_type | string  | no       | Type of recipient                 | 'EMAIL'                          |
+| recipient_ids  | list    | varies   | List of recipient email addresses |                                  |
+| active         | boolean | no       | Whether the recipient is active   |                                  |
+| severity       | string  | no       | Alert severity level              | 'UNKNOWN', 'CRITICAL', 'WARNING' |
 
 ### Receiver Reference
 
-| Parameter                | Type   | Required | Description                |
-|-------------------------|--------|----------|----------------------------|
-| receiver_ref.name       | string | yes      | Name of the receiver      |
-| receiver_ref.uid        | string | yes      | UID of the receiver       |
+
+| Parameter         | Type   | Required | Description          |
+| ------------------- | -------- | ---------- | ---------------------- |
+| receiver_ref.name | string | yes      | Name of the receiver |
+| receiver_ref.uid  | string | no       | UID of the receiver  |
 
 ### Labels Configuration
 
-| Parameter | Type   | Required | Description                            |
-|-----------|--------|----------|----------------------------------------|
-| labels    | dict   | no       | Key-value pairs for recipient labels   |
+
+| Parameter | Type | Required | Description                          |
+| ----------- | ------ | ---------- | -------------------------------------- |
+| labels    | dict | no       | Key-value pairs for recipient labels |
 
 ## Operation-Specific Requirements
 
 ### CREATE Operation
+
 Required parameters:
+
 - name
 - recipient_ids
 - receiver_ref
 
 ### UPDATE Operation
+
 Required parameters:
+
 - name
-- uid
 
 ### DELETE Operation
+
 Required parameters:
+
 - name
-- uid
 
 ### INSPECT_ONE Operation
+
 Required parameters:
+
 - name
-- uid
 
 ### INSPECT_ALL Operation
+
 Required parameters:
+
 - org_id
 
 ## Examples
 
 ### Create a recipient
+
 ```yaml
 - name: Create email recipient
   recipient:
@@ -126,6 +139,7 @@ Required parameters:
 ```
 
 ### Update a recipient
+
 ```yaml
 - name: Update email recipient
   recipient:
@@ -143,6 +157,7 @@ Required parameters:
 ```
 
 ### Delete a recipient
+
 ```yaml
 - name: Delete recipient
   recipient:
@@ -158,12 +173,13 @@ Required parameters:
 
 The module returns the following information:
 
-| Key       | Type   | Description                          |
-|-----------|--------|--------------------------------------|
-| changed   | bool   | Whether the operation changed state  |
-| recipient | dict   | Details of the affected recipient    |
-| recipients| list   | List of recipients (for INSPECT_ALL) |
-| message   | string | Operation status message             |
+
+| Key        | Type   | Description                          |
+| ------------ | -------- | -------------------------------------- |
+| changed    | bool   | Whether the operation changed state  |
+| recipient  | dict   | Details of the affected recipient    |
+| recipients | list   | List of recipients (for INSPECT_ALL) |
+| message    | string | Operation status message             |
 
 ### Recipient Object Structure
 
@@ -199,6 +215,7 @@ The module implements comprehensive error handling:
 5. Permission checks
 
 Common error scenarios:
+
 - Invalid recipient configuration
 - Duplicate recipient names
 - Invalid receiver reference
@@ -208,23 +225,24 @@ Common error scenarios:
 ## Notes
 
 1. **Configuration Considerations**
+
    - Email address validation
    - Severity level selection
    - Receiver connectivity
    - Alert filtering
-
 2. **Best Practices**
+
    - Regular validation of email addresses
    - Proper severity level configuration
    - Clear recipient naming conventions
    - Monitoring alert delivery
-
 3. **Limitations**
+
    - Currently supports only EMAIL type recipients
    - Operation-specific requirements
    - Recipient naming restrictions
    - Alert delivery policies
-
 4. **Security Considerations**
+
    - Access control
    - Email address privacy

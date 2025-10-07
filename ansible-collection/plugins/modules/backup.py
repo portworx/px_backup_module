@@ -89,7 +89,6 @@ options:
     uid:
         description:
             - Unique identifier of the backup
-            - Required for UPDATE, DELETE, INSPECT_ONE, and UPDATE_BACKUP_SHARE operations
         required: false
         type: str
     backup_location_ref:
@@ -715,7 +714,7 @@ def build_backup_request(params: Dict[str, Any]) -> Dict[str, Any]:
     metadata = {
         "name": params.get('name'),
         "org_id": params.get('org_id'),
-        "uid": params.get('uid')  # Include UID for updates
+        "uid": params.get('uid', '')
     }
 
     # Add labels if provided
@@ -950,7 +949,7 @@ def update_backup_share(module: AnsibleModule, client: PXBackupClient) -> Tuple[
         backup_share_request = {
             "org_id": module.params['org_id'],
             "name": module.params['name'],
-            "uid": module.params['uid'],
+            "uid": module.params.get('uid', ''),
             "backupshare": {
                 "collaborators": collaborators,
                 "groups": groups
@@ -1037,7 +1036,7 @@ def enumerate_backups(module: AnsibleModule, client: PXBackupClient) -> List[Dic
         # Build query parameters
         params = {
             'enumerate_options.cluster_name_filter': module.params.get('cluster_name_filter'),
-            'enumerate_options.cluster_uid_filter': module.params.get('cluster_uid_filter')
+            'enumerate_options.cluster_uid_filter': module.params.get('cluster_uid_filter', '')
         }
 
         # Add other parameters if they exist
@@ -1092,9 +1091,9 @@ def inspect_backup(module: AnsibleModule, client: PXBackupClient) -> Dict[str, A
     """Get details of a specific backup"""
     try:
         # Build request URL and params
-        params = {}
-        if module.params.get('uid'):
-            params['uid'] = module.params['uid']
+        params = {
+            'uid': module.params.get('uid', ''),
+        }
 
         response = client.make_request(
             'GET',
@@ -1106,7 +1105,7 @@ def inspect_backup(module: AnsibleModule, client: PXBackupClient) -> Dict[str, A
         module.debug(f"API Response: {response}")
 
         if not response:
-            module.fail_json(msg=f"No backup found with name {module.params['name']} and uid {module.params['uid']}")
+            module.fail_json(msg=f"No backup found with name {module.params['name']}")
 
         # Return the processed response
         return {
@@ -1133,7 +1132,7 @@ def delete_backup(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict[s
     try:
         # Build delete request parameters
         params = {
-            'uid': module.params['uid']
+            'uid': module.params.get('uid', '')
         }
         
         # Add cluster information
@@ -1224,13 +1223,13 @@ def needs_update(current: Dict[str, Any], desired: Dict[str, Any]) -> bool:
 def get_backup_resource_details(module: AnsibleModule, client: PXBackupClient) -> Dict[str, Any]:
     """Get detailed backup resource information for VirtualMachine backups"""
     try:
-        params = {}
-        if module.params.get('uid'):
-            params['uid'] = module.params['uid']
+        params = {
+            'uid': module.params.get('uid', '')
+        }
             
         response = client.make_request(
             'GET',
-            f"v1/backup/getbackupresourcedetails/{module.params['org_id']}/{module.params['name']}/{module.params['uid']}",
+            f"v1/backup/getbackupresourcedetails/{module.params['org_id']}/{module.params['name']}",
             params=params
         )
         
@@ -1250,7 +1249,7 @@ def retry_backup_resources(module: AnsibleModule, client: PXBackupClient) -> Tup
         retry_request = {
             "org_id": module.params['org_id'],
             "name": module.params['name'],
-            "uid": module.params['uid']
+            "uid": module.params.get('uid', '')
         }
         
         # Add optional fields
@@ -1563,7 +1562,7 @@ def run_module():
             required=False,
             options=dict(
                 name=dict(type='str', required=True),
-                uid=dict(type='str', required=True)
+                uid=dict(type='str', required=False)
             )
         ),
         backup_schedule_ref=dict(
@@ -1572,7 +1571,7 @@ def run_module():
             required=False,
             options=dict(
                 name=dict(type='str', required=True),
-                uid=dict(type='str', required=True)
+                uid=dict(type='str', required=False)
             )
         ),
         volume_resource_only_policy_ref=dict(
@@ -1644,19 +1643,19 @@ def run_module():
     operation_requirements = {
         'CREATE': ['name', 'backup_location_ref', 'cluster_ref'],
 
-        'UPDATE': ['name', 'uid'],
+        'UPDATE': ['name'],
 
-        'DELETE': ['name', 'uid'],
+        'DELETE': ['name'],
 
-        'INSPECT_ONE': ['name', 'uid'],
+        'INSPECT_ONE': ['name'],
 
         'INSPECT_ALL': ['org_id'],
 
-        'UPDATE_BACKUP_SHARE': ['name', 'uid', 'backup_share'],
+        'UPDATE_BACKUP_SHARE': ['name', 'backup_share'],
 
-        'GET_BACKUP_RESOURCE_DETAILS': ['name', 'uid'],
+        'GET_BACKUP_RESOURCE_DETAILS': ['name'],
 
-        'RETRY_BACKUP_RESOURCES': ['name', 'uid']  
+        'RETRY_BACKUP_RESOURCES': ['name']  
     }
 
     module = AnsibleModule(
@@ -1666,21 +1665,21 @@ def run_module():
             ('operation', 'CREATE', [
              'name', 'backup_location_ref', 'cluster_ref']),
 
-            ('operation', 'UPDATE', ['name', 'uid']),
+            ('operation', 'UPDATE', ['name']),
 
-            ('operation', 'DELETE', ['name', 'uid']),
+            ('operation', 'DELETE', ['name']),
 
-            ('operation', 'INSPECT_ONE', ['name', 'uid']),
+            ('operation', 'INSPECT_ONE', ['name']),
             
             ('operation', 'INSPECT_ALL', ['org_id']),
 
             ('operation', 'UPDATE_BACKUP_SHARE',
              
-             ['name', 'uid', 'backup_share']),
+             ['name', 'backup_share']),
 
-            ('operation', 'GET_BACKUP_RESOURCE_DETAILS', ['name', 'uid']),
+            ('operation', 'GET_BACKUP_RESOURCE_DETAILS', ['name']),
 
-            ('operation', 'RETRY_BACKUP_RESOURCES', ['name', 'uid'])  
+            ('operation', 'RETRY_BACKUP_RESOURCES', ['name'])  
         ]
     )
 

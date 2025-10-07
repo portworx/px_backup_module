@@ -18,14 +18,11 @@ backup_schedules:
       - "{{ pvc_resource }}"  # Uses the PVC resource type from resource collector API
     schedule_policy_ref:
       name: "example-schedule-policy"
-      uid: "example-schedule-policy-uid"
     backup_location_ref:
       name: "example-backup-location"
-      uid: "example-backup-location-uid"
     backup_type: "Normal"
     cluster_ref:
       name: "example-cluster"
-      uid: "example-cluster-uid"
     backup_object_type:
       type: "All"
     direct_kdmp: true
@@ -40,17 +37,14 @@ backup_schedules:
       - "{{ pvc_resource }}"  # Excludes the PVC resource type from resource collector API
     backup_location_ref:
       name: "example-backup-location"
-      uid: "example-backup-location-uid"
     backup_type: "Normal"
     cluster_ref:
       name: "example-cluster"
-      uid: "example-cluster-uid"
     backup_object_type:
       type: "All"
     direct_kdmp: false
     schedule_policy_ref:
       name: "example-schedule-policy"
-      uid: "example-schedule-policy-uid"
     owner: "example-owner"
 
   # Schedule with include resources
@@ -66,15 +60,12 @@ backup_schedules:
         version: "v1"
     backup_location_ref:
       name: "example-backup-location"
-      uid: "example-backup-location-uid"
     backup_type: "Normal"
     cluster_ref:
       name: "example-cluster"
-      uid: "example-cluster-uid"
     backup_object_type:
       type: "All"
     direct_kdmp: false
     schedule_policy_ref:
       name: "example-schedule-policy"
-      uid: "example-schedule-policy-uid"
     owner: "example-owner"
