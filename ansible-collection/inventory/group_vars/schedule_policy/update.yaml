@@ -1,10 +1,9 @@
 # List of schedule_policies to update
 schedule_policy_updates:
-  - name: "generic-policy"
-    uid: "00000000-0000-0000-0000-000000000000"
+  - name: "test-policy-2"
     schedule_policy:
       interval:
-        minutes: 10
+        minutes: 15
         retain: 5 
         incremental_count:
           count: 5

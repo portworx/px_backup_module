@@ -28,7 +28,7 @@
             token: "{{ px_backup_token }}"
             org_id: "{{ org_id }}"
             name: "{{ name }}"
-            uid: "{{ uid }}"
+            uid: "{{ uid  | default(omit) }}"
             # Optional parameters
             include_resources: "{{ include_resources | default([]) }}"
             skip_vm_auto_exec_rules: "{{ skip_vm_auto_exec_rules | default(false) }}"

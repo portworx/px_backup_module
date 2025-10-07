@@ -1,7 +1,5 @@
 # Rules to delete
 rules_delete:
   - name: "test-rule-1"
-    uid: "test-rule-1-uid"
 
   - name: "test-rule-2"
-    uid: "test-rule-2-uid"

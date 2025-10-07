@@ -72,7 +72,6 @@ options:
     uid:
         description: 
             - Unique identifier of the receiver
-            - Required for UPDATE, DELETE, and INSPECT_ONE operations
         required: false
         type: str
     receiver_type:
@@ -294,7 +293,7 @@ def update_receiver(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict
     """Update an existing receiver"""
     try:
         receiver_request = build_receiver_request(module.params)
-        receiver_request['metadata']['uid'] = module.params['uid']
+        receiver_request['metadata']['uid'] = module.params.get('uid','')
         
         current = inspect_receiver(module, client)
         if not needs_update(current, receiver_request):
@@ -350,7 +349,7 @@ def inspect_receiver(module: AnsibleModule, client: PXBackupClient) -> Dict[str,
     try:
         response = client.make_request(
             method='GET',
-            endpoint=f"v1/receiver/{module.params['org_id']}/{module.params['name']}/{module.params['uid']}/{module.params['include_secrets']}/{module.params['receiver_type']}",
+            endpoint=f"v1/receiver/{module.params['org_id']}/{module.params['name']}/{module.params['include_secrets']}/{module.params['receiver_type']}",
             params={}
         )
         return response.get('receiver', {})
@@ -362,7 +361,7 @@ def delete_receiver(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict
     try:
         response = client.make_request(
             method='DELETE',
-            endpoint=f"v1/receiver/{module.params['org_id']}/{module.params['name']}/{module.params['uid']}"
+            endpoint=f"v1/receiver/{module.params['org_id']}/{module.params['name']}"
         )
         return response, True
     except Exception as e:
@@ -472,10 +471,10 @@ def run_module():
     # Define required parameters for each operation
     operation_requirements = {
         'CREATE': ['name', 'email_config'],
-        'UPDATE': ['name', 'uid', 'email_config'],
-        'DELETE': ['name', 'uid'],
+        'UPDATE': ['name', 'email_config'],
+        'DELETE': ['name',],
         'VALIDATE_SMTP': ['name', 'email_config'],
-        'INSPECT_ONE': ['name', 'uid'],
+        'INSPECT_ONE': ['name',],
         'INSPECT_ALL': ['org_id']
     }
 
@@ -484,10 +483,10 @@ def run_module():
         supports_check_mode=True,
         required_if=[
             ('operation', 'CREATE', ['name', 'email_config']),
-            ('operation', 'UPDATE', ['name', 'uid', 'email_config']),
-            ('operation', 'DELETE', ['name', 'uid']),
+            ('operation', 'UPDATE', ['name', 'email_config']),
+            ('operation', 'DELETE', ['name']),
             ('operation', 'VALIDATE_SMTP', ['name', 'email_config']),
-            ('operation', 'INSPECT_ONE', ['name', 'uid'])
+            ('operation', 'INSPECT_ONE', ['name'])
         ]
     )
 

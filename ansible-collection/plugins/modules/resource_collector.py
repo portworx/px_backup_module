@@ -165,10 +165,6 @@ def validate_params(params: Dict[str, Any]) -> None:
     missing = [param for param in required_params if not params.get(param)]
     if missing:
         raise ValidationError(f"Missing required parameters: {', '.join(missing)}")
-        
-    if params.get('cluster_ref'):
-        if not params['cluster_ref'].get('name') or not params['cluster_ref'].get('uid'):
-            raise ValidationError("cluster_ref requires both name and uid")
 
 def get_resource_types(module: AnsibleModule, client: PXBackupClient) -> Tuple[List[str], bool]:
     """
@@ -178,7 +174,7 @@ def get_resource_types(module: AnsibleModule, client: PXBackupClient) -> Tuple[L
         # Build query parameters
         params = {
             'cluster_ref.name': module.params['cluster_ref']['name'],
-            'cluster_ref.uid': module.params['cluster_ref']['uid']
+            'cluster_ref.uid': module.params['cluster_ref'].get('uid','')
         }
 
         # Make API request
@@ -232,7 +228,7 @@ def run_module():
             required=True,
             options=dict(
                 name=dict(type='str', required=True),
-                uid=dict(type='str', required=True)
+                uid=dict(type='str', required=False)
             )
         ),
         # SSL cert implementation

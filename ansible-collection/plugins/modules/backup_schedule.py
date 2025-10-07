@@ -7,6 +7,15 @@ from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.px_backup.api import PXBackupClient
 import requests
 
+# Constants for enum mappings
+BACKUP_OBJECT_TYPE_MAP = {
+    'Invalid': 0,
+    'All': 1,
+    'VirtualMachine': 2,
+    'VM': 2,  # Alias for VirtualMachine
+    'NS': 1   # Alias for All (namespace backup)
+}
+
 
 DOCUMENTATION = r'''
 ---
@@ -174,13 +183,15 @@ options:
         required: false
         type: str
     backup_object_type:
-        description: Backup Object types
+        description: Backup object type configuration
         type: dict
+        required: false
         suboptions:
             type:
                 description: Type of backup object
-                choices: ['Invalid', 'NS', 'VM', 'All']
                 type: str
+                choices: ['Invalid', 'NS', 'VM', 'All']
+                required: true
     volume_snapshot_class_mapping:
         description: Volume Snapshot Class Mapping
         required: false
@@ -407,9 +418,8 @@ options:
             uid:
                 description: Policy UID
                 type: str
-                required: true
     include_objects:
-        description: List of exact backup schedules to include (name + UID required)
+        description: List of exact backup schedules to include (name required)
         type: list
         elements: dict
         required: false
@@ -422,7 +432,6 @@ options:
             uid:
                 description: Schedule UID
                 type: str
-                required: true
     exclude_objects:
         description: List of exact backup schedules to exclude (name + UID required)
         type: list
@@ -488,7 +497,9 @@ def create_backup_schedule(module, client):
 def update_backup_schedule(module, client):
     """Update an existing backup schedule"""
     backup_schedule_request = backup_schedule_request_body(module)
-    backup_schedule_request['metadata']['uid'] = module.params['uid']
+
+    if module.params.get('uid'):
+        backup_schedule_request['metadata']['uid'] = module.params['uid']
     
     try:    
         response = client.make_request('PUT', 'v1/backupschedule', backup_schedule_request)
@@ -498,9 +509,9 @@ def update_backup_schedule(module, client):
 
 def enumerate_backup_schedules(module, client, operation):
     """List all backup schedules with support for both GET and POST methods"""
-    backup_location_ref = module.params.get('backup_location_ref', {})
-    cluster_ref = module.params.get('cluster_ref', {}) 
-    enumerate_options = module.params.get('enumerate_options', {})
+    backup_location_ref = module.params.get('backup_location_ref') or {}
+    cluster_ref = module.params.get('cluster_ref') or {}
+    enumerate_options = module.params.get('enumerate_options') or {}
     
     if operation == 'INSPECT_ALL_POST_REQUEST':
         try:
@@ -549,9 +560,12 @@ def enumerate_backup_schedules(module, client, operation):
                 request_body["cluster_ref"] = cluster_ref
             
             # Add 2.9.0 fields if provided
-            if module.params.get('volume_resource_only_policy_ref'):
-                params['volume_resource_only_policy_ref.name'] = module.params.get('volume_resource_only_policy_ref').get('name')
-                params['volume_resource_only_policy_ref.uid'] = module.params.get('volume_resource_only_policy_ref').get('uid')
+            volume_resource_only_policy_ref = module.params.get('volume_resource_only_policy_ref') or {}
+            if volume_resource_only_policy_ref.get('name'):
+                params['volume_resource_only_policy_ref.name'] = volume_resource_only_policy_ref.get('name')
+
+            if volume_resource_only_policy_ref.get('uid'):
+                params['volume_resource_only_policy_ref.uid'] = volume_resource_only_policy_ref.get('uid')
                 
             if module.params.get('policy_ref'):
                 request_body["policy_ref"] = module.params.get('policy_ref')
@@ -583,17 +597,24 @@ def enumerate_backup_schedules(module, client, operation):
         # Use GET with query parameters for simpler queries
         params = {}
 
-        if backup_location_ref:
+        if backup_location_ref.get('name'):
             params['backup_location_ref.name'] = backup_location_ref.get('name')
+            
+        if backup_location_ref.get('uid'):
             params['backup_location_ref.uid'] = backup_location_ref.get('uid')
 
-        if cluster_ref:
+        if cluster_ref.get('name'):
             params['cluster_ref.name'] = cluster_ref.get('name')
+
+        if cluster_ref.get('uid'):
             params['cluster_ref.uid'] = cluster_ref.get('uid')
 
-        if module.params.get('volume_resource_only_policy_ref'):
-            params['volume_resource_only_policy_ref.name'] = module.params.get('volume_resource_only_policy_ref').get('name')
-            params['volume_resource_only_policy_ref.uid'] = module.params.get('volume_resource_only_policy_ref').get('uid')
+        volume_resource_only_policy_ref = module.params.get('volume_resource_only_policy_ref') or {}
+        if volume_resource_only_policy_ref.get('name'):
+            params['volume_resource_only_policy_ref.name'] = volume_resource_only_policy_ref.get('name')
+
+        if volume_resource_only_policy_ref.get('uid'):
+            params['volume_resource_only_policy_ref.uid'] = volume_resource_only_policy_ref.get('uid')
 
         if enumerate_options:
             # Handle time_range
@@ -641,9 +662,13 @@ def handle_request_exception(e, module, operation):
 
 def inspect_backup_schedules(module, client):
     """Get details of a specific backup schedule"""
-    params = {
-        'uid': module.params.get('uid')
-    }
+    if module.params.get('uid'):
+        params = {
+            'uid': module.params['uid']
+        }
+    else:
+        params = {}
+
     try:
         response = client.make_request(
             'GET',
@@ -661,7 +686,7 @@ def delete_backup_schedules(module, client):
     params = module.params
     
     # Check if only the basic required parameters are provided
-    # (org_id, name, uid are always required, so we check for additional parameters)
+    # (org_id and name are always required, so we check for additional parameters)
     additional_params = [
         'policy_ref', 'include_objects', 'exclude_objects', 'include_filter', 
         'exclude_filter', 'cluster_scope', 'delete_backups', 'backup_object_type',
@@ -672,13 +697,17 @@ def delete_backup_schedules(module, client):
     
     # For simple delete operations - use DELETE endpoint
     if not has_additional_params:
-        request_params = {
-            'uid': params.get('uid')
-        }
+        if params.get('uid'):
+            request_params = {
+                'uid': params.get('uid')
+            }
+        else:
+            request_params = {}
+
         try:
             response = client.make_request(
                 'DELETE',
-                f"v1/backupschedule/{params['org_id']}/{params['name']}/{params['uid']}",
+                f"v1/backupschedule/{params['org_id']}/{params['name']}",
                 params=request_params
             )
             return response, True
@@ -690,9 +719,11 @@ def delete_backup_schedules(module, client):
         try:
             delete_request = {
                 "org_id": params['org_id'],
-                "name": params.get('name'),
-                "uid": params.get('uid')
+                "name": params.get('name')
             }
+
+            if params.get('uid'):
+                delete_request['uid'] = params['uid']
             
             # Add deprecated delete_backups field if provided
             if params.get('delete_backups') is not None:
@@ -700,7 +731,12 @@ def delete_backup_schedules(module, client):
             
             # Add 2.9.0 fields if provided
             if params.get('backup_object_type'):
-                delete_request["backup_object_type"] = params['backup_object_type']
+                backup_obj_type = params['backup_object_type']
+                if isinstance(backup_obj_type, dict) and 'type' in backup_obj_type:
+                    type_value = BACKUP_OBJECT_TYPE_MAP.get(backup_obj_type['type'], 1)
+                    delete_request["backup_object_type"] = {"type": type_value}
+                else:
+                    delete_request["backup_object_type"] = {"type": 0}
                 
             if params.get('policy_ref'):
                 delete_request["policy_ref"] = params['policy_ref']
@@ -782,8 +818,14 @@ def backup_schedule_request_body(module):
     if module.params.get('cluster'):
         backup_schedule_request['cluster'] = module.params['cluster']
 
-    if module.params['backup_object_type']:
-        backup_schedule_request["backup_object_type"] = module.params['backup_object_type']
+    # Add backup object type if provided
+    if module.params.get('backup_object_type'):
+        backup_obj_type = module.params['backup_object_type']
+        if isinstance(backup_obj_type, dict) and 'type' in backup_obj_type:
+            type_value = BACKUP_OBJECT_TYPE_MAP.get(backup_obj_type['type'], 1)
+            backup_schedule_request["backup_object_type"] = {"type": type_value}
+        else:
+            backup_schedule_request["backup_object_type"] = {"type": 0}
 
 
     if module.params.get('operation') == "UPDATE":
@@ -871,8 +913,8 @@ def run_module():
                 version=dict(type='str')
             )),
         backup_object_type=dict(
-            required=False,
             type='dict',
+            required=False,
             options=dict(
                 type=dict(type='str', choices=['Invalid', 'NS', 'VM', 'All'], required=True),
             ),
@@ -994,7 +1036,7 @@ def run_module():
             required=False,
             options=dict(
                 name=dict(type='str', required=True),
-                uid=dict(type='str', required=True)
+                uid=dict(type='str', required=False)
             )
         ),
         
@@ -1005,7 +1047,7 @@ def run_module():
             required=False,
             options=dict(
                 name=dict(type='str', required=True),
-                uid=dict(type='str', required=True)
+                uid=dict(type='str', required=False)
             )
         ),
         include_objects=dict(
@@ -1014,7 +1056,7 @@ def run_module():
             required=False,
             options=dict(
                 name=dict(type='str', required=True),
-                uid=dict(type='str', required=True)
+                uid=dict(type='str', required=False)
             )
         ),
         exclude_objects=dict(
@@ -1023,7 +1065,7 @@ def run_module():
             required=False,
             options=dict(
                 name=dict(type='str', required=True),
-                uid=dict(type='str', required=True)
+                uid=dict(type='str', required=False)
             )
         ),
         include_filter=dict(type='str', required=False),
@@ -1039,7 +1081,7 @@ def run_module():
                     elements='dict',
                     options=dict(
                         name=dict(type='str', required=True),
-                        uid=dict(type='str', required=True)
+                        uid=dict(type='str', required=False)
                     )
                 ),
                 all_clusters=dict(type='bool')

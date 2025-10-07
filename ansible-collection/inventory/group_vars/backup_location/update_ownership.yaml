@@ -2,7 +2,6 @@
 # Backup locations to update
 backup_ownership_updates:
   - name: "bl-1"
-    uid: "bl-1-uid"
     ownership:
       owner: "9f2a1ab7-fee0"
       groups:
@@ -13,7 +12,6 @@ backup_ownership_updates:
           access: "Read"
 
   - name: "gcp-backup-2"
-    uid: "e1359f6b-15c8-4383-85de"
     ownership:
       owner: "9f2a1ab7-fee0"
       groups:
@@ -24,7 +22,6 @@ backup_ownership_updates:
           access: "Read"
 
   - name: "azure-backup-test-2"
-    uid: "2e706c32-1da0-4d3a"
     ownership:
       owner: "9f2a1ab7-fee0"
       groups:
@@ -35,7 +32,6 @@ backup_ownership_updates:
           access: "Read"
 
   - name: "nfs-backup-2"
-    uid: "a47c397a-1fd2-450e"
     ownership:
       owner: "9f2a1ab7-fee0"
       groups:

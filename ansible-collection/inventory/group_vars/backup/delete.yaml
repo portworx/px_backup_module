@@ -1,11 +1,8 @@
 ---
 backup_deletes:
   - name: "prod-backup"
-    uid: "backup-123"
     # Optional: cluster_ref if deleting through specific cluster
     cluster_ref:
       name: "prod-cluster"
-      uid: "cluster-456"
 
   - name: "test-backup"
-    uid: "backup-789"

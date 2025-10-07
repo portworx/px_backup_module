@@ -4,9 +4,7 @@ cloud_credentials:
   # AWS Configuration
   - name: "aws-cc"
     include_secrets: True
-    uid: "uid"
 
   # GCP Configuration  
   - name: "azure-cc"
-    uid: "uid"
     include_secrets: False

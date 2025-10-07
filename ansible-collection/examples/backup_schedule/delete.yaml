@@ -15,7 +15,7 @@
         api_url: "{{ px_backup_api_url }}"
         token: "{{ px_backup_token }}"
         org_id: "{{ org_id }}"
-        uid: "f7152020"
+        uid: {{ schedule_uid | default(omit) }}
         name: "schedule-name"
         # SSL Certificate Parameters
         ssl_config: "{{ ssl_config.px_backup | default({}) }}"

@@ -1,7 +1,5 @@
 # Backup locations to delete
 cloud_credentials:
-  - name: "gcp-cc"
-    uid: "uid"
+  - name: "aws-cc"
 
   - name: "ibm-cc"
-    uid: "uid"

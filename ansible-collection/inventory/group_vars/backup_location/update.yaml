@@ -2,12 +2,10 @@
 # Backup locations to update
 backup_locations_update:
   - name: "s3-bl"
-    uid: "s3-bl-uid"
     location_type: "S3"
     path: "s3-bl-path/bucket"
     cloud_credential_ref:
       cloud_credential_name: "s3-cloud-cred-name"
-      cloud_credential_uid: "s3-cloud-cred-uid"
     validate_cloud_credential: true
     object_lock_enabled: false
     s3_config:
@@ -34,7 +32,6 @@ backup_locations_update:
 
   # NFS Configuration
   - name: "nfs-bl"
-    uid: "nfs-bl-uid"
     location_type: "NFS"
     path: "/mnt/nfs-share"
     encryption_key: "{{ encryption_key }}"
@@ -48,12 +45,10 @@ backup_locations_update:
 
  # GCP Configuration  
   - name: "gcp-bl"
-    uid: "gcp-bl-uid"
     location_type: "Google"
     path: "my-gcp-backup-bucket"
     cloud_credential_ref: 
       cloud_credential_name: "gcp-cred-name" 
-      cloud_credential_uid: "gcp-cred-uid"
     encryption_key: "{{ encryption_key }}"
     validate_cloud_credential: true
     object_lock_enabled: "{{ object_lock }}"
@@ -76,12 +71,10 @@ backup_locations_update:
 
 #   # # Azure Configuration
   - name: "azure-bl"
-    uid: "azure-bl-uid"
     location_type: "Azure"
     path: "my-azure-container"
     cloud_credential_ref:
       cloud_credential_name: "azure"
-      cloud_credential_uid: "azure-cred-uid"
     encryption_key: "{{ encryption_key }}"
     validate_cloud_credential: true
     object_lock_enabled: "{{ object_lock }}"

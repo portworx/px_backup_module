@@ -19,7 +19,7 @@
             token: "{{ px_backup_token}}"
             name: "{{ item.name }}"
             org_id: "{{ org_id | default('default') }}"
-            uid: "{{ item.uid }}"
+            uid: "{{ item.uid | default(omit) }}"
             include_secrets: "{{ item.include_secrets |  default(omit) }}"
             # SSL Certificate Parameters
             ssl_config: "{{ ssl_config.px_backup | default({}) }}"

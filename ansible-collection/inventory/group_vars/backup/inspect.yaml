@@ -1,5 +1,5 @@
 # ansible-collection/inventory/group_vars/backup/inspect.yaml
 ---
 # Required variables
-backup_name: "kopia-5ef3cfc-interval-2024-11-21-085415"    # Name of the backup to inspect
-backup_uid: "d03516ba-7473-40d1-a9ee-6de784b8877f"      # UID of the backup to inspect
+backup_name: "test-g-c1897a0-interval-2025-09-04-054335"    # Name of the backup to inspect
+

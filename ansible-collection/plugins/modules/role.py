@@ -174,9 +174,9 @@ requirements:
 notes:
     - "Operation-specific required parameters:"
     - "CREATE: name, rules"
-    - "UPDATE: name, uid, rules"
-    - "DELETE: org_id, name, uid"
-    - "INSPECT_ONE: org_id, name, uid"
+    - "UPDATE: name, rules"
+    - "DELETE: org_id, name"
+    - "INSPECT_ONE: org_id, name"
     - "INSPECT_ALL: org_id"
     - "PERMISSION: org_id"
 '''
@@ -258,7 +258,7 @@ def update_role(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict[str
         # Build request using module.params
         params = dict(module.params)
         role_request = build_role_request(params)
-        role_request['metadata']['uid'] = params['uid']
+        role_request['metadata']['uid'] = params.get('uid', '')
         
         # Get current state for comparison
         current = inspect_role(module, client)
@@ -307,7 +307,7 @@ def inspect_role(module, client):
     try:
         response = client.make_request(
             'GET',
-            f"v1/role/{module.params['org_id']}/{module.params['name']}/{module.params['uid']}",
+            f"v1/role/{module.params['org_id']}/{module.params['name']}",
             params={}
         )
         return response
@@ -319,7 +319,7 @@ def delete_role(module, client):
     try:
         response = client.make_request(
             'DELETE',
-            f"v1/role/{module.params['org_id']}/{module.params['name']}/{module.params['uid']}",
+            f"v1/role/{module.params['org_id']}/{module.params['name']}",
             params={}
         )
         return response, True
@@ -566,9 +566,9 @@ def run_module():
     # Define required parameters for each operation
     operation_requirements = {
         'CREATE': ['name', 'rules'],
-        'UPDATE': ['name', 'uid', 'rules'],
-        'DELETE': ['name', 'uid'],
-        'INSPECT_ONE': ['name', 'uid'],
+        'UPDATE': ['name','rules'],
+        'DELETE': ['name'],
+        'INSPECT_ONE': ['name'],
         'INSPECT_ALL': ['org_id'],
         'PERMISSION': ['org_id']
     }

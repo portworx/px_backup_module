@@ -36,21 +36,21 @@ The module supports the following operations:
 ### Common Parameters
 
 
-| Parameter       | Type       | Required | Default | Description                                    | Choices                                    |
-| ----------------- | ------------ | ---------- | --------- | ------------------------------------------------ | -------------------------------------------- |
-| api_url         | string     | yes      |         | PX-Backup API URL                              |                                            |
-| token           | string     | yes      |         | Authentication token                           |                                            |
-| operation       | string     | yes      | CREATE  | Operation to perform                           |                                            |
-| name            | string     | varies   |         | Name of the cloud credential                   |                                            |
-| org_id          | string     | yes      |         | Organization ID                                |                                            |
-| uid             | string     | varies   |         | Unique identifier (required for update/delete) |                                            |
-| owner           | string     | no       |         | Owner name                                     |                                            |
-| credential_type | string     | yes      |         | Cloud provider type                            | `AWS`, `Azure`, `Google`, `IBM`, `Rancher` |
-| aws_config      | dictionary | false    |         | aws config type                                |                                            |
-| azure_config    | dictionary | false    |         | azure config                                   |                                            |
-| ibm_config      | dictionary | false    |         | ibm config                                     |                                            |
-| google_config   | dictionary | false    |         | google config                                  |                                            |
-| rancher_config  | dictionary | false    |         | rancher config                                 |                                            |
+| Parameter       | Type       | Required | Default | Description                  | Choices                                    |
+| ----------------- | ------------ | ---------- | --------- | ------------------------------ | -------------------------------------------- |
+| api_url         | string     | yes      |         | PX-Backup API URL            |                                            |
+| token           | string     | yes      |         | Authentication token         |                                            |
+| operation       | string     | yes      | CREATE  | Operation to perform         |                                            |
+| name            | string     | varies   |         | Name of the cloud credential |                                            |
+| org_id          | string     | yes      |         | Organization ID              |                                            |
+| uid             | string     | varies   |         | Unique identifier            |                                            |
+| owner           | string     | no       |         | Owner name                   |                                            |
+| credential_type | string     | yes      |         | Cloud provider type          | `AWS`, `Azure`, `Google`, `IBM`, `Rancher` |
+| aws_config      | dictionary | false    |         | aws config type              |                                            |
+| azure_config    | dictionary | false    |         | azure config                 |                                            |
+| ibm_config      | dictionary | false    |         | ibm config                   |                                            |
+| google_config   | dictionary | false    |         | google config                |                                            |
+| rancher_config  | dictionary | false    |         | rancher config               |                                            |
 
 ### SSL/TLS Configuration
 
