@@ -525,16 +525,17 @@ def inspect_cluster(module: AnsibleModule, client: PXBackupClient) -> Dict[str, 
     """Get details of a specific cluster"""
     try:
         params = {
-            'include_secrets': module.params.get('include_secrets', False)
+            'include_secrets': module.params.get('include_secrets', False),
+            'uid': module.params.get('uid', '')
         }
-        
+
         response = client.make_request(
             method='GET',
             endpoint=f"v1/cluster/{module.params['org_id']}/{module.params['name']}",
             params=params
         )
         return response
-        
+
     except Exception as e:
         module.fail_json(msg=f"Failed to inspect cluster: {str(e)}")
 
