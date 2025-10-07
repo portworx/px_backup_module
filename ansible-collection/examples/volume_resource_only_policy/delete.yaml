@@ -22,8 +22,7 @@
       assert:
         that: 
           - "item.name is defined"
-          - "item.uid is defined"
-        fail_msg: "Each volume resource only policy configuration must include 'name' and 'uid'"
+        fail_msg: "Each volume resource only policy configuration must include 'name'"
       loop: "{{ volume_resource_only_policy_deletes }}"
       loop_control:
         label: "{{ item.name }}"
@@ -41,7 +40,7 @@
             token: "{{ px_backup_token }}"
             org_id: "{{ org_id }}"
             name: "{{ item.name }}"
-            uid: "{{ item.uid }}"
+            uid: "{{ item.uid | default(omit) }}"
             # SSL Certificate Parameters
             ssl_config: "{{ ssl_config.px_backup | default({}) }}"
           register: delete_result

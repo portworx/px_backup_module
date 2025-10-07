@@ -43,7 +43,7 @@
           debug:
             msg: |
               Schedule: {{ item.metadata.name }}
-              UID: {{ item.metadata.uid }}
+              UID: {{ item.metadata.uid | default(omit) }}
               Status: {{ item.backup_schedule_info.status.status | default('Unknown') }}
               Cluster: {{ item.backup_schedule_info.cluster_ref.name | default('N/A') }}
               Namespaces: {{ item.backup_schedule_info.namespaces | default([]) | join(', ') }}

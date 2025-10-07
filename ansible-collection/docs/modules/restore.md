@@ -60,7 +60,7 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 | Parameter       | Type   | Required | Description                        |
 | ----------------- | -------- | ---------- | ------------------------------------ |
 | backup_ref.name | string | yes      | Name of the backup to restore from |
-| backup_ref.uid  | string | yes      | UID of the backup to restore from  |
+| backup_ref.uid  | string | no       | UID of the backup to restore from  |
 
 ### Target Configuration
 
@@ -69,7 +69,7 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 | ----------------------- | -------- | ---------- | ---------------------------------------- |
 | cluster_ref           | dict   | no       | Target cluster reference               |
 | cluster_ref.name      | string | yes      | Target cluster name                    |
-| cluster_ref.uid       | string | yes      | Target cluster UID                     |
+| cluster_ref.uid       | string | no       | Target cluster UID                     |
 | namespace_mapping     | dict   | no       | Source to target namespace mapping     |
 | storage_class_mapping | dict   | no       | Source to target storage class mapping |
 

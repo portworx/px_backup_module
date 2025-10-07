@@ -2,4 +2,3 @@
 # Backup locations to delete
 backup_locations_delete:
   - name: "sample-backup-location-name"
-    uid: "sample-backup-location-uid"

@@ -4,4 +4,3 @@ restore_deletes:
     # Optional: cluster_ref if deleting through specific cluster
     # cluster_ref:
     #   name: "prod-cluster"
-    #   uid: "cluster-456"

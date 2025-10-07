@@ -4,7 +4,6 @@
 volume_resource_only_policy_updates:
   # Example: Update volume types and CSI drivers
   - name: "comprehensive-skip-policy"
-    uid: "7e6f3039-dfcb-448b-bc9d-c22d79a3814e"
     volume_types:
       - "Portworx"
       - "Csi"
@@ -23,7 +22,6 @@ volume_resource_only_policy_updates:
 
   # Example: Update only ownership
   - name: "skip-csi-drivers-policy"
-    uid: "61faca55-936a-45a0-bd13-04d480983ae8"
     ownership:
       owner: "admin@example.com"
       groups:

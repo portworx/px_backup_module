@@ -1,7 +1,5 @@
 # Policies to delete
 schedule_policies_delete:
   - name: "test-policy-1"
-    uid: "test-policy-1-uid"
 
   - name: "test-policy-2"
-    uid: "test-policy-2-uid"

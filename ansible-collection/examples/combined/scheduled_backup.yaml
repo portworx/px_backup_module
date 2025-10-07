@@ -106,7 +106,6 @@
         msg:
           - "Cluster Creation Results:"
           - "Name: {{ cluster_result.results[0].item.name }}"
-          - "UID: {{ cluster_result.results[0].cluster.metadata.uid }}"
       when: cluster_result is defined
 
     - name: Display backup schedule results

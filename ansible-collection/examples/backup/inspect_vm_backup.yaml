@@ -27,7 +27,7 @@
             token: "{{ px_backup_token }}"
             org_id: "{{ org_id }}"
             name: "{{ backup_name }}"
-            uid: "{{ backup_uid }}"
+            uid: "{{ backup_uid | default(omit) }}"
             # SSL Certificate Parameters
             ssl_config: "{{ ssl_config.px_backup | default({}) }}"
           register: backup_result

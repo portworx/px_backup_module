@@ -1,4 +1,3 @@
 # ansible-collection/inventory/group_vars/volume_resource_only_policy/inspect.yaml
 ---
-name: "comprehensive-skip-policy"
-uid: "c22d79a3814e"
+name: "skip-portworx-policy"

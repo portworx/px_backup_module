@@ -27,13 +27,13 @@
             api_url: "{{ px_backup_api_url }}"
             token: "{{ px_backup_token }}"
             name: "{{ item.name }}"
-            uid: "{{ item.uid }}"
+            uid: "{{ item.uid | default(omit) }}"
             org_id: "{{ org_id | default('default') }}"
             recipient_type: "{{ item.recipient_type | default('EMAIL') }}"
             recipient_ids: "{{ item.recipient_ids }}"
             receiver_ref:
               name: "{{ item.receiver_ref.name }}"
-              uid: "{{ item.receiver_ref.uid }}"
+              uid: "{{ item.receiver_ref.uid | default(omit) }}"
             severity: "{{ item.severity | default('WARNING') }}"
             active: "{{ item.active | default(true) }}"
             # SSL Certificate Parameters

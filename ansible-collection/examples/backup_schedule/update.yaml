@@ -34,7 +34,7 @@
             uid: "{{ item.uid | default(omit) }}"
             suspend: "{{ item.suspend }}"
             cluster_ref: "{{ item.cluster_ref | default(omit) }}"
-            backup_object_type: "{{ item.backup_object_type | default('All') }}"
+            backup_object_type: "{{ item.backup_object_type | default({'type': 'All'}) }}"
             schedule_policy_ref: "{{ item.schedule_policy_ref | default(omit) }}"
             backup_location_ref: "{{ item.backup_location_ref | default(omit) }}"
             pre_exec_rule_ref: "{{ item.pre_exec_rule_ref | default(omit) }}"

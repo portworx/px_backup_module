@@ -71,7 +71,6 @@ options:
     uid:
         description: 
             - Unique identifier of the recipient
-            - Required for UPDATE, DELETE, and INSPECT_ONE operations
         required: false
         type: str
     recipient_type:
@@ -276,7 +275,7 @@ def update_recipient(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dic
     """Update an existing recipient"""
     try:
         recipient_request = build_recipient_request(module.params)
-        recipient_request['metadata']['uid'] = module.params['uid']
+        recipient_request['metadata']['uid'] = module.params.get('uid','')
         current = inspect_recipient(module, client)
         if not needs_update(current, recipient_request):
             return current, False
@@ -317,7 +316,7 @@ def inspect_recipient(module: AnsibleModule, client: PXBackupClient) -> Dict[str
     try:
         response = client.make_request(
             method='GET',
-            endpoint=f"v1/recipient/{module.params['org_id']}/{module.params['name']}/{module.params['uid']}"
+            endpoint=f"v1/recipient/{module.params['org_id']}/{module.params['name']}"
         )
         return response.get('recipient', {})
     except Exception as e:
@@ -328,7 +327,7 @@ def delete_recipient(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dic
     try:
         response = client.make_request(
             method='DELETE',
-            endpoint=f"v1/recipient/{module.params['org_id']}/{module.params['name']}/{module.params['uid']}"
+            endpoint=f"v1/recipient/{module.params['org_id']}/{module.params['name']}"
         )
         return response, True
     except Exception as e:
@@ -355,7 +354,7 @@ def build_recipient_request(params: Dict[str, Any]) -> Dict[str, Any]:
     if params.get('receiver_ref'):
         request['recipient_info']['receiver_ref'] = {
             "name": params['receiver_ref'].get('name'),
-            "uid": params['receiver_ref'].get('uid')
+            "uid": params['receiver_ref'].get('uid', '')
         }
 
     return request
@@ -430,9 +429,9 @@ def run_module():
     # Define required parameters for each operation
     operation_requirements = {
         'CREATE': ['name', 'recipient_ids', 'receiver_ref'],
-        'UPDATE': ['name', 'uid'],
-        'DELETE': ['name', 'uid'],
-        'INSPECT_ONE': ['name', 'uid'],
+        'UPDATE': ['name'],
+        'DELETE': ['name'],
+        'INSPECT_ONE': ['name'],
         'INSPECT_ALL': ['org_id']
     }
 
@@ -441,9 +440,9 @@ def run_module():
         supports_check_mode=True,
         required_if=[
             ('operation', 'CREATE', ['name', 'recipient_ids', 'receiver_ref']),
-            ('operation', 'UPDATE', ['name', 'uid']),
-            ('operation', 'DELETE', ['name', 'uid']),
-            ('operation', 'INSPECT_ONE', ['name', 'uid'])
+            ('operation', 'UPDATE', ['name']),
+            ('operation', 'DELETE', ['name']),
+            ('operation', 'INSPECT_ONE', ['name'])
         ]
     )
 

@@ -73,7 +73,6 @@ options:
     uid:
         description: 
             - Unique identifier of the rule
-            - Required for UPDATE, DELETE, VALIDATE, INSPECT_ONE, and UPDATE_OWNERSHIP operations
         required: false
         type: str
     labels:
@@ -193,11 +192,11 @@ requirements:
 notes:
     - "Operation-specific required parameters:"
     - "CREATE: name, rules"
-    - "UPDATE: name, uid, rules"
-    - "DELETE: org_id, name, uid"
-    - "INSPECT_ONE: org_id, name, uid"
+    - "UPDATE: name, rules"
+    - "DELETE: org_id, name"
+    - "INSPECT_ONE: org_id, name"
     - "INSPECT_ALL: org_id"
-    - "UPDATE_OWNERSHIP: org_id, name, uid, ownership"
+    - "UPDATE_OWNERSHIP: org_id, name, ownership"
 '''
 
 # Configure logging
@@ -277,7 +276,7 @@ def update_rule(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict[str
         # Build request using module.params
         params = dict(module.params)
         rule_request = build_rule_request(params)
-        rule_request['metadata']['uid'] = params['uid']
+        rule_request['metadata']['uid'] = params.get('uid', '')
         
         # Get current state for comparison
         current = inspect_rule(module, client)
@@ -301,7 +300,7 @@ def update_ownership(module, client):
         "org_id": module.params['org_id'],
         "name": module.params['name'],
         "ownership": module.params['ownership'],
-        "uid": module.params['uid']
+        "uid": module.params.get('uid', '')
     }
     
     try:
@@ -328,7 +327,7 @@ def inspect_rule(module, client):
     try:
         response = client.make_request(
             'GET',
-            f"v1/rule/{module.params['org_id']}/{module.params['name']}/{module.params['uid']}",
+            f"v1/rule/{module.params['org_id']}/{module.params['name']}",
             params={}
         )
         return response
@@ -340,7 +339,7 @@ def delete_rule(module, client):
     try:
         response = client.make_request(
             'DELETE',
-            f"v1/rule/{module.params['org_id']}/{module.params['name']}/{module.params['uid']}",
+            f"v1/rule/{module.params['org_id']}/{module.params['name']}",
             params={}
         )
         return response, True
@@ -586,11 +585,11 @@ def run_module():
     # Define required parameters for each operation
     operation_requirements = {
         'CREATE': ['name', 'rules'],
-        'UPDATE': ['name', 'uid', 'rules'],
-        'DELETE': ['name', 'uid'],
-        'INSPECT_ONE': ['name', 'uid'],
+        'UPDATE': ['name', 'rules'],
+        'DELETE': ['name',],
+        'INSPECT_ONE': ['name', ],
         'INSPECT_ALL': ['org_id'],
-        'UPDATE_OWNERSHIP': ['name', 'uid', 'ownership']
+        'UPDATE_OWNERSHIP': ['name','ownership']
     }
 
     module = AnsibleModule(
