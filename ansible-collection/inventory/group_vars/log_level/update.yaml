@@ -1,0 +1,3 @@
+---
+# Log level to set (Debug, Info, Trace)
+new_level: Debug

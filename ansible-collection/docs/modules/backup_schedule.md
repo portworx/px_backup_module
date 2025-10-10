@@ -38,9 +38,8 @@ The module supports the following operations:
 
 ### Common Parameters
 
-
-| Parameter      | Type    | Required | Default | Description                             |
-| ---------------- | --------- | ---------- | --------- | ----------------------------------------- |
+| Parameter      | Type    | Required | Default | Description                             | Supported Versions |
+| ---------------- | --------- | ---------- | --------- | ----------------------------------------- | ------------------- |
 | api_url        | string  | yes      |         | PX-Backup API URL                       |
 | token          | string  | yes      |         | Authentication token                    |
 | operation      | string  | yes      |         | Operation to perform                    |
@@ -50,6 +49,7 @@ The module supports the following operations:
 | owner          | string  | no       |         | Owner name or uid                       |
 | validate_certs | boolean | no       | true    | Verify SSL certificates                 |
 | labels         | dict    | no       |         | Labels to attach to the Backup Schedule |
+| remark         | string  | no       |         | Last remark made during update operation|  2.10.0
 
 ### SSL/TLS Configuration
 
@@ -431,6 +431,21 @@ The following parameters are deprecated but maintained for backward compatibilit
     name: "daily-backup"
     org_id: "default"
     uid: "schedule-uid-123"
+```
+
+### update backup schedule with Remark
+
+```yaml
+- name: Update backup schedule with remark
+  backup_schedule:
+    operation: UPDATE
+    api_url: "{{ px_backup_api_url }}"
+    token: "{{ px_backup_token }}"
+    org_id: "default"
+    name: "my-schedule"
+    uid: "schedule-uid"
+    suspend: true
+    remark: "Suspended for maintenance window"
 ```
 
 ## Error Handling

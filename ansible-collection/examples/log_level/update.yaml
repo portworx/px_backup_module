@@ -1,0 +1,52 @@
+# ansible-collection/examples/log_level/update.yaml
+---
+- name: Update PX-Backup Log Level
+  hosts: localhost
+  gather_facts: true
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/log_level/update.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - org_id is defined
+          - new_level is defined
+        fail_msg: "Required variables must be defined"
+
+  tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+    - name: Update log level
+      block:
+        - name: Update log level
+          log_level:
+            operation: UPDATE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            org_id: "{{ org_id }}"
+            level: "{{ new_level }}"
+            # SSL Certificate Parameters
+            ssl_config: "{{ ssl_config.px_backup | default({}) }}"
+          register: log_level_result
+
+      rescue:
+        - name: Display error details
+          debug:
+            msg: "Failed to update log level: {{ log_level_result.msg if log_level_result.msg is defined else 'Unknown error occurred' }}"
+          when: log_level_result is defined
+
+        - name: Fail with error message
+          fail:
+            msg: "Failed to update log level. See above for details."
+
+    # Output configuration: Display the output or save to file
+    - name: Handle output
+      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
+      vars:
+        output_data: "{{ log_level_result }}"
+        output_filename_prefix: "log_level_update"
+      when: output_config.enabled | default(false)

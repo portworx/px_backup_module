@@ -46,57 +46,54 @@
           register: vro_policy_result
 
       rescue:
-              - name: Handle VRO policy creation failure
-                debug:
-                  msg:
-                    - "=== VRO POLICY CREATION FAILED ==="
-                    - "Error: {{ vro_policy_result.msg | default('Unknown error') }}"
-                
-              - name: Check if policy already exists
-                volume_resource_only_policy:
-                  operation: INSPECT_ALL
-                  api_url: "{{ px_backup_api_url }}"
-                  token: "{{ px_backup_token }}"
-                  org_id: "{{ org_id | default('default') }}"
-                  # SSL Certificate Parameters
-                  validate_certs: "{{ px_backup_validate_certs | default(true) }}"
-                  ca_cert: "{{ px_backup_ca_cert | default(omit) }}"
-                  client_cert: "{{ px_backup_client_cert | default(omit) }}"
-                  client_key: "{{ px_backup_client_key | default(omit) }}"
-                register: existing_vro_policies
-                ignore_errors: true
+        - name: Handle VRO policy creation failure
+          debug:
+            msg:
+              - "=== VRO POLICY CREATION FAILED ==="
+              - "Error: {{ vro_policy_result.msg | default('Unknown error') }}"
 
-              - name: Debug existing policies
-                debug:
-                  msg: 
-                    - "Found {{ existing_vro_policies.volume_resource_only_policies | length }} existing policies"
-                    - "Policy names: {{ existing_vro_policies.volume_resource_only_policies | map(attribute='metadata.name') | list }}"
-                when: 
-                  - existing_vro_policies is succeeded
-                  - existing_vro_policies.volume_resource_only_policies is defined
+        - name: Check if policy already exists
+          volume_resource_only_policy:
+            operation: INSPECT_ALL
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            org_id: "{{ org_id | default('default') }}"
+            # SSL Certificate Parameters
+            ssl_config: "{{ ssl_config.px_backup | default({}) }}"
+          register: existing_vro_policies
+          ignore_errors: true
 
-              - name: Find matching policy by name
-                set_fact:
-                  matching_policy: "{{ item }}"
-                loop: "{{ existing_vro_policies.volume_resource_only_policies | default([]) }}"
-                when: 
-                  - existing_vro_policies is succeeded
-                  - existing_vro_policies.volume_resource_only_policies is defined
-                  - item.metadata.name == nfs_vro_policy_name
-                loop_control:
-                  label: "{{ item.metadata.name }}"
+        - name: Debug existing policies
+          debug:
+            msg:
+              - "Found {{ existing_vro_policies.volume_resource_only_policies | length }} existing policies"
+              - "Policy names: {{ existing_vro_policies.volume_resource_only_policies | map(attribute='metadata.name') | list }}"
+          when:
+            - existing_vro_policies is succeeded
+            - existing_vro_policies.volume_resource_only_policies is defined
 
-              - name: Use existing policy if found
-                set_fact:
-                  vro_policy_result:
-                    volume_resource_only_policy: "{{ matching_policy }}"
-                    changed: false
-                when: matching_policy is defined
+        - name: Find matching policy by name
+          set_fact:
+            matching_policy: "{{ item }}"
+          loop: "{{ existing_vro_policies.volume_resource_only_policies | default([]) }}"
+          when:
+            - existing_vro_policies is succeeded
+            - existing_vro_policies.volume_resource_only_policies is defined
+            - item.metadata.name == nfs_vro_policy_name
+          loop_control:
+            label: "{{ item.metadata.name }}"
 
-              - name: Fail if policy cannot be created or found
-                fail:
-                  msg: "Failed to create VRO policy '{{ nfs_vro_policy_name }}' and it doesn't exist in the system. Cannot proceed."
-                when: matching_policy is not defined
+        - name: Use existing policy if found
+          set_fact:
+            vro_policy_result:
+              volume_resource_only_policy: "{{ matching_policy }}"
+              changed: false
+          when: matching_policy is defined
+
+        - name: Fail if policy cannot be created or found
+          fail:
+            msg: "Failed to create VRO policy '{{ nfs_vro_policy_name }}' and it doesn't exist in the system. Cannot proceed."
+          when: matching_policy is not defined
 
     - name: Prepare VRO policy reference
       set_fact:
@@ -174,7 +171,7 @@
         msg:
           - "=== BACKUP SCHEDULE UPDATE SUCCESS ==="
           - "Schedule: {{ item.item.name }}"
-          - "VRO Policy Applied: {{ vro_policy_ref.name }} }})"
+          - "VRO Policy Applied: {{ vro_policy_ref.name }}"
           - "Update Status: Success"
           - "---"
       loop: "{{ successful_updates }}"

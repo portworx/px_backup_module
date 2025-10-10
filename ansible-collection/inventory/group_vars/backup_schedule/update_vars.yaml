@@ -17,7 +17,7 @@ backup_schedules_update:
       name: "minio"
     labels:
       key: value
-
+    remark: "Adding remark via Ansible"
   # OR Bulk update schedules
   - backup_object_type:
       type: "All"  # Can be "All" or "VM" or "NS"
