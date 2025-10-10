@@ -33,11 +33,7 @@
           name: "{{ item.name }}"
           uid: "{{ item.uid | default(omit) }}"
           # SSL Certificate Parameters
-          ssl_config:
-            validate_certs: "{{ px_backup_validate_certs | default(true) }}"
-            ca_cert: "{{ px_backup_ca_cert | default(omit) }}"
-            client_cert: "{{ px_backup_client_cert | default(omit) }}"
-            client_key: "{{ px_backup_client_key | default(omit) }}"
+          ssl_config: "{{ ssl_config.px_backup | default({}) }}"
         register: current_configs
         loop: "{{ clusters_update }}"
         loop_control:
@@ -65,11 +61,7 @@
           platform_credential_ref: "{{ item.platform_credential_ref | default(omit) }}"
           ownership: "{{ item.ownership | default(omit) }}"
           # SSL Certificate Parameters
-          ssl_config:
-            validate_certs: "{{ px_backup_validate_certs | default(true) }}"
-            ca_cert: "{{ px_backup_ca_cert | default(omit) }}"
-            client_cert: "{{ px_backup_client_cert | default(omit) }}"
-            client_key: "{{ px_backup_client_key | default(omit) }}"
+          ssl_config: "{{ ssl_config.px_backup | default({}) }}"
         register: update_results
         loop: "{{ clusters_update }}"
         loop_control:
@@ -78,20 +70,7 @@
       rescue:
         - name: Log failure details
           debug:
-            msg: |
-              Failed to update clusters:
-              {% if ansible_failed_task is defined %}
-              Failed task: {{ ansible_failed_task.name }}
-              Failed result: {{ ansible_failed_result }}
-              {% endif %}
-
-              {% if update_results is defined %}
-              Update failures: {{ update_results.results | selectattr('failed', 'true') | map(attribute='msg') | list }}
-              {% endif %}
-
-              {% if current_configs is defined %}
-              Configurations retrieved for: {{ current_configs.results | map(attribute='item.name') | list }}
-              {% endif %}
+            msg: "Failed to update clusters: {{ update_results.results | selectattr('failed', 'true') | map(attribute='msg') | list }}"
 
         - name: Show detailed error information
           debug:

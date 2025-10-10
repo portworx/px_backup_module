@@ -1,0 +1,48 @@
+---
+- name: List Log Level for Px-Backup Module
+  hosts: localhost
+  gather_facts: true
+  
+  vars_files:
+    - "{{ inventory_dir}}/group_vars/common/all.yaml"
+
+  vars:
+    # Log level scenarios
+    log_level_scenarios:
+      - name: "Enable debug logging"
+        level: "Debug"
+        description: "Most verbose logging for troubleshooting"
+      - name: "Set standard logging"
+        level: "Info"
+        description: "Standard informational logging"
+      - name: "Enable trace logging"
+        level: "Trace"
+        description: "Detailed trace logging for deep debugging"
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - org_id is defined
+        fail_msg: "Required variables must be defined"
+
+  tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+
+    - name: Inspect log level
+      log_level:
+        operation: INSPECT
+        api_url: "{{ px_backup_api_url }}"
+        token: "{{ px_backup_token }}"
+        org_id: "{{ org_id }}"
+        ssl_config: "{{ ssl_config.px_backup | default({}) }}"
+      register: log_level_result
+
+    # Output configuration: Display the output or save to file
+    - name: Handle output
+      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
+      vars:
+        output_data: "{{ backup_result }}"
+        output_filename_prefix: "backup_create"
+      when: output_config.enabled | default(false)
