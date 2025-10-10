@@ -24,8 +24,6 @@
         fail_msg: "Required variables must be defined"
 
   tasks:
-    - name: Login and fetch Px-Backup token
-      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
     - name: Inspect clusters
       block:
         - name: Get cluster details
@@ -44,16 +42,45 @@
           loop_control:
             label: "{{ item.name }}"
 
-      rescue:
-        - name: Display error details
+        - name: Log failure details
           debug:
-            msg: "Failed to inspect clusters: {{ inspect_result.results | selectattr('failed', 'true') | map(attribute='msg') | list }}"
-          when: inspect_result is defined and inspect_result.results is defined
+            msg: |
+              Failed during cluster inspection process.
+
+              {% if ansible_failed_task is defined %}
+              Failed task: {{ ansible_failed_task.name }}
+              Failed result: {{ ansible_failed_result }}
+              {% endif %}
+
+              {% if inspect_result is defined %}
+              Inspection failures: {{ inspect_result.results | selectattr('failed', 'true') | map(attribute='msg') | list }}
+              {% endif %}
+
+              Clusters attempted: {{ clusters_inspect | map(attribute='name') | list }}
+
+        - name: Show detailed error information
+          debug:
+            var: ansible_failed_result
+          when: ansible_failed_result is defined
 
         - name: Fail with error message
           fail:
-            msg: "Failed to inspect clusters. See above for details."
+            msg: "Error during cluster inspection process. Check the failure logs above."
 
+    - name: Show inspection results
+      debug:
+        msg:
+          - "Inspection Results:"
+          - "----------------------------------------"
+          - "Cluster: {{ item.item.name }}"
+          - "UID: {{ item.item.uid }}"
+          - "Status: {{ 'Success' if not item.failed else 'Failed' }}"
+          - "Include Secrets: {{ item.item.include_secrets | default(false) }}"
+          - "----------------------------------------"
+      loop: "{{ inspect_result.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+      when: inspect_result is defined
 
     # Output configuration: Display the output or save to file
     - name: Handle output
@@ -61,4 +88,6 @@
       vars:
         output_data: "{{ inspect_result }}"
         output_filename_prefix: "cluster_inspect"
-      when: output_config.enabled | default(false)
+      when:
+        - output_config.enabled | default(false)
+        - inspect_result is defined
