@@ -391,6 +391,11 @@ options:
         description: Advanced label selector for resources (string format with operator support)
         required: false
         type: str
+    # New in 2.10.0
+    remark:
+        description: Last remark made during update operation
+        required: false
+        type: str
     # New in 2.9.0
     volume_resource_only_policy_ref:
         description: reference to Volume Resource Only policy ref
@@ -500,6 +505,9 @@ def update_backup_schedule(module, client):
 
     if module.params.get('uid'):
         backup_schedule_request['metadata']['uid'] = module.params['uid']
+
+    if module.params.get('remark'):
+        backup_schedule_request["remark"] = module.params.get('remark')
     
     try:    
         response = client.make_request('PUT', 'v1/backupschedule', backup_schedule_request)
@@ -961,6 +969,10 @@ def run_module():
         parallel_backup=dict(type='bool', required=False),
         keep_cr_status=dict(type='bool', required=False),
         advanced_resource_label_selector=dict(type='str', required=False),
+
+        # New in 2.10.0
+        remark=dict(type='str', required=False),
+
         # Deprecated fields (keeping for backward compatibility)
         schedule_policy=dict(type='str', required=False),
         backup_location=dict(type='str', required=False),
