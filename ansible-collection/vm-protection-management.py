@@ -625,6 +625,7 @@ def update_schedules(matching_schedules, suspend=False):
                     "backup_object_type": backup_object_type,
                     "skip_vm_auto_exec_rules": True,
                     "validate_certs": True,
+                    "remark":"Schedule updated by script(vm-protection-management)",
                     "labels": schedule["metadata"].get("labels", {}),
                 }],
                 "vm_namespaces": vm_namespaces,
