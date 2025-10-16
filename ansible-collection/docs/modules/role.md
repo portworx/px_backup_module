@@ -28,6 +28,7 @@ The module supports the following operations:
 | INSPECT_ONE | Get details of a specific role  |
 | INSPECT_ALL | List all roles                  |
 | PERMISSION  | List all permissions for a role |
+| GET_CURRENT_USER_ROLES| GET role details of current user |
 
 ## Parameters
 
@@ -46,7 +47,8 @@ The module supports the following operations:
 | rules          | list       | varies   |         | List of rules                        |         |
 | labels         | dictionary | no       |         | Label for the role                   |         |
 | validate_certs | boolean    | no       | `true`  | Whether to validate SSL certificates |         |
-
+| role_id | string | no |  | role_id of the sender | |
+ 
 ### SSL/TLS Configuration
 
 All modules support comprehensive SSL/TLS certificate management. See [SSL Certificate Configuration](../common/ssl_configuration.md) for:
@@ -113,6 +115,11 @@ The module implements comprehensive error handling:
    - Permission boundaries
    - Update constraints
 
+4. **Role Dependecy**
+
+    - role_id is expected when creation of a new role. 
+    - if not explictly provided will be picked from the user's token
+    
 ## Troubleshooting
 
 1. **Creation Issues**

@@ -21,6 +21,7 @@ import typing
 from typing import Dict, List, Tuple, Optional, Any, Union
 import logging
 from dataclasses import dataclass
+import base64
 
 from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.px_backup.api import PXBackupClient
@@ -49,9 +50,10 @@ options:
             - "- INSPECT_ONE retrieves details of a specific role "
             - "- INSPECT_ALL lists all roles "
             - "- PERMISSION returns list of services, APIs permission for given user"
+            - "- GET_CURRENT_USER_ROLES returns roles owned by the current user (from token)"
         required: true
         type: str
-        choices: ['CREATE', 'UPDATE', 'DELETE', 'INSPECT_ONE', 'INSPECT_ALL', 'PERMISSION']
+        choices: ['CREATE', 'UPDATE', 'DELETE', 'INSPECT_ONE', 'INSPECT_ALL', 'PERMISSION', 'GET_CURRENT_USER_ROLES']
     api_url:
         description: PX-Backup API URL
         required: true
@@ -166,6 +168,16 @@ options:
                         description: Public access type
                         choices: ['Invalid', 'Read', 'Write', 'Admin']
                         type: str
+    role_id:
+        description:
+            - User ID to set as the role owner
+            - When provided, this user ID will be set as the owner of the role
+            - If not provided, the current user ID will be automatically extracted from the JWT token
+            - This ensures the role appears in PXCentral UI for the specified or current user
+            - Only applies to CREATE operation when ownership is not explicitly provided
+            - Format: UUID string (e.g., 3fe6c733-6df6-4058-91b8-bcd3344c8564)
+        required: false
+        type: str
 
 requirements:
     - python >= 3.9
@@ -276,6 +288,38 @@ def update_role(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict[str
     except Exception as e:
         module.fail_json(msg=f"Failed to update role: {str(e)}")
 
+def get_current_user_from_token(token):
+    """Extract user information from JWT token"""
+    try:
+        # JWT tokens have 3 parts: header.payload.signature
+        # We want the payload (middle part)
+        parts = token.split('.')
+        if len(parts) != 3:
+            return None
+
+        payload_b64 = parts[1]
+
+        # Add padding if needed (base64 strings must be multiples of 4)
+        padding = 4 - (len(payload_b64) % 4)
+        if padding != 4:
+            payload_b64 += '=' * padding
+
+        # Decode base64 and parse JSON
+        payload_json = base64.b64decode(payload_b64).decode('utf-8')
+        user_info = json.loads(payload_json)
+
+        return {
+            'user_id': user_info.get('sub', ''),
+            'email': user_info.get('email', ''),
+            'issuer': user_info.get('iss', ''),
+            'audience': user_info.get('aud', ''),
+            'issued_at': user_info.get('iat', ''),
+            'expires_at': user_info.get('exp', ''),
+            'jwt_id': user_info.get('jti', '')
+        }
+    except Exception:
+        return None
+
 def permission_role(module, client):
     """Fetch all permissions"""
 
@@ -300,6 +344,39 @@ def enumerate_roles(module, client):
         return response.get('roles', [])
     except Exception as e:
         module.fail_json(msg=f"Failed to enumerate roles: {str(e)}")
+
+def get_current_user_roles(module, client):
+    """Get roles owned by the current user"""
+    try:
+        # Get user info from token
+        token = module.params.get('token', '')
+        user_info = get_current_user_from_token(token)
+
+        if not user_info or not user_info.get('user_id'):
+            module.fail_json(msg="Failed to extract user information from token")
+
+        # Get all roles
+        params = {
+            'labels': module.params.get('labels', {})
+        }
+        response = client.make_request('GET', f"v1/role/{module.params['org_id']}", params=params)
+        all_roles = response.get('roles', [])
+
+        # Filter roles owned by current user
+        current_user_id = user_info['user_id']
+        user_roles = [
+            role for role in all_roles
+            if role.get('metadata', {}).get('ownership', {}).get('owner') == current_user_id
+        ]
+
+        return {
+            'user_info': user_info,
+            'roles': user_roles,
+            'total_user_roles': len(user_roles),
+            'total_all_roles': len(all_roles)
+        }
+    except Exception as e:
+        module.fail_json(msg=f"Failed to get current user roles: {str(e)}")
 
 def inspect_role(module, client):
     """Get details of a specific role"""
@@ -353,7 +430,27 @@ def build_role_request(params: Dict[str, Any]) -> Dict[str, Any]:
         request['metadata']['labels'] = params['labels']
         
     if params.get('ownership'):
+        # Use explicitly provided ownership
         request['metadata']['ownership'] = params['ownership']
+    else:
+        # Determine owner ID: use role_id if provided, otherwise extract from token
+        owner_id = params.get('role_id')
+
+        if not owner_id:
+            # Extract from current user token as fallback
+            token = params.get('token', '')
+            user_info = get_current_user_from_token(token)
+            if user_info and user_info.get('user_id'):
+                owner_id = user_info['user_id']
+
+        # Set ownership if we have an owner ID
+        if owner_id:
+            request['metadata']['ownership'] = {
+                "owner": owner_id,
+                "public": {
+                    "type": "Read"
+                }
+            }
 
     return request
 
@@ -458,6 +555,15 @@ def perform_operation(module: AnsibleModule, client: PXBackupClient, operation: 
             message="Role deleted successfully"
             )
 
+        elif operation == 'GET_CURRENT_USER_ROLES':
+                result = get_current_user_roles(module, client)
+                return OperationResult(
+                    success=True,
+                    changed=False,
+                    data=result,
+                    message=f"Found {result['total_user_roles']} roles owned by current user"
+                )
+
     except Exception as e:
         logger.exception(f"Operation {operation} failed")
         return OperationResult(
@@ -480,12 +586,14 @@ def run_module():
                 'DELETE',
                 'INSPECT_ONE',
                 'INSPECT_ALL',
-                'PERMISSION'
+                'PERMISSION',
+                'GET_CURRENT_USER_ROLES'
             ]
         ),
         name=dict(type='str', required=False),
         org_id=dict(type='str', required=True),
         uid=dict(type='str', required=False),
+        role_id=dict(type='str', required=False),
         rules=dict(
             type='list',
             elements='dict',
@@ -570,7 +678,8 @@ def run_module():
         'DELETE': ['name'],
         'INSPECT_ONE': ['name'],
         'INSPECT_ALL': ['org_id'],
-        'PERMISSION': ['org_id']
+        'PERMISSION': ['org_id'],
+        'GET_CURRENT_USER_ROLES': []
     }
 
     module = AnsibleModule(
