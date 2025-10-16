@@ -52,12 +52,17 @@
             state: directory
             mode: '0755'
 
+        - name: Generate timestamp
+          set_fact:
+            current_timestamp: "{{ ansible_date_time.epoch | default(now(utc=true) | int) }}"
+          when: add_timestamp | bool
+
         - name: Generate base filename
           set_fact:
             output_base_filename: >-
               {{ output_filename_prefix | default('output') }}
               {%- if add_timestamp | bool -%}
-              _{{ ansible_date_time.epoch }}
+              _{{ current_timestamp }}
               {%- endif -%}
 
         # Include format-specific tasks for file output
