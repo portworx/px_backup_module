@@ -1,10 +1,10 @@
 ---
 # Define roles list
 roles:
-  # Example role 1
-  - name: "test-role-1"
+  # Example role 1 - with automatic current user as owner
+  - name: "test-role-from-ansible"
     labels:
-      role-label: "test-label"
+      role-label: "ansible-test-label"
     rules:
       - services: ['cloudcredential']
         apis: ['inspect*', 'enumerate*']
@@ -17,8 +17,19 @@ roles:
       - services: ['role']
         apis: ['inspect*', 'enumerate*']
 
-  # Example role 2
-  - name: "test-role-2"
+  # Example role 2 - with specific role_id as owner
+  - name: "test-role-from-ansible"
+    role_id: "603ded96-1c75-4320-ac03-d9046e563824"  # Specific user ID
+    labels:
+      role-label: "ansible-test-label"
     rules:
+      - services: ['cloudcredential']
+        apis: ['inspect*', 'enumerate*']
+      - services: ['schedulepolicy']
+        apis: ['inspect*', 'enumerate*']
+      - services: ['backuplocation']
+        apis: ['inspect*', 'enumerate*']
+      - services: ['rules']
+        apis: ['inspect*', 'enumerate*']
       - services: ['role']
         apis: ['inspect*', 'enumerate*']
