@@ -1,0 +1,27 @@
+---
+# Keycloak Role Configuration for UPDATE operations
+
+# Roles to update (list of roles with their update configurations)
+roles_to_update:
+  # Example 1: Update test role
+  - name: "px-backup-test-role-from-ansible-2"
+    description: "Updated test role for PX-Backup management"
+    attributes:
+      service: "px-backup"
+      access_level: "senior-operator"
+      department: "Operations"
+      updated_by: "ansible"
+
+  # Example 2: Update operator role (uncomment to use)
+  # - name: "px-backup-operator"
+  #   description: "Updated operator role for PX-Backup management"
+  #   attributes:
+  #     service: "px-backup"
+  #     access_level: "operator"
+  #     department: "Operations"
+  #     updated_by: "ansible"
+
+# Update options
+update_options:
+  backup_before_update: true
+  verify_after_update: true

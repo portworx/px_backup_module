@@ -1,0 +1,48 @@
+---
+# Keycloak Role Configuration for ENUMERATE operations
+
+# Pagination settings
+pagination:
+  first: 0
+  max: 20
+  
+# Alternative pagination configurations for different scenarios
+pagination_configs:
+  small_batch:
+    first: 0
+    max: 10
+  large_batch:
+    first: 0
+    max: 50
+  all_roles:
+    first: 0
+    max: 1000
+
+# Filtering options
+role_filters:
+  # Filter by service attribute
+  by_service:
+    enabled: false
+    service_name: "px-backup"
+  
+  # Filter by access level
+  by_access_level:
+    enabled: false
+    access_levels:
+      - "admin"
+      - "operator"
+  
+  # Filter by department
+  by_department:
+    enabled: false
+    departments:
+      - "IT"
+      - "Operations"
+
+# Display options
+display_options:
+  show_attributes: true
+  show_descriptions: true
+  show_role_count: true
+  group_by_service: false
+  sort_by: "name"  # Options: name, description, created_date

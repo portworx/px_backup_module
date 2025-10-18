@@ -1,0 +1,93 @@
+---
+- name: Create Keycloak Role Example
+  hosts: keycloak_role
+  gather_facts: false
+
+  tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - pxcentral_auth_url is defined
+          - pxcentral_client_id is defined
+          - pxcentral_username is defined
+          - pxcentral_password is defined
+          - roles_to_create is defined
+          - roles_to_create | length > 0
+        fail_msg: "Required variables must be defined. Check group_vars/common/all.yaml and group_vars/keycloak_role/create.yaml"
+
+    - name: Get authentication token
+      auth:
+        auth_url: "{{ pxcentral_auth_url }}"
+        client_id: "{{ pxcentral_client_id }}"
+        username: "{{ pxcentral_username }}"
+        password: "{{ pxcentral_password }}"
+        token_duration: "{{ token_duration | default('1h') }}"
+        ssl_config: "{{ ssl_config.px_central | default({}) }}"
+      register: auth_result
+      no_log: false
+
+    - name: Set token fact
+      set_fact:
+        keycloak_token: "{{ auth_result.access_token }}"
+      no_log: false
+
+    - name: Display roles to be created
+      debug:
+        msg: "Roles scheduled for creation: {{ roles_to_create | map(attribute='name') | join(', ') }}"
+
+    - name: Create Keycloak roles
+      keycloak_role:
+        operation: CREATE
+        auth_url: "{{ pxcentral_auth_url }}"
+        token: "{{ keycloak_token }}"
+        name: "{{ item.name }}"
+        description: "{{ item.description }}"
+        attributes: "{{ item.attributes }}"
+        ssl_config: "{{ ssl_config.px_central | default({}) }}"
+      register: create_results
+      loop: "{{ roles_to_create }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Display creation results
+      debug:
+        msg: "{{ item.item.name }}: {{ item.message }}"
+      loop: "{{ create_results.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+
+    - name: Display created role details
+      debug:
+        msg: "Created role: {{ item.role.name }} - {{ item.role.description | default('No description') }}"
+      loop: "{{ create_results.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+      when: item.role is defined
+
+    - name: Verify roles were created
+      keycloak_role:
+        operation: INSPECT
+        auth_url: "{{ pxcentral_auth_url }}"
+        token: "{{ keycloak_token }}"
+        name: "{{ item.name }}"
+        ssl_config: "{{ ssl_config.px_central | default({}) }}"
+      register: verify_results
+      loop: "{{ roles_to_create }}"
+      loop_control:
+        label: "{{ item.name }}"
+      failed_when: false
+
+    - name: Display verification results
+      debug:
+        msg: "Verified role: {{ item.role.name }} with attributes: {{ item.role.attributes | default({}) }}"
+      loop: "{{ verify_results.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+      when: item.role is defined
+
+    - name: Summary
+      debug:
+        msg: |
+          Creation Summary:
+          - Attempted to create: {{ roles_to_create | length }} role(s)
+          - Successfully created: {{ create_results.results | selectattr('changed', 'equalto', true) | list | length }} role(s)
