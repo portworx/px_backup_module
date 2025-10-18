@@ -17,46 +17,101 @@
         fail_msg: "Required variables must be defined"
 
   tasks:
-    - name: Login and fetch Px-Backup token
+    - name: Login and fetch PX-Backup token
       include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
-    - name: Create roles
-      block:
-        - name: Debug payload
-          debug:
-            var: item
-          loop: "{{ roles }}"
-        - name: Create role
-          role:
-            operation: CREATE
-            api_url: "{{ px_backup_api_url }}"
-            token: "{{ px_backup_token }}"
-            name: "{{ item.name }}"
-            org_id: "{{ org_id | default('default') }}"
-            labels: "{{ item.labels | default(omit) }}"
-            rules: "{{ item.rules }}"
-            role_id: "{{ item.role_id | default(omit) }}"  # Optional: specify owner user ID
-            # SSL Certificate Parameters
-            ssl_config: "{{ ssl_config.px_backup | default({}) }}"
-          loop: "{{ roles }}"
-          register: role_result
-          loop_control:
-            label: "{{ item.name }}"
 
-      rescue:
-        - name: Display error details
-          debug:
-            msg: "Failed to create role: {{ role_result.results | selectattr('failed', 'true') | map(attribute='msg') | list }}"
-          when: role_result is defined and role_result.results is defined
+    - name: Create Keycloak roles for PX-Backup roles without role_id
+      keycloak_role:
+        operation: CREATE
+        auth_url: "{{ pxcentral_auth_url }}"
+        token: "{{ px_backup_token }}"
+        name: "px-backup-{{ item.name }}"
+        description: "Role created via ansible"
+        attributes:
+          px_backup_role: "{{ item.name }}"
+          auto_generated: "true"
+          created_by: "ansible-automation"
+        ssl_config: "{{ ssl_config.px_backup | default({}) }}"
+      register: keycloak_role_creation_result
+      loop: "{{ roles }}"
+      loop_control:
+        label: "{{ item.name }}"
+      when: item.role_id is not defined
+      failed_when:
+        - keycloak_role_creation_result.failed is defined
+        - keycloak_role_creation_result.failed
+        - "'already exists' not in (keycloak_role_creation_result.msg | default(''))"
+        - "'Conflict' not in (keycloak_role_creation_result.msg | default(''))"
 
-        - name: Fail with error message
-          fail:
-            msg: "Failed to create roles. See above for details."
+    - name: Inspect existing Keycloak roles for roles without role_id
+      keycloak_role:
+        operation: INSPECT
+        auth_url: "{{ pxcentral_auth_url }}"
+        token: "{{ px_backup_token }}"
+        name: "px-backup-{{ item.name }}"
+        ssl_config: "{{ ssl_config.px_backup | default({}) }}"
+      register: keycloak_role_inspect_result
+      loop: "{{ roles }}"
+      loop_control:
+        label: "{{ item.name }}"
+      when: item.role_id is not defined
+      failed_when: false  # Don't fail if role doesn't exist, we'll handle it below
 
+    - name: Fail if Keycloak role creation and inspection both failed
+      fail:
+        msg: "Failed to create or find Keycloak role 'px-backup-{{ item.name }}'. Creation result: {{ (keycloak_role_creation_result.results | selectattr('item.name', 'equalto', item.name) | first).msg | default('N/A') }}"
+      loop: "{{ roles }}"
+      loop_control:
+        label: "{{ item.name }}"
+      when:
+        - item.role_id is not defined
+        - keycloak_role_inspect_result is defined
+        - (keycloak_role_inspect_result.results | selectattr('item.name', 'equalto', item.name) | first).failed | default(false)
+        - (keycloak_role_creation_result.results | selectattr('item.name', 'equalto', item.name) | first).failed | default(false)
 
-    # Output configuration: Display the output or save to file
-    - name: Handle output
-      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
-      vars:
-        output_data: "{{ role_result }}"
-        output_filename_prefix: "role_create"
-      when: output_config.enabled | default(false)
+    - name: Create PX-Backup roles
+      role:
+        operation: CREATE
+        api_url: "{{ px_backup_api_url }}"
+        token: "{{ px_backup_token }}"
+        name: "{{ item.name }}"
+        org_id: "{{ item.org_id | default('default') }}"
+        labels: "{{ item.labels | default({}) }}"
+        rules: "{{ item.rules }}"
+        role_id: >-
+          {% if item.role_id is defined %}
+          {{ item.role_id }}
+          {% else %}
+          {{ (keycloak_role_inspect_result.results | selectattr('item.name', 'equalto', item.name) | first).role.id }}
+          {% endif %}
+        ownership: "{{ item.ownership | default(omit) }}"  # Optional: explicit ownership
+        ssl_config: "{{ ssl_config.px_backup | default({}) }}"
+      register: role_creation_result
+      loop: "{{ roles }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Display role creation results
+      debug:
+        msg: |
+          Role created successfully!
+          Name: {{ item.item.name }}
+          PX-Backup Role ID: {{ item.role.metadata.uid | default('N/A') }}
+          {% if item.item.role_id is not defined %}
+          Auto-created Keycloak role: px-backup-{{ item.item.name }}
+          Keycloak role ID: {{ (keycloak_role_inspect_result.results | selectattr('item.name', 'equalto', item.item.name) | first).role.id }}
+          {% else %}
+          Used existing Keycloak role: {{ item.item.role_id }}
+          {% endif %}
+      loop: "{{ role_creation_result.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+      when: item is succeeded
+
+    - name: Display errors for failed role creations
+      debug:
+        msg: "Role creation failed for {{ item.item.name }}: {{ item.msg }}"
+      loop: "{{ role_creation_result.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+      when: item is failed

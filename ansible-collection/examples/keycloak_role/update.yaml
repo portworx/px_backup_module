@@ -1,0 +1,116 @@
+---
+- name: Update Keycloak Role Example
+  hosts: keycloak_role
+  gather_facts: false
+  vars:
+    # Update options from group_vars
+    backup_before_update: "{{ update_options.backup_before_update }}"
+    verify_after_update: "{{ update_options.verify_after_update }}"
+
+  tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - pxcentral_auth_url is defined
+          - pxcentral_client_id is defined
+          - pxcentral_username is defined
+          - pxcentral_password is defined
+          - roles_to_update is defined
+          - roles_to_update | length > 0
+        fail_msg: "Required variables must be defined. Check group_vars/common/all.yaml and group_vars/keycloak_role/update.yaml"
+
+    - name: Get authentication token
+      auth:
+        auth_url: "{{ pxcentral_auth_url }}"
+        client_id: "{{ pxcentral_client_id }}"
+        username: "{{ pxcentral_username }}"
+        password: "{{ pxcentral_password }}"
+        token_duration: "{{ token_duration | default('1h') }}"
+        ssl_config: "{{ ssl_config.px_central | default({}) }}"
+      register: auth_result
+      no_log: false
+
+    - name: Set token fact
+      set_fact:
+        keycloak_token: "{{ auth_result.access_token }}"
+      no_log: false
+
+    - name: Display roles to be updated
+      debug:
+        msg: "Roles scheduled for update: {{ roles_to_update | map(attribute='name') | join(', ') }}"
+
+    - name: Get current role details before update
+      keycloak_role:
+        operation: INSPECT
+        auth_url: "{{ pxcentral_auth_url }}"
+        token: "{{ keycloak_token }}"
+        name: "{{ item.name }}"
+        ssl_config: "{{ ssl_config.px_central | default({}) }}"
+      register: current_roles
+      loop: "{{ roles_to_update }}"
+      loop_control:
+        label: "{{ item.name }}"
+      when: backup_before_update
+      failed_when: false  # Don't fail if role doesn't exist
+
+    - name: Display current role details
+      debug:
+        msg: "Current role: {{ item.role.name }} - {{ item.role.description | default('No description') }}"
+      loop: "{{ current_roles.results | default([]) }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+      when:
+        - backup_before_update
+        - item.role is defined
+
+    - name: Update Keycloak roles
+      keycloak_role:
+        operation: UPDATE
+        auth_url: "{{ pxcentral_auth_url }}"
+        token: "{{ keycloak_token }}"
+        name: "{{ item.name }}"
+        description: "{{ item.description }}"
+        attributes: "{{ item.attributes }}"
+        ssl_config: "{{ ssl_config.px_central | default({}) }}"
+      register: update_results
+      loop: "{{ roles_to_update }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Display update results
+      debug:
+        msg: "{{ item.item.name }}: {{ item.message }}"
+      loop: "{{ update_results.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+
+    - name: Verify roles were updated
+      keycloak_role:
+        operation: INSPECT
+        auth_url: "{{ pxcentral_auth_url }}"
+        token: "{{ keycloak_token }}"
+        name: "{{ item.name }}"
+        ssl_config: "{{ ssl_config.px_central | default({}) }}"
+      register: verify_results
+      loop: "{{ roles_to_update }}"
+      loop_control:
+        label: "{{ item.name }}"
+      when: verify_after_update
+      failed_when: false
+
+    - name: Display verification results
+      debug:
+        msg: "Verified role: {{ item.role.name }} - {{ item.role.description | default('No description') }}"
+      loop: "{{ verify_results.results | default([]) }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+      when:
+        - verify_after_update
+        - item.role is defined
+
+    - name: Summary
+      debug:
+        msg: |
+          Update Summary:
+          - Attempted to update: {{ roles_to_update | length }} role(s)
+          - Successfully updated: {{ update_results.results | selectattr('changed', 'equalto', true) | list | length }} role(s)

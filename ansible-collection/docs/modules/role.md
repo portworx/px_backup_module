@@ -7,6 +7,8 @@ The role module manages roles in PX-Backup, enabling management of admin or user
 * Create and manage roles in PX-Backup
 * Access control and ownership management
 * Comprehensive role inspection capabilities
+* Automatic Keycloak role creation when role_id is not provided
+* Seamless integration between PX-Backup and Keycloak authentication
 
 ## Requirements
 
@@ -47,7 +49,7 @@ The module supports the following operations:
 | rules          | list       | varies   |         | List of rules                        |         |
 | labels         | dictionary | no       |         | Label for the role                   |         |
 | validate_certs | boolean    | no       | `true`  | Whether to validate SSL certificates |         |
-| role_id | string | no |  | role_id of the sender | |
+| role_id | string | no |  | Keycloak role ID to associate with PX-Backup role. If not provided, a new Keycloak role will be created automatically | |
  
 ### SSL/TLS Configuration
 

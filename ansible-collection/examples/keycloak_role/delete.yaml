@@ -1,0 +1,166 @@
+---
+- name: Delete Keycloak Role Example
+  hosts: keycloak_role
+  gather_facts: false
+  vars:
+    # Safety settings from group_vars
+    confirm_deletion: "{{ deletion_safety.confirm_deletion }}"
+    backup_role_before_delete: "{{ deletion_safety.backup_role_before_delete }}"
+    backup_directory: "{{ deletion_safety.backup_directory }}"
+
+  tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - pxcentral_auth_url is defined
+          - pxcentral_client_id is defined
+          - pxcentral_username is defined
+          - pxcentral_password is defined
+          - roles_to_delete is defined
+          - roles_to_delete | length > 0
+          - confirm_deletion is defined
+          - confirm_deletion == true
+        fail_msg: "Required variables must be defined and confirm_deletion must be true. Check group_vars/common/all.yaml and group_vars/keycloak_role/delete.yaml"
+
+    - name: Get authentication token
+      auth:
+        auth_url: "{{ pxcentral_auth_url }}"
+        client_id: "{{ pxcentral_client_id }}"
+        username: "{{ pxcentral_username }}"
+        password: "{{ pxcentral_password }}"
+        token_duration: "{{ token_duration | default('1h') }}"
+        ssl_config: "{{ ssl_config.px_central | default({}) }}"
+      register: auth_result
+      no_log: false
+
+    - name: Set token fact
+      set_fact:
+        keycloak_token: "{{ auth_result.access_token }}"
+      no_log: false
+
+    - name: Generate timestamp for backup files
+      set_fact:
+        backup_timestamp: "{{ lookup('pipe', 'date +%Y%m%d_%H%M%S') }}"
+
+    - name: Display roles to be deleted
+      debug:
+        msg: "Roles scheduled for deletion: {{ roles_to_delete | join(', ') }}"
+
+    - name: Get role details before deletion (for backup/verification)
+      keycloak_role:
+        operation: INSPECT
+        auth_url: "{{ pxcentral_auth_url }}"
+        token: "{{ keycloak_token }}"
+        name: "{{ item }}"
+        ssl_config: "{{ ssl_config.px_central | default({}) }}"
+      register: roles_backup
+      loop: "{{ roles_to_delete }}"
+      loop_control:
+        label: "{{ item }}"
+      when: backup_role_before_delete
+      failed_when: false  # Don't fail if role doesn't exist
+
+    - name: Display role details before deletion
+      debug:
+        msg: |
+          Role to be deleted:
+          Name: {{ item.role.name }}
+          Description: {{ item.role.description | default('No description') }}
+          Attributes: {{ item.role.attributes | default({}) }}
+      loop: "{{ roles_backup.results | default([]) }}"
+      loop_control:
+        label: "{{ item.item }}"
+      when:
+        - backup_role_before_delete
+        - item.role is defined
+
+    - name: Save role backups to files (optional)
+      copy:
+        content: "{{ item.role | to_nice_json }}"
+        dest: "{{ backup_directory }}/keycloak_role_backup_{{ item.item }}_{{ backup_timestamp }}.json"
+      loop: "{{ roles_backup.results | default([]) }}"
+      loop_control:
+        label: "{{ item.item }}"
+      when:
+        - backup_role_before_delete
+        - item.role is defined
+      delegate_to: localhost
+
+    - name: Confirm deletion prompt
+      pause:
+        prompt: "Are you sure you want to delete {{ roles_to_delete | length }} role(s): {{ roles_to_delete | join(', ') }}? Type 'yes' to continue"
+      register: deletion_confirmation
+      when: confirm_deletion
+
+    - name: Validate deletion confirmation
+      assert:
+        that:
+          - deletion_confirmation.user_input | lower == 'yes'
+        fail_msg: "Deletion cancelled by user"
+      when: confirm_deletion
+
+    - name: Delete Keycloak roles
+      keycloak_role:
+        operation: DELETE
+        auth_url: "{{ pxcentral_auth_url }}"
+        token: "{{ keycloak_token }}"
+        name: "{{ item }}"
+        ssl_config: "{{ ssl_config.px_central | default({}) }}"
+      register: delete_results
+      loop: "{{ roles_to_delete }}"
+      loop_control:
+        label: "{{ item }}"
+
+    - name: Display deletion results
+      debug:
+        msg: "{{ item.item }}: {{ item.message }}"
+      loop: "{{ delete_results.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: Verify roles were deleted
+      keycloak_role:
+        operation: INSPECT
+        auth_url: "{{ pxcentral_auth_url }}"
+        token: "{{ keycloak_token }}"
+        name: "{{ item }}"
+        ssl_config: "{{ ssl_config.px_central | default({}) }}"
+      register: verify_deletions
+      loop: "{{ roles_to_delete }}"
+      loop_control:
+        label: "{{ item }}"
+      failed_when: false  # Don't fail if role doesn't exist (expected)
+
+    - name: Confirm deletion success
+      debug:
+        msg: "Role '{{ item.item }}' has been successfully deleted"
+      loop: "{{ verify_deletions.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+      when: item.failed
+
+    - name: Warning if roles still exist
+      debug:
+        msg: "WARNING: Role '{{ item.item }}' still exists after deletion attempt!"
+      loop: "{{ verify_deletions.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+      when: not item.failed
+
+    - name: Display backup file locations
+      debug:
+        msg: "Role backup saved to: {{ backup_directory }}/keycloak_role_backup_{{ item.item }}_{{ backup_timestamp }}.json"
+      loop: "{{ roles_backup.results | default([]) }}"
+      loop_control:
+        label: "{{ item.item }}"
+      when:
+        - backup_role_before_delete
+        - item.role is defined
+
+    - name: Summary
+      debug:
+        msg: |
+          Deletion Summary:
+          - Attempted to delete: {{ roles_to_delete | length }} role(s)
+          - Successfully deleted: {{ verify_deletions.results | selectattr('failed', 'equalto', true) | list | length }} role(s)
+          - Failed to delete: {{ verify_deletions.results | selectattr('failed', 'equalto', false) | list | length }} role(s)

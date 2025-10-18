@@ -1,7 +1,14 @@
 ---
 # Define roles list
+#
+# NEW FEATURE: Automatic Keycloak Role Creation
+# When role_id is not provided, the module will automatically:
+# 1. Create a new role in Keycloak with description "Role created via ansible"
+# 2. Use the newly created Keycloak role ID for the PX-Backup role association
+# 3. Set ownership based on the current user token
+#
 roles:
-  # Example role 1 - with automatic current user as owner
+  # Example role 1 - WITHOUT role_id (will auto-create Keycloak role)
   - name: "test-role-from-ansible"
     labels:
       role-label: "ansible-test-label"
@@ -17,9 +24,9 @@ roles:
       - services: ['role']
         apis: ['inspect*', 'enumerate*']
 
-  # Example role 2 - with specific role_id as owner
+  # Example role 2 - WITH role_id (will use given Keycloak role)
   - name: "test-role-from-ansible"
-    role_id: "603ded96-1c75-4320-ac03-d9046e563824"  # Specific user ID
+    role_id: "603ded96-1c75-4320-ac03-d9046e563824"  # Specific role ID
     labels:
       role-label: "ansible-test-label"
     rules:

@@ -35,10 +35,11 @@ short_description: Manage roles in PX-Backup
 
 version_added: "2.9.0"
 
-description: 
+description:
     - Manage roles in PX-Backup using different operations
     - Supports CRUD operations, and ownership management
     - Provides both single role and bulk inspection capabilities
+    - For CREATE operations, requires a pre-existing Keycloak role ID (use keycloak_role module first)
 
 options:
     operation:
@@ -170,13 +171,13 @@ options:
                         type: str
     role_id:
         description:
-            - User ID to set as the role owner
-            - When provided, this user ID will be set as the owner of the role
-            - If not provided, the current user ID will be automatically extracted from the JWT token
-            - This ensures the role appears in PXCentral UI for the specified or current user
-            - Only applies to CREATE operation when ownership is not explicitly provided
+            - Keycloak role ID to associate with the PX-Backup role
+            - This Keycloak role ID will be associated with the PX-Backup role
+            - Required for CREATE operation - the Keycloak role must be created first using the keycloak_role module
+            - This ensures proper integration between PX-Backup roles and Keycloak authentication
             - Format: UUID string (e.g., 3fe6c733-6df6-4058-91b8-bcd3344c8564)
-        required: false
+            - To create the Keycloak role, use the keycloak_role module with operation CREATE before calling this module
+        required: true
         type: str
 
 requirements:
@@ -241,6 +242,11 @@ def create_role(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict[str
     try:
         # Get module parameters directly
         params = dict(module.params)
+
+        # Validate that role_id is provided
+        if not params.get('role_id'):
+            module.fail_json(msg="role_id is required for role creation. Please create the Keycloak role first using the keycloak_role module.")
+
         role_request = build_role_request(params)
 
         # Make the create request
@@ -249,11 +255,10 @@ def create_role(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict[str
             endpoint='v1/role',
             data=role_request
         )
-        
+
         # Return the response
         return response, True
-            
-        
+
     except Exception as e:
         error_msg = str(e)
         if isinstance(e, requests.exceptions.RequestException) and hasattr(e, 'response'):
@@ -418,7 +423,8 @@ def build_role_request(params: Dict[str, Any]) -> Dict[str, Any]:
         "metadata": {
             "name": params.get('name'),
             "org_id": params.get('org_id')
-        }
+        },
+        "role_id": params['role_id']
     }
 
     # Add rules if provided
@@ -673,7 +679,7 @@ def run_module():
 
     # Define required parameters for each operation
     operation_requirements = {
-        'CREATE': ['name', 'rules'],
+        'CREATE': ['name', 'rules', 'role_id'],
         'UPDATE': ['name','rules'],
         'DELETE': ['name'],
         'INSPECT_ONE': ['name'],

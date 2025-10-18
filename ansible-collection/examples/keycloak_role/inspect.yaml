@@ -1,0 +1,75 @@
+---
+- name: Inspect Keycloak Role Example
+  hosts: keycloak_role
+  gather_facts: false
+  vars:
+    # Use roles from keycloak_roles_inspect list from group_vars
+    roles_to_inspect: "{{ keycloak_roles_inspect }}"
+    
+
+  tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - pxcentral_auth_url is defined
+          - pxcentral_client_id is defined
+          - pxcentral_username is defined
+          - pxcentral_password is defined
+          - roles_to_inspect is defined
+          - roles_to_inspect | length > 0
+        fail_msg: "Required variables must be defined. Check group_vars/common/all.yaml and group_vars/keycloak_role/inspect.yaml"
+
+    - name: Get authentication token
+      auth:
+        auth_url: "{{ pxcentral_auth_url }}"
+        client_id: "{{ pxcentral_client_id }}"
+        username: "{{ pxcentral_username }}"
+        password: "{{ pxcentral_password }}"
+        token_duration: "{{ token_duration | default('1h') }}"
+        ssl_config: "{{ ssl_config.px_central | default({}) }}"
+      register: auth_result
+      no_log: false
+
+    - name: Set token fact
+      set_fact:
+        keycloak_token: "{{ auth_result.access_token }}"
+      no_log: false
+
+    - name: Inspect Keycloak roles
+      keycloak_role:
+        operation: INSPECT
+        auth_url: "{{ pxcentral_auth_url }}"
+        token: "{{ keycloak_token }}"
+        name: "{{ item.name }}"
+        ssl_config: "{{ ssl_config.px_central | default({}) }}"
+      register: inspect_results
+      loop: "{{ roles_to_inspect }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Display role details
+      debug:
+        msg: |
+          Role Details:
+          Name: {{ item.role.name }}
+          Description: {{ item.role.description | default('No description') }}
+          ID: {{ item.role.id | default('N/A') }}
+          Attributes: {{ item.role.attributes | default({}) | to_nice_json }}
+      loop: "{{ inspect_results.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+      when: item.role is defined
+
+    - name: Display detailed role information (if enabled)
+      debug:
+        var: item.role
+      loop: "{{ inspect_results.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+      when:
+        - item.role is defined
+        - inspect_options.show_detailed_info | default(false)
+
+    - name: Summary of inspections
+      debug:
+        msg: "Successfully inspected {{ inspect_results.results | selectattr('role', 'defined') | list | length }} out of {{ roles_to_inspect | length }} roles"
