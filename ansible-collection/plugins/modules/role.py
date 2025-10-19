@@ -51,10 +51,9 @@ options:
             - "- INSPECT_ONE retrieves details of a specific role "
             - "- INSPECT_ALL lists all roles "
             - "- PERMISSION returns list of services, APIs permission for given user"
-            - "- GET_CURRENT_USER_ROLES returns roles owned by the current user (from token)"
         required: true
         type: str
-        choices: ['CREATE', 'UPDATE', 'DELETE', 'INSPECT_ONE', 'INSPECT_ALL', 'PERMISSION', 'GET_CURRENT_USER_ROLES']
+        choices: ['CREATE', 'UPDATE', 'DELETE', 'INSPECT_ONE', 'INSPECT_ALL', 'PERMISSION']
     api_url:
         description: PX-Backup API URL
         required: true
@@ -350,39 +349,6 @@ def enumerate_roles(module, client):
     except Exception as e:
         module.fail_json(msg=f"Failed to enumerate roles: {str(e)}")
 
-def get_current_user_roles(module, client):
-    """Get roles owned by the current user"""
-    try:
-        # Get user info from token
-        token = module.params.get('token', '')
-        user_info = get_current_user_from_token(token)
-
-        if not user_info or not user_info.get('user_id'):
-            module.fail_json(msg="Failed to extract user information from token")
-
-        # Get all roles
-        params = {
-            'labels': module.params.get('labels', {})
-        }
-        response = client.make_request('GET', f"v1/role/{module.params['org_id']}", params=params)
-        all_roles = response.get('roles', [])
-
-        # Filter roles owned by current user
-        current_user_id = user_info['user_id']
-        user_roles = [
-            role for role in all_roles
-            if role.get('metadata', {}).get('ownership', {}).get('owner') == current_user_id
-        ]
-
-        return {
-            'user_info': user_info,
-            'roles': user_roles,
-            'total_user_roles': len(user_roles),
-            'total_all_roles': len(all_roles)
-        }
-    except Exception as e:
-        module.fail_json(msg=f"Failed to get current user roles: {str(e)}")
-
 def inspect_role(module, client):
     """Get details of a specific role"""
     
@@ -561,14 +527,6 @@ def perform_operation(module: AnsibleModule, client: PXBackupClient, operation: 
             message="Role deleted successfully"
             )
 
-        elif operation == 'GET_CURRENT_USER_ROLES':
-                result = get_current_user_roles(module, client)
-                return OperationResult(
-                    success=True,
-                    changed=False,
-                    data=result,
-                    message=f"Found {result['total_user_roles']} roles owned by current user"
-                )
 
     except Exception as e:
         logger.exception(f"Operation {operation} failed")
@@ -593,7 +551,6 @@ def run_module():
                 'INSPECT_ONE',
                 'INSPECT_ALL',
                 'PERMISSION',
-                'GET_CURRENT_USER_ROLES'
             ]
         ),
         name=dict(type='str', required=False),
@@ -685,7 +642,6 @@ def run_module():
         'INSPECT_ONE': ['name'],
         'INSPECT_ALL': ['org_id'],
         'PERMISSION': ['org_id'],
-        'GET_CURRENT_USER_ROLES': []
     }
 
     module = AnsibleModule(

@@ -30,7 +30,6 @@ The module supports the following operations:
 | INSPECT_ONE | Get details of a specific role  |
 | INSPECT_ALL | List all roles                  |
 | PERMISSION  | List all permissions for a role |
-| GET_CURRENT_USER_ROLES| GET role details of current user |
 
 ## Parameters
 
