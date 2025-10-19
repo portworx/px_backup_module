@@ -11,6 +11,9 @@ The keycloak_role module manages roles in Keycloak, providing comprehensive role
 * List all roles with pagination support
 * Uses Bearer token authentication from the auth module
 * Supports SSL/TLS certificate configuration
+* Manages role attributes and descriptions
+* Provides comprehensive error handling
+* Supports check mode for validation
 
 ## Requirements
 
@@ -28,8 +31,8 @@ The module supports the following role management operations:
 | CREATE       | Create a new role with specified properties   |
 | UPDATE       | Update an existing role's properties          |
 | DELETE       | Remove a role from Keycloak                   |
-| INSPECT_ONE  | Retrieve details of a specific role           |
-| INSPECT_ALL  | List all roles with optional pagination       |
+| INSPECT  | Retrieve details of a specific role           |
+| ENUMERATE  | List all roles with optional pagination       |
 
 ## Parameters
 
@@ -37,7 +40,7 @@ The module supports the following role management operations:
 
 | Parameter | Type   | Required | Default | Description                                    |
 | --------- | ------ | -------- | ------- | ---------------------------------------------- |
-| operation | string | yes      |         | Operation to perform (CREATE/UPDATE/DELETE/INSPECT_ONE/INSPECT_ALL) |
+| operation | string | yes      |         | Operation to perform (CREATE/UPDATE/DELETE/INSPECT/ENUMERATE) |
 | auth_url  | string | yes      |         | Keycloak authentication server URL            |
 | token     | string | yes      |         | Bearer authentication token from auth module  |
 
@@ -45,11 +48,11 @@ The module supports the following role management operations:
 
 | Parameter   | Type   | Required For                    | Default | Description                           |
 | ----------- | ------ | ------------------------------- | ------- | ------------------------------------- |
-| name        | string | CREATE, UPDATE, DELETE, INSPECT_ONE |         | Name of the role (must be unique)    |
+| name        | string | CREATE, UPDATE, DELETE, INSPECT |         | Name of the role (must be unique)    |
 | description | string | CREATE, UPDATE (optional)       |         | Human-readable description of role   |
 | attributes  | dict   | CREATE, UPDATE (optional)       | `{}`    | Custom attributes for the role        |
 
-### Pagination Parameters (INSPECT_ALL only)
+### Pagination Parameters (ENUMERATE only)
 
 | Parameter | Type | Required | Default | Description                              |
 | --------- | ---- | -------- | ------- | ---------------------------------------- |
@@ -65,9 +68,13 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 * Mutual TLS authentication
 * Self-signed certificate handling
 
-| Parameter  | Type | Required | Default | Description                                |
-| ---------- | ---- | -------- | ------- | ------------------------------------------ |
-| ssl_config | dict | no       | `{}`    | SSL/TLS configuration options              |
+| Parameter                 | Type    | Required | Default | Description                                    |
+| ------------------------- | ------- | -------- | ------- | ---------------------------------------------- |
+| ssl_config                | dict    | no       | `{}`    | SSL/TLS configuration options                  |
+| ssl_config.validate_certs | boolean | no       | `true`  | Verify SSL certificates                        |
+| ssl_config.ca_cert        | path    | no       |         | Path to CA certificate file                   |
+| ssl_config.client_cert    | path    | no       |         | Path to client certificate file               |
+| ssl_config.client_key     | path    | no       |         | Path to client private key file               |
 
 ## Configuration with Group Variables
 
@@ -164,7 +171,7 @@ See the example configurations in:
 # Get details of a specific role
 - name: Inspect backup admin role
   keycloak_role:
-    operation: INSPECT_ONE
+    operation: INSPECT
     auth_url: "{{ pxcentral_auth_url }}"
     token: "{{ px_backup_token }}"
     name: "backup-admin"
@@ -177,7 +184,7 @@ See the example configurations in:
 # List all roles with pagination
 - name: Get first 50 roles
   keycloak_role:
-    operation: INSPECT_ALL
+    operation: ENUMERATE
     auth_url: "{{ pxcentral_auth_url }}"
     token: "{{ px_backup_token }}"
     first: 0
@@ -226,7 +233,7 @@ See the example configurations in:
     # Step 3: Verify role creation
     - name: Verify role was created
       keycloak_role:
-        operation: INSPECT_ONE
+        operation: INSPECT
         auth_url: "{{ pxcentral_auth_url }}"
         token: "{{ auth_result.access_token }}"
         name: "px-backup-operator"
@@ -237,65 +244,346 @@ See the example configurations in:
         msg: "Created role: {{ created_role.role.name }} - {{ created_role.role.description }}"
 ```
 
+### Advanced SSL Configuration
+
+```yaml
+- name: Create role with mutual TLS authentication
+  keycloak_role:
+    operation: CREATE
+    auth_url: "https://keycloak.secure.example.com"
+    token: "{{ px_backup_token }}"
+    name: "secure-backup-admin"
+    description: "Secure administrator role with mTLS"
+    attributes:
+      security_level: "high"
+      created_via: "ansible"
+    ssl_config:
+      validate_certs: true
+      ca_cert: "/etc/ssl/certs/keycloak-ca.pem"
+      client_cert: "/etc/ssl/certs/ansible-client.pem"
+      client_key: "/etc/ssl/private/ansible-client.key"
+```
+
+### Bulk Role Management
+
+```yaml
+- name: Create multiple roles for different access levels
+  keycloak_role:
+    operation: CREATE
+    auth_url: "{{ pxcentral_auth_url }}"
+    token: "{{ px_backup_token }}"
+    name: "{{ item.name }}"
+    description: "{{ item.description }}"
+    attributes: "{{ item.attributes | default({}) }}"
+  loop:
+    - name: "px-backup-viewer"
+      description: "Read-only access to PX-Backup"
+      attributes:
+        access_level: "read"
+        department: "support"
+    - name: "px-backup-operator"
+      description: "Operator access to PX-Backup"
+      attributes:
+        access_level: "write"
+        department: "operations"
+    - name: "px-backup-admin"
+      description: "Full administrative access to PX-Backup"
+      attributes:
+        access_level: "admin"
+        department: "platform"
+  register: role_creation_results
+
+- name: Display creation results
+  debug:
+    msg: "Created role: {{ item.role.name }}"
+  loop: "{{ role_creation_results.results }}"
+  when: item.changed
+```
+
+### Check Mode and Validation
+
+```yaml
+- name: Validate role creation without making changes
+  keycloak_role:
+    operation: CREATE
+    auth_url: "{{ pxcentral_auth_url }}"
+    token: "{{ px_backup_token }}"
+    name: "test-role"
+    description: "Test role for validation"
+  check_mode: true
+  register: validation_result
+
+- name: Show what would be created
+  debug:
+    msg: "{{ validation_result.message }}"
+```
+
 ## Return Values
 
-### For CREATE, UPDATE, and INSPECT_ONE operations
+| Name    | Type   | Description                                      |
+| ------- | ------ | ------------------------------------------------ |
+| role    | dict   | Role information (CREATE, UPDATE, INSPECT)      |
+| roles   | list   | List of roles (ENUMERATE only)                  |
+| message | string | Operation result message                         |
+| changed | bool   | Whether the operation changed anything           |
 
-| Field   | Type | Description                                    |
-| ------- | ---- | ---------------------------------------------- |
-| role    | dict | Complete role object from Keycloak           |
-| message | str  | Operation result message                       |
-| changed | bool | Whether the operation modified anything        |
+### Role Object Structure
 
-### For INSPECT_ALL operation
+The `role` field contains a complete Keycloak role object with the following structure:
 
-| Field   | Type | Description                                    |
-| ------- | ---- | ---------------------------------------------- |
-| roles   | list | Array of role objects from Keycloak          |
-| message | str  | Operation result message                       |
-| changed | bool | Always false for inspection operations        |
+```json
+{
+  "id": "12345678-1234-1234-1234-123456789012",
+  "name": "backup-admin",
+  "description": "Administrator role for backup operations",
+  "composite": false,
+  "clientRole": false,
+  "containerId": "master",
+  "attributes": {
+    "department": "IT",
+    "level": "admin",
+    "created_by": "ansible"
+  }
+}
+```
 
-### For DELETE operation
+### Return Value Examples
 
-| Field   | Type | Description                                    |
-| ------- | ---- | ---------------------------------------------- |
-| message | str  | Operation result message                       |
-| changed | bool | Always true for successful deletions          |
+#### CREATE Operation Success
+```json
+{
+  "role": {
+    "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "name": "px-backup-operator",
+    "description": "Operator role for PX-Backup management",
+    "composite": false,
+    "clientRole": false,
+    "containerId": "master",
+    "attributes": {
+      "service": "px-backup",
+      "access_level": "operator"
+    }
+  },
+  "message": "Role 'px-backup-operator' created successfully",
+  "changed": true
+}
+```
+
+#### ENUMERATE Operation Success
+```json
+{
+  "roles": [
+    {
+      "id": "role-1-id",
+      "name": "admin",
+      "description": "Administrator role",
+      "composite": false,
+      "clientRole": false,
+      "containerId": "master"
+    },
+    {
+      "id": "role-2-id",
+      "name": "user",
+      "description": "Standard user role",
+      "composite": false,
+      "clientRole": false,
+      "containerId": "master"
+    }
+  ],
+  "message": "Retrieved 2 roles",
+  "changed": false
+}
+```
+
+#### DELETE Operation Success
+```json
+{
+  "message": "Role 'obsolete-role' deleted successfully",
+  "changed": true
+}
+```
+
+## Error Handling
+
+The module implements comprehensive error handling for Keycloak role management scenarios:
+
+1. **Parameter Validation**
+   - Required parameter checks
+   - Format validation
+   - Value constraints
+   - SSL configuration validation
+
+2. **Common Error Scenarios**
+   - Invalid credentials or expired tokens
+   - Network connectivity issues
+   - SSL certificate validation failures
+   - Invalid Keycloak URLs
+   - Role not found errors
+   - Permission denied errors
+   - Malformed API responses
+
+3. **Error Response Format**
+   - Structured error messages
+   - Clear failure reasons
+   - Actionable error information
+   - HTTP status code details
 
 ## Notes
 
-1. **Authentication Requirements**
-   - Requires a valid Bearer token with admin privileges
-   - Token must be obtained from the auth module
-   - Token must not be expired
+### Authentication Requirements
 
-2. **Role Management**
-   - Role names must be unique within the realm
-   - Roles are created in the master realm
-   - Custom attributes support key-value pairs
+* Requires a valid Bearer token with admin privileges
+* Token must be obtained from the auth module
+* Token must not be expired
+* Admin privileges required in Keycloak master realm
 
-3. **Security Considerations**
-   - SSL certificate validation enabled by default
-   - Bearer tokens are marked as sensitive (no_log)
-   - Secure credential handling
+### Role Management
 
-4. **Error Handling**
-   - Comprehensive error messages for API failures
-   - HTTP status code validation
-   - Network timeout protection (30 seconds)
+* Role names must be unique within the realm
+* Roles are created in the master realm
+* Custom attributes support key-value pairs
+* Attributes are stored as arrays in Keycloak format
+* Role descriptions are optional but recommended
 
-5. **Best Practices**
-   - Use descriptive role names and descriptions
-   - Implement proper token management
-   - Use SSL certificate validation in production
-   - Handle role dependencies before deletion
+### Security Considerations
+
+* SSL certificate validation enabled by default
+* Bearer tokens are marked as sensitive (no_log)
+* Secure credential handling
+* Use HTTPS for production environments
+* Implement proper access control for role management
+
+### Performance Considerations
+
+* Use pagination for large role lists
+* Implement appropriate timeouts for network operations
+* Consider batch operations for multiple role management
+* Monitor Keycloak server performance during bulk operations
+
+### Best Practices
+
+* Use descriptive role names and descriptions
+* Implement consistent attribute naming conventions
+* Regular role auditing and cleanup
+* Implement proper error handling in playbooks
+* Use check mode for validation before making changes
+* Document role purposes and attribute meanings
 
 ## Limitations
 
-- Only supports master realm role management
-- No support for composite roles in this version
-- No client-specific role management
-- Limited to basic role attributes
+* Only supports master realm role management
+* No support for composite roles in this version
+* No client-specific role management
+* Limited to basic role attributes
+* Requires admin privileges in Keycloak
+* Token must be valid and not expired
+* SSL certificate validation is enabled by default
+
+## Troubleshooting
+
+### Authentication Issues
+
+1. **Token Validation Errors**
+   ```
+   Error: Failed to create role 'test-role': Keycloak API request failed: 401 Client Error: Unauthorized
+   ```
+   - Verify token validity and expiration
+   - Check admin privileges in Keycloak
+   - Ensure token was obtained with correct credentials
+
+2. **Invalid Auth URL**
+   ```
+   Error: Failed to create role 'test-role': Keycloak API request failed: Connection refused
+   ```
+   - Validate auth_url format and accessibility
+   - Check network connectivity to Keycloak server
+   - Verify Keycloak service is running
+
+### Role Operation Failures
+
+1. **Role Already Exists**
+   ```
+   Error: Failed to create role 'admin': HTTP 409: Conflict
+   ```
+   - Verify role name uniqueness for CREATE operations
+   - Use UPDATE operation for existing roles
+   - Check existing roles with ENUMERATE operation
+
+2. **Role Not Found**
+   ```
+   Error: Failed to get role 'nonexistent': HTTP 404: Not Found
+   ```
+   - Check role existence for UPDATE/DELETE operations
+   - Verify role name spelling and case sensitivity
+   - Use ENUMERATE to list available roles
+
+3. **Permission Denied**
+   ```
+   Error: Failed to create role 'test': HTTP 403: Forbidden
+   ```
+   - Verify admin privileges in Keycloak
+   - Check realm-level permissions
+   - Ensure token has role management permissions
+
+### Network and SSL Issues
+
+1. **SSL Certificate Validation**
+   ```
+   Error: SSL certificate verification failed
+   ```
+   - Test connectivity to Keycloak server
+   - Verify SSL certificate paths and permissions
+   - Check certificate chain and trust store
+   - Consider using ca_cert parameter for custom CAs
+
+2. **Client Certificate Issues**
+   ```
+   Error: SSL error occurred: [SSL: CERTIFICATE_VERIFY_FAILED]
+   ```
+   - Verify client certificate and key file paths
+   - Check file permissions and accessibility
+   - Ensure certificate and key match
+   - Validate certificate chain
+
+### API Response Issues
+
+1. **Malformed JSON Response**
+   ```
+   Error: Failed to parse JSON response
+   ```
+   - Check Keycloak API version compatibility
+   - Verify JSON response format
+   - Review HTTP status codes and error messages
+   - Monitor Keycloak server health and performance
+
+2. **Timeout Issues**
+   ```
+   Error: Request timeout after 30 seconds
+   ```
+   - Check network latency to Keycloak server
+   - Monitor Keycloak server performance
+   - Consider increasing timeout values
+   - Verify server resource availability
+
+### Common Solutions
+
+1. **Verify Keycloak Configuration**
+   ```bash
+   # Test Keycloak API accessibility
+   curl -k "https://your-keycloak-server/auth/realms/master"
+   ```
+
+2. **Check Token Validity**
+   ```bash
+   # Decode JWT token to check expiration
+   echo "your-token" | cut -d. -f2 | base64 -d | jq .exp
+   ```
+
+3. **Test SSL Configuration**
+   ```bash
+   # Test SSL connection
+   openssl s_client -connect your-keycloak-server:443 -servername your-keycloak-server
+   ```
 
 ## Related Modules
 
