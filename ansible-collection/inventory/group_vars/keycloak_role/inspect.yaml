@@ -1,25 +1,4 @@
 ---
-# Keycloak Roles to inspect
-keycloak_roles_inspect:
-  # Example 1: Inspect specific role by name
-  - name: "px-backup-test-role-from-ansible-2"
-    # Optional: specify additional parameters if needed
-    
-  # Example 2: Inspect operator role (uncomment to use)
-  - name: "px-backup-operator"
-
-  # # Example 3: Inspect admin role (uncomment to use)
-  # - name: "px-backup-admin"
-
-  # # Example 4: Inspect viewer role (uncomment to use)
-  # - name: "px-backup-viewer"
-
-
-
-# Inspection options
-inspect_options:
-  show_attributes: true
-  show_detailed_info: true
-  include_permissions: true
-  format_output: true
+# Role name to inspect
+name: "px-backup-operator"
 

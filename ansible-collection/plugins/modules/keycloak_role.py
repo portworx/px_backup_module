@@ -673,6 +673,16 @@ def run_module():
             if not name:
                 raise ValidationError(f"Parameter 'name' is required for {operation} operation")
 
+         # Validate certificate files exist if provided in ssl_config and validation is enabled
+        import os
+        for cert_param in ['ca_cert', 'client_cert', 'client_key']:
+            cert_path = ssl_config.get(cert_param)
+            if cert_path:
+                if not os.path.exists(cert_path):
+                    module.fail_json(msg=f"ssl_config.{cert_param} file not found: {cert_path}")
+                if not os.access(cert_path, os.R_OK):
+                    module.fail_json(msg=f"ssl_config.{cert_param} file not readable: {cert_path}")
+
         # Validate SSL configuration
         if ssl_config.get('client_cert') and not ssl_config.get('client_key'):
             raise ValidationError("ssl_config.client_key is required when ssl_config.client_cert is provided")

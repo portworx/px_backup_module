@@ -1,31 +1,9 @@
 ---
-# Keycloak Role Configuration for CREATE operations
-
-# Roles to create (list of roles with their configurations)
-roles_to_create:
-  # Example 1: Basic operator role
-  - name: "px-backup-test-role-from-ansible-2"
-    description: "Operator role for PX-Backup management via Ansible"
+# Define Keycloak roles list
+keycloak_roles:
+  - name: "px-backup-operator"
+    description: "Operator role for PX-Backup management"
     attributes:
       service: "px-backup"
       access_level: "operator"
       department: "IT"
-      created_by: "ansible"
-
-  # Example 2: Admin role (uncomment to use)
-  # - name: "px-backup-admin"
-  #   description: "Administrator role for PX-Backup with full permissions"
-  #   attributes:
-  #     service: "px-backup"
-  #     access_level: "admin"
-  #     department: "Operations"
-  #     created_by: "ansible"
-
-  # Example 3: Viewer role (uncomment to use)
-  # - name: "px-backup-viewer"
-  #   description: "Read-only viewer role for PX-Backup monitoring"
-  #   attributes:
-  #     service: "px-backup"
-  #     access_level: "viewer"
-  #     department: "Monitoring"
-  #     created_by: "ansible"

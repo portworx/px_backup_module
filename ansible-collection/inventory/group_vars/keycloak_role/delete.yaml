@@ -1,18 +1,5 @@
 ---
-# Keycloak Role Configuration for DELETE operations
-
-# Roles to delete (list of role names)
-roles_to_delete:
-  - "px-backup-test-role-from-ansible-2"
-  # - "px-backup-viewer"
-  # - "px-backup-admin"  # Commented out for safety
-
-
-# Safety settings
-deletion_safety:
-  confirm_deletion: true
-  backup_role_before_delete: true
-  require_confirmation_prompt: true
-  backup_directory: "/tmp"
+# Role name to delete
+role_name: "px-backup-operator"
 
 
