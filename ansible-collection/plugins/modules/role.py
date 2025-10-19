@@ -292,37 +292,6 @@ def update_role(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict[str
     except Exception as e:
         module.fail_json(msg=f"Failed to update role: {str(e)}")
 
-def get_current_user_from_token(token):
-    """Extract user information from JWT token"""
-    try:
-        # JWT tokens have 3 parts: header.payload.signature
-        # We want the payload (middle part)
-        parts = token.split('.')
-        if len(parts) != 3:
-            return None
-
-        payload_b64 = parts[1]
-
-        # Add padding if needed (base64 strings must be multiples of 4)
-        padding = 4 - (len(payload_b64) % 4)
-        if padding != 4:
-            payload_b64 += '=' * padding
-
-        # Decode base64 and parse JSON
-        payload_json = base64.b64decode(payload_b64).decode('utf-8')
-        user_info = json.loads(payload_json)
-
-        return {
-            'user_id': user_info.get('sub', ''),
-            'email': user_info.get('email', ''),
-            'issuer': user_info.get('iss', ''),
-            'audience': user_info.get('aud', ''),
-            'issued_at': user_info.get('iat', ''),
-            'expires_at': user_info.get('exp', ''),
-            'jwt_id': user_info.get('jti', '')
-        }
-    except Exception:
-        return None
 
 def permission_role(module, client):
     """Fetch all permissions"""
@@ -404,25 +373,7 @@ def build_role_request(params: Dict[str, Any]) -> Dict[str, Any]:
     if params.get('ownership'):
         # Use explicitly provided ownership
         request['metadata']['ownership'] = params['ownership']
-    else:
-        # Determine owner ID: use role_id if provided, otherwise extract from token
-        owner_id = params.get('role_id')
 
-        if not owner_id:
-            # Extract from current user token as fallback
-            token = params.get('token', '')
-            user_info = get_current_user_from_token(token)
-            if user_info and user_info.get('user_id'):
-                owner_id = user_info['user_id']
-
-        # Set ownership if we have an owner ID
-        if owner_id:
-            request['metadata']['ownership'] = {
-                "owner": owner_id,
-                "public": {
-                    "type": "Read"
-                }
-            }
 
     return request
 
@@ -550,7 +501,7 @@ def run_module():
                 'DELETE',
                 'INSPECT_ONE',
                 'INSPECT_ALL',
-                'PERMISSION',
+                'PERMISSION'
             ]
         ),
         name=dict(type='str', required=False),
@@ -641,7 +592,7 @@ def run_module():
         'DELETE': ['name'],
         'INSPECT_ONE': ['name'],
         'INSPECT_ALL': ['org_id'],
-        'PERMISSION': ['org_id'],
+        'PERMISSION': ['org_id']
     }
 
     module = AnsibleModule(
