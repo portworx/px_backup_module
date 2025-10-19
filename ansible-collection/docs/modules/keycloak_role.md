@@ -129,194 +129,74 @@ See the example configurations in:
 
 ## Examples
 
-### Basic Role Management
+### Create Keycloak Role
 
 ```yaml
-# Create a new role
-- name: Create backup administrator role
+- name: Create Keycloak role
   keycloak_role:
     operation: CREATE
     auth_url: "{{ pxcentral_auth_url }}"
-    token: "{{ px_backup_token }}"
-    name: "backup-admin"
-    description: "Administrator role for backup operations"
-    attributes:
-      department: "IT"
-      level: "admin"
+    token: "{{ keycloak_token }}"
+    name: "{{ item.name }}"
+    description: "{{ item.description | default(omit) }}"
+    attributes: "{{ item.attributes | default(omit) }}"
+    ssl_config: "{{ ssl_config.px_central | default({}) }}"
+  loop: "{{ keycloak_roles }}"
+```
 
-# Update an existing role
-- name: Update role description
+### Update Keycloak Role
+
+```yaml
+- name: Update Keycloak role
   keycloak_role:
     operation: UPDATE
     auth_url: "{{ pxcentral_auth_url }}"
-    token: "{{ px_backup_token }}"
-    name: "backup-admin"
-    description: "Updated administrator role for backup operations"
-    attributes:
-      department: "Operations"
-      level: "senior-admin"
+    token: "{{ keycloak_token }}"
+    name: "{{ item.name | default(omit) }}"
+    description: "{{ item.description | default(omit) }}"
+    attributes: "{{ item.attributes | default(omit) }}"
+    ssl_config: "{{ ssl_config.px_central | default({}) }}"
+  loop: "{{ keycloak_roles_update }}"
+```
 
-# Delete a role
-- name: Remove obsolete role
+### Delete Keycloak Role
+
+```yaml
+- name: Delete Keycloak role
   keycloak_role:
     operation: DELETE
     auth_url: "{{ pxcentral_auth_url }}"
-    token: "{{ px_backup_token }}"
-    name: "backup-admin"
+    token: "{{ keycloak_token }}"
+    name: "role-name"
+    ssl_config: "{{ ssl_config.px_central | default({}) }}"
 ```
 
-### Role Inspection
+### Inspect Keycloak Role
 
 ```yaml
-# Get details of a specific role
-- name: Inspect backup admin role
+- name: Inspect Keycloak role
   keycloak_role:
     operation: INSPECT
     auth_url: "{{ pxcentral_auth_url }}"
-    token: "{{ px_backup_token }}"
-    name: "backup-admin"
-  register: role_details
+    token: "{{ keycloak_token }}"
+    name: "{{ name }}"
+    ssl_config: "{{ ssl_config.px_central | default({}) }}"
+```
 
-- name: Display role information
-  debug:
-    var: role_details.role
+### List All Keycloak Roles
 
-# List all roles with pagination
-- name: Get first 50 roles
+```yaml
+- name: List Keycloak roles
   keycloak_role:
     operation: ENUMERATE
     auth_url: "{{ pxcentral_auth_url }}"
-    token: "{{ px_backup_token }}"
-    first: 0
-    max: 50
-  register: roles_list
-
-- name: Display roles count
-  debug:
-    msg: "Found {{ roles_list.roles | length }} roles"
+    token: "{{ keycloak_token }}"
+    first: "{{ enumerate_options.first | default(omit) }}"
+    max: "{{ enumerate_options.max | default(omit) }}"
+    ssl_config: "{{ ssl_config.px_central | default({}) }}"
 ```
 
-### Complete Workflow with Authentication
 
-```yaml
-- name: Complete Keycloak role management workflow
-  hosts: localhost
-  vars:
-    pxcentral_auth_url: "http://10.13.162.146:32282"
-    pxcentral_client_id: "pxcentral"
-    pxcentral_username: "admin"
-    pxcentral_password: "{{ admin_password }}"
-
-  tasks:
-    # Step 1: Get authentication token
-    - name: Get Keycloak admin token
-      auth:
-        auth_url: "{{ pxcentral_auth_url }}"
-        client_id: "{{ pxcentral_client_id }}"
-        username: "{{ pxcentral_username }}"
-        password: "{{ pxcentral_password }}"
-        token_duration: "1h"
-      register: auth_result
-
-    # Step 2: Create role
-    - name: Create custom role
-      keycloak_role:
-        operation: CREATE
-        auth_url: "{{ pxcentral_auth_url }}"
-        token: "{{ auth_result.access_token }}"
-        name: "px-backup-operator"
-        description: "Operator role for PX-Backup management"
-        attributes:
-          service: "px-backup"
-          access_level: "operator"
-
-    # Step 3: Verify role creation
-    - name: Verify role was created
-      keycloak_role:
-        operation: INSPECT
-        auth_url: "{{ pxcentral_auth_url }}"
-        token: "{{ auth_result.access_token }}"
-        name: "px-backup-operator"
-      register: created_role
-
-    - name: Display created role
-      debug:
-        msg: "Created role: {{ created_role.role.name }} - {{ created_role.role.description }}"
-```
-
-### Advanced SSL Configuration
-
-```yaml
-- name: Create role with mutual TLS authentication
-  keycloak_role:
-    operation: CREATE
-    auth_url: "https://keycloak.secure.example.com"
-    token: "{{ px_backup_token }}"
-    name: "secure-backup-admin"
-    description: "Secure administrator role with mTLS"
-    attributes:
-      security_level: "high"
-      created_via: "ansible"
-    ssl_config:
-      validate_certs: true
-      ca_cert: "/etc/ssl/certs/keycloak-ca.pem"
-      client_cert: "/etc/ssl/certs/ansible-client.pem"
-      client_key: "/etc/ssl/private/ansible-client.key"
-```
-
-### Bulk Role Management
-
-```yaml
-- name: Create multiple roles for different access levels
-  keycloak_role:
-    operation: CREATE
-    auth_url: "{{ pxcentral_auth_url }}"
-    token: "{{ px_backup_token }}"
-    name: "{{ item.name }}"
-    description: "{{ item.description }}"
-    attributes: "{{ item.attributes | default({}) }}"
-  loop:
-    - name: "px-backup-viewer"
-      description: "Read-only access to PX-Backup"
-      attributes:
-        access_level: "read"
-        department: "support"
-    - name: "px-backup-operator"
-      description: "Operator access to PX-Backup"
-      attributes:
-        access_level: "write"
-        department: "operations"
-    - name: "px-backup-admin"
-      description: "Full administrative access to PX-Backup"
-      attributes:
-        access_level: "admin"
-        department: "platform"
-  register: role_creation_results
-
-- name: Display creation results
-  debug:
-    msg: "Created role: {{ item.role.name }}"
-  loop: "{{ role_creation_results.results }}"
-  when: item.changed
-```
-
-### Check Mode and Validation
-
-```yaml
-- name: Validate role creation without making changes
-  keycloak_role:
-    operation: CREATE
-    auth_url: "{{ pxcentral_auth_url }}"
-    token: "{{ px_backup_token }}"
-    name: "test-role"
-    description: "Test role for validation"
-  check_mode: true
-  register: validation_result
-
-- name: Show what would be created
-  debug:
-    msg: "{{ validation_result.message }}"
-```
 
 ## Return Values
 
