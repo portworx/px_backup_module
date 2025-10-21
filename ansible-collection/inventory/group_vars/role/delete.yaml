@@ -1,5 +1,7 @@
 # Roles to delete
 roles_delete:
+  # Delete both PX-Backup role and associated Keycloak role (uses global pxcentral_auth_url)
   - name: "test-role-1"
 
+  # Delete only PX-Backup role, keep Keycloak role intact (no Keycloak integration)
   - name: "test-role-2"

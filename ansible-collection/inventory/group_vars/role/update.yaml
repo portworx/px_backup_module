@@ -1,11 +1,42 @@
 # List of roles to update
 role_updates:
+  # Update role with Keycloak integration (uses global pxcentral_auth_url)
   - name: "test-role-1"
-    uid: "test-role-1-uid"
+    uid: "test-role-uid"  # Use actual UID from inspect operation
+    keycloak_description: "Updated role description via Ansible"
+    keycloak_attributes:
+      environment: "production"
+      managed_by: "ansible"
     labels:
       app: "app-1"
+      environment: "prod"
     rules:
       - apis: ["inspect*", "enumerate*"]
         services: ["cloudcredential"]
       - apis: ["inspect*", "enumerate*"]
         services: ["schedulepolicy"]
+      - apis: ["inspect*", "enumerate*"]
+        services: ["backuplocation"]
+
+  # Update role without Keycloak integration (PX-Backup only)
+  - name: "test-role-2"
+    uid: "test-role-2-uid"  # Replace with actual UID
+    # No auth_url provided - only PX-Backup role will be updated
+    labels:
+      app: "app-2"
+      environment: "staging"
+    rules:
+      - apis: ["inspect*", "enumerate*"]
+        services: ["cloudcredential"]
+      - apis: ["inspect*", "enumerate*"]
+        services: ["schedulepolicy"]
+
+  # Minimal update (only change labels)
+  - name: "test-role-3"
+    uid: "test-role-3-uid"
+    labels:
+      app: "app-3"
+    rules:
+      - apis: ["inspect*"]
+        services: ["role"]
+    

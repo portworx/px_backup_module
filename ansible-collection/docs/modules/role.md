@@ -1,12 +1,15 @@
 # Role Module
 
-The role module manages roles in PX-Backup, enabling management of admin or user roles.
+The role module manages roles in PX-Backup, enabling management of admin or user roles with integrated Keycloak support.
+
 
 ## Synopsis
 
 * Create and manage roles in PX-Backup
+* Automatic Keycloak role integration and management
 * Access control and ownership management
 * Comprehensive role inspection capabilities
+* Seamless role synchronization between PX-Backup and Keycloak
 
 ## Requirements
 
@@ -47,6 +50,30 @@ The module supports the following operations:
 | labels         | dictionary | no       |         | Label for the role                   |         |
 | validate_certs | boolean    | no       | `true`  | Whether to validate SSL certificates |         |
 
+### Keycloak Integration Parameters
+
+| Parameter           | Type       | Required | Default                    | Description                                    |
+| ------------------- | ---------- | -------- | -------------------------- | ---------------------------------------------- |
+| auth_url           | string     | no       |                            | Keycloak authentication server URL             |
+| role_id            | string     | no       |                            | Existing Keycloak role ID to associate        |
+| keycloak_description| string     | no       | "Role created via ansible" | Description for auto-created Keycloak role    |
+| keycloak_attributes | dictionary | no       | {}                         | Custom attributes for Keycloak role           |
+
+#### Keycloak Integration Behavior
+
+**CREATE Operation:**
+- If `role_id` is provided: Associates the PX-Backup role with the existing Keycloak role
+- If `role_id` is not provided and `auth_url` is provided: Automatically creates a new Keycloak role
+- If neither is provided: Creates only the PX-Backup role
+
+**UPDATE Operation:**
+- If `auth_url` is provided with `keycloak_description` or `keycloak_attributes`: Updates the associated Keycloak role
+- If `auth_url` is not provided: Updates only the PX-Backup role
+
+**DELETE Operation:**
+- If `auth_url` is provided: Deletes both PX-Backup and associated Keycloak roles
+- If `auth_url` is not provided: Deletes only the PX-Backup role
+
 ### SSL/TLS Configuration
 
 All modules support comprehensive SSL/TLS certificate management. See [SSL Certificate Configuration](../common/ssl_configuration.md) for:
@@ -77,6 +104,130 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 | rules.services | list(string) | yes      |         | Services that the role has access to  |
 | rules.apis     | list(string) | yes      |         | API actions that the role can perform |
 
+
+
+## Examples
+
+### Basic Role Creation
+
+```yaml
+- name: Create a basic role
+  role:
+    operation: CREATE
+    api_url: "{{ px_backup_api_url }}"
+    token: "{{ px_backup_token }}"
+    org_id: "default"
+    name: "backup-operator"
+    rules:
+      - services: ["backup"]
+        apis: ["create", "inspect*"]
+      - services: ["restore"]
+        apis: ["create", "inspect*"]
+```
+
+### Role Creation with Keycloak Integration
+
+```yaml
+- name: Create role with automatic Keycloak role creation
+  role:
+    operation: CREATE
+    api_url: "{{ px_backup_api_url }}"
+    token: "{{ px_backup_token }}"
+    org_id: "default"
+    name: "backup-admin"
+    auth_url: "{{ pxcentral_auth_url }}"
+    keycloak_description: "PX-Backup Administrator Role"
+    keycloak_attributes:
+      department: "IT"
+      environment: "production"
+    rules:
+      - services: ["backup", "restore", "schedule"]
+        apis: ["*"]
+```
+
+### Role Update with Keycloak Sync
+
+```yaml
+- name: Update role and sync with Keycloak
+  role:
+    operation: UPDATE
+    api_url: "{{ px_backup_api_url }}"
+    token: "{{ px_backup_token }}"
+    org_id: "default"
+    name: "backup-admin"
+    uid: "role-uuid-here"
+    auth_url: "{{ pxcentral_auth_url }}"
+    keycloak_description: "Updated PX-Backup Administrator Role"
+    keycloak_attributes:
+      department: "DevOps"
+      environment: "production"
+      updated_by: "ansible"
+    rules:
+      - services: ["backup", "restore", "schedule", "cloudcredential"]
+        apis: ["*"]
+```
+
+### Role Deletion Examples
+
+```yaml
+# Delete both PX-Backup and Keycloak roles
+- name: Delete role with Keycloak cleanup
+  role:
+    operation: DELETE
+    api_url: "{{ px_backup_api_url }}"
+    token: "{{ px_backup_token }}"
+    org_id: "default"
+    name: "backup-admin"
+    auth_url: "{{ pxcentral_auth_url }}"
+
+# Delete only PX-Backup role, preserve Keycloak role
+- name: Delete PX-Backup role only
+  role:
+    operation: DELETE
+    api_url: "{{ px_backup_api_url }}"
+    token: "{{ px_backup_token }}"
+    org_id: "default"
+    name: "backup-admin"
+    # No auth_url provided - Keycloak role preserved
+```
+
+## Return Values
+
+| Key     | Type   | Description                                    |
+| ------- | ------ | ---------------------------------------------- |
+| changed | bool   | Whether the operation resulted in changes      |
+| role    | dict   | Role details (for single role operations)     |
+| roles   | list   | List of roles (for INSPECT_ALL operation)     |
+| rules   | list   | Permission rules (for PERMISSION operation)   |
+| message | string | Operation result message                       |
+
+### Example Return Value
+
+```json
+{
+    "changed": true,
+    "role": {
+        "metadata": {
+            "name": "backup-admin",
+            "org_id": "default",
+            "uid": "role-uuid-here",
+            "create_time": "2024-01-01T00:00:00Z",
+            "labels": {
+                "environment": "production"
+            }
+        },
+        "role_id": "keycloak-role-uuid",
+        "rules": [
+            {
+                "services": ["backup", "restore"],
+                "apis": ["*"]
+            }
+        ]
+    },
+    "message": "Role created successfully"
+}
+```
+
 ## Error Handling
 
 The module implements comprehensive error handling:
@@ -101,6 +252,7 @@ The module implements comprehensive error handling:
    - Token security
    - SSL certificate validation
    - Secret key protection
+
 2. **Best Practices**
 
    - Regular credential rotation
@@ -108,33 +260,59 @@ The module implements comprehensive error handling:
    - Access control review
    - Audit logging
    - Encryption at rest
-3. **Limitations**
+
+3. **Keycloak Integration Best Practices**
+
+   - Use consistent role naming conventions
+   - Implement proper Keycloak admin permissions
+   - Monitor role synchronization status
+   - Use meaningful role descriptions and attributes
+   - Implement role lifecycle management
+4. **Limitations**
 
    - Permission boundaries
    - Update constraints
+   - Keycloak attribute updates only occur when explicitly provided
+   - Keycloak operations require admin-level access
 
 ## Troubleshooting
 
-1. **Creation Issues**
+### PX-Backup Role Issues
 
+
+1. **Creation Issues**
    - Check permissions
    - Validate configurations
    - Ensure unique names
-2. **Access Problems**
+   - Verify required parameters  
 
+2. **Access Problems**
    - Verify ownership settings
    - Check group permissions
    - Validate token access
    - Review public access
-3. **Update Failures**
 
+
+3. **Update Failures**
    - Confirm role exists
    - Check update permissions
    - Validate new configurations
    - Review ownership rights
-4. **Common Solutions**
 
+### Keycloak Integration Issues
+
+4. **Keycloak Connection Problems**
+   - Verify `auth_url` is accessible
+   - Check Keycloak admin credentials
+   - Validate SSL certificates for Keycloak
+   - Ensure proper network connectivity
+
+### Common Solutions
+
+5. **General Troubleshooting**
    - Check network connectivity
    - Verify SSL certificates
    - Review error messages
    - Check API endpoints
+   - Enable debug logging
+   - Validate JSON/YAML syntax

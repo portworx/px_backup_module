@@ -21,6 +21,7 @@ import typing
 from typing import Dict, List, Tuple, Optional, Any, Union
 import logging
 from dataclasses import dataclass
+import base64
 
 from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.px_backup.api import PXBackupClient
@@ -34,10 +35,14 @@ short_description: Manage roles in PX-Backup
 
 version_added: "2.9.0"
 
-description: 
+description:
     - Manage roles in PX-Backup using different operations
     - Supports CRUD operations, and ownership management
     - Provides both single role and bulk inspection capabilities
+    - For CREATE operations, automatically creates a Keycloak role if role_id is not provided
+    - For UPDATE operations, automatically updates the associated Keycloak role attributes if auth_url is provided
+    - For DELETE operations, automatically deletes the associated Keycloak role if auth_url is provided
+    - Integrates with Keycloak for seamless role management
 
 options:
     operation:
@@ -166,6 +171,38 @@ options:
                         description: Public access type
                         choices: ['Invalid', 'Read', 'Write', 'Admin']
                         type: str
+    role_id:
+        description:
+            - Keycloak role ID to associate with the PX-Backup role
+            - This Keycloak role ID will be associated with the PX-Backup role
+            - If not provided for CREATE operation, a Keycloak role will be automatically created
+            - This ensures proper integration between PX-Backup roles and Keycloak authentication
+            - Format: UUID string (e.g., 3fe6c733-6df6-4058-91b8-bcd3344c8564)
+        required: false
+        type: str
+    auth_url:
+        description:
+            - Keycloak authentication server URL
+            - For CREATE operation: required if role_id is not provided (used to automatically create Keycloak roles)
+            - For DELETE operation: optional (if provided, the associated Keycloak role will also be deleted; if not provided, only PX-Backup role is deleted)
+        required: false
+        type: str
+    keycloak_description:
+        description:
+            - Description for the auto-created Keycloak role
+            - Only used when role_id is not provided for CREATE operation
+            - Default: "Role created via ansible"
+        required: false
+        type: str
+        default: "Role created via ansible"
+    keycloak_attributes:
+        description:
+            - Custom attributes for the auto-created Keycloak role
+            - Only used when role_id is not provided for CREATE operation
+            - Dictionary of key-value pairs
+        required: false
+        type: dict
+        default: {}
 
 requirements:
     - python >= 3.9
@@ -173,12 +210,14 @@ requirements:
 
 notes:
     - "Operation-specific required parameters:"
-    - "CREATE: name, rules"
-    - "UPDATE: name, rules"
-    - "DELETE: org_id, name"
+    - "CREATE: name, rules (role_id optional - if not provided and auth_url is provided, a Keycloak role will be automatically created)"    
+    - "UPDATE: name, rules (role_id optional - if not provided and auth_url is provided, a Keycloak role will be automatically updated)"    
+    - "DELETE: org_id, name (role_id optional - if not provided and auth_url is provided, a Keycloak role will be automatically deleted)"    
     - "INSPECT_ONE: org_id, name"
     - "INSPECT_ALL: org_id"
     - "PERMISSION: org_id"
+    - "When updating/deleting a role with auth_url provided, the module will attempt to update the associated Keycloak role (role_name) if keycloak_description or keycloak_attributes are provided"
+    - "If Keycloak role update/delete fails, the PX-Backup role update is not affected (warning is logged)"
 '''
 
 # Configure logging
@@ -189,6 +228,222 @@ logger.addHandler(logging.NullHandler())
 class RoleError(Exception):
     """Base exception for role operations"""
     pass
+
+# Keycloak API Functions
+def make_keycloak_request(auth_url, endpoint, method='GET', data=None, params=None, token=None, ssl_config=None):
+    """
+    Make HTTP request to Keycloak Admin API with proper authentication and SSL handling.
+
+    Args:
+        auth_url (str): Base Keycloak authentication URL
+        endpoint (str): API endpoint path
+        method (str): HTTP method (GET, POST, PUT, DELETE)
+        data (dict): Request payload for POST/PUT operations
+        params (dict): Query parameters
+        token (str): Bearer authentication token
+        ssl_config (dict): SSL configuration options
+
+    Returns:
+        dict: Response data from Keycloak API
+
+    Raises:
+        Exception: If request fails or returns error status
+    """
+    # Ensure auth_url has protocol
+    if not auth_url.startswith(('http://', 'https://')):
+        auth_url = f"http://{auth_url}"
+
+    # Construct full URL
+    base_url = auth_url.rstrip('/')
+    url = f"{base_url}/auth/admin/realms/master/roles{endpoint}"
+
+    # Prepare headers
+    headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Authorization': f'Bearer {token}'
+    }
+
+    # Extract SSL configuration
+    if ssl_config is None:
+        ssl_config = {}
+
+    verify_ssl = ssl_config.get('validate_certs', True)
+    ca_cert = ssl_config.get('ca_cert')
+    client_cert = ssl_config.get('client_cert')
+    client_key = ssl_config.get('client_key')
+
+    # Prepare SSL verification
+    verify = verify_ssl
+    if ca_cert:
+        verify = ca_cert
+
+    # Prepare client certificate
+    cert = None
+    if client_cert and client_key:
+        cert = (client_cert, client_key)
+
+    try:
+        # Make the request
+        response = requests.request(
+            method=method,
+            url=url,
+            headers=headers,
+            json=data,
+            params=params,
+            verify=verify,
+            cert=cert,
+            timeout=30
+        )
+
+        # Check for HTTP errors
+        if response.status_code >= 400:
+            error_msg = f"HTTP {response.status_code}: {response.reason}"
+            try:
+                error_detail = response.json()
+                if 'error' in error_detail:
+                    error_msg += f" - {error_detail['error']}"
+                if 'error_description' in error_detail:
+                    error_msg += f": {error_detail['error_description']}"
+            except:
+                error_msg += f" - {response.text}"
+            raise Exception(error_msg)
+
+        # Return JSON response for successful requests
+        if response.status_code == 204:  # No Content (successful DELETE)
+            return {}
+
+        if response.content:
+            return response.json()
+        else:
+            return {}
+
+    except requests.exceptions.RequestException as e:
+        raise Exception(f"Request failed: {str(e)}")
+
+
+def convert_attributes_to_keycloak_format(attributes):
+    """Convert attributes from dict format to Keycloak format where values are arrays."""
+    if not attributes:
+        return {}
+
+    keycloak_attributes = {}
+    for key, value in attributes.items():
+        if isinstance(value, list):
+            keycloak_attributes[key] = value
+        else:
+            keycloak_attributes[key] = [str(value)]
+
+    return keycloak_attributes
+
+
+def convert_attributes_from_keycloak_format(keycloak_attributes):
+    """Convert attributes from Keycloak format (arrays) to simple dict format."""
+    if not keycloak_attributes:
+        return {}
+
+    simple_attributes = {}
+    for key, value_list in keycloak_attributes.items():
+        if isinstance(value_list, list) and len(value_list) > 0:
+            # If single value, return as string; if multiple values, return as list
+            simple_attributes[key] = value_list[0] if len(value_list) == 1 else value_list
+        else:
+            simple_attributes[key] = value_list
+
+    return simple_attributes
+
+
+def get_keycloak_role_by_name(auth_url, token, name, ssl_config=None):
+    """Get a specific role by name from Keycloak."""
+    try:
+        response = make_keycloak_request(
+            auth_url=auth_url,
+            endpoint=f'/{name}',
+            method='GET',
+            token=token,
+            ssl_config=ssl_config
+        )
+
+        # Convert attributes to simple format for user-friendly output
+        if 'attributes' in response:
+            response['attributes'] = convert_attributes_from_keycloak_format(response['attributes'])
+
+        return response
+
+    except Exception as e:
+        raise Exception(f"Failed to get Keycloak role '{name}': {str(e)}")
+
+
+def create_keycloak_role(auth_url, token, name, description=None, attributes=None, ssl_config=None):
+    """Create a new role in Keycloak."""
+    role_data = {
+        'name': name,
+        'description': description or '',
+        'attributes': convert_attributes_to_keycloak_format(attributes)
+    }
+
+    try:
+        make_keycloak_request(
+            auth_url=auth_url,
+            endpoint='',
+            method='POST',
+            data=role_data,
+            token=token,
+            ssl_config=ssl_config
+        )
+
+        # Get the created role details
+        created_role = get_keycloak_role_by_name(auth_url, token, name, ssl_config)
+        return created_role, f"Keycloak role '{name}' created successfully"
+
+    except Exception as e:
+        raise Exception(f"Failed to create Keycloak role '{name}': {str(e)}")
+
+
+def update_keycloak_role(auth_url, token, name, description=None, attributes=None, ssl_config=None):
+    """Update an existing role in Keycloak."""
+    try:
+        # First get the current role to ensure it exists
+        current_role = get_keycloak_role_by_name(auth_url, token, name, ssl_config)
+
+        # Prepare update data - preserve existing values if not provided
+        role_data = {
+            'name': name,
+            'description': description if description is not None else current_role.get('description', ''),
+            'attributes': convert_attributes_to_keycloak_format(attributes) if attributes is not None else current_role.get('attributes', {})
+        }
+
+        make_keycloak_request(
+            auth_url=auth_url,
+            endpoint=f'/{name}',
+            method='PUT',
+            data=role_data,
+            token=token,
+            ssl_config=ssl_config
+        )
+
+        # Get the updated role details
+        updated_role = get_keycloak_role_by_name(auth_url, token, name, ssl_config)
+        return updated_role, f"Keycloak role '{name}' updated successfully"
+
+    except Exception as e:
+        raise Exception(f"Failed to update Keycloak role '{name}': {str(e)}")
+
+
+def delete_keycloak_role(auth_url, token, name, ssl_config=None):
+    """Delete a role from Keycloak."""
+    try:
+        make_keycloak_request(
+            auth_url=auth_url,
+            endpoint=f'/{name}',
+            method='DELETE',
+            token=token,
+            ssl_config=ssl_config
+        )
+        return f"Keycloak role '{name}' deleted successfully"
+
+    except Exception as e:
+        raise Exception(f"Failed to delete Keycloak role '{name}': {str(e)}")
 
 class ValidationError(RoleError):
     """Raised when validation fails"""
@@ -229,6 +484,52 @@ def create_role(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict[str
     try:
         # Get module parameters directly
         params = dict(module.params)
+
+        # If role_id is not provided, create a Keycloak role automatically
+        if not params.get('role_id'):
+            if params.get('auth_url'):
+                # Prepare Keycloak role name
+                keycloak_role_name = params.get('name')
+                keycloak_description = params.get('keycloak_description', 'Role created via ansible')
+                keycloak_attributes = params.get('keycloak_attributes', {})
+
+                # Add default attributes
+                if not keycloak_attributes:
+                    keycloak_attributes = {
+                        'px_backup_role': params.get('name'),
+                        'auto_generated': 'true',
+                        'created_by': 'ansible-automation'
+                    }
+
+                try:
+                    # First, check if the Keycloak role already exists
+                    try:
+                        keycloak_role = get_keycloak_role_by_name(
+                            auth_url=params.get('auth_url'),
+                            token=params.get('token'),
+                            name=keycloak_role_name,
+                            ssl_config=params.get('ssl_config', {})
+                        )
+                        params['role_id'] = keycloak_role.get('id')
+                        logger.info(f"Using existing Keycloak role '{keycloak_role_name}' with ID: {params['role_id']}")
+                    except Exception as inspect_error:
+                        # Role doesn't exist, create it
+                        logger.debug(f"Keycloak role '{keycloak_role_name}' not found, creating new role")
+                        keycloak_role, _ = create_keycloak_role(
+                            auth_url=params.get('auth_url'),
+                            token=params.get('token'),
+                            name=keycloak_role_name,
+                            description=keycloak_description,
+                            attributes=keycloak_attributes,
+                            ssl_config=params.get('ssl_config', {})
+                        )
+                        params['role_id'] = keycloak_role.get('id')
+                        logger.info(f"Auto-created Keycloak role '{keycloak_role_name}' with ID: {params['role_id']}")
+                except Exception as e:
+                    # Both inspection and creation failed
+                    module.fail_json(msg=f"Failed to get or create Keycloak role '{keycloak_role_name}': {str(e)}")
+            else:
+                logger.info(f"No auth_url provided - skipping Keycloak role creation for '{module.params['name']}'")
         role_request = build_role_request(params)
 
         # Make the create request
@@ -253,24 +554,46 @@ def create_role(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict[str
         module.fail_json(msg=f"Failed to create role: {error_msg}")
 
 def update_role(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict[str, Any], bool]:
-    """Update an existing role"""
+    """Update an existing role and optionally its associated Keycloak role"""
     try:
-        # Build request using module.params
         params = dict(module.params)
         role_request = build_role_request(params)
         role_request['metadata']['uid'] = params.get('uid', '')
         
-        # Get current state for comparison
+        # Check if PX-Backup update is needed first
         current = inspect_role(module, client)
-        if not needs_update(current, role_request):
-            return current, False
+        px_backup_needs_update = needs_update(current, role_request)
+        
+        # Check if Keycloak update is needed
+        keycloak_updated = False
+        auth_url = params.get('auth_url')
+        if auth_url and (params.get('keycloak_description') or params.get('keycloak_attributes')):
+            try:
+                keycloak_role_name = params.get('name')
+                update_keycloak_role(
+                    auth_url=auth_url,
+                    token=params.get('token'),
+                    name=keycloak_role_name,
+                    description=params.get('keycloak_description'),
+                    attributes=params.get('keycloak_attributes'),
+                    ssl_config=params.get('ssl_config', {})
+                )
+                logger.info(f"Updated Keycloak role '{keycloak_role_name}' attributes")
+                keycloak_updated = True
+            except Exception as keycloak_error:
+                logger.warning(f"Failed to update Keycloak role: {str(keycloak_error)}")
+        
+        # If PX-Backup doesn't need update, return early
+        if not px_backup_needs_update:
+            return current, keycloak_updated
             
-        # Make update request
+        # Update PX-Backup role
         response = client.make_request(
             method='PUT',
             endpoint='v1/role',
             data=role_request
         )
+        
         return response, True
         
     except Exception as e:
@@ -315,13 +638,32 @@ def inspect_role(module, client):
         module.fail_json(msg=f"Failed to inspect role: {str(e)}")
 
 def delete_role(module, client):
-    """Delete a role"""
+    """Delete a role and optionally its associated Keycloak role"""
     try:
+        # First, delete the PX-Backup role
         response = client.make_request(
             'DELETE',
             f"v1/role/{module.params['org_id']}/{module.params['name']}",
             params={}
         )
+
+        auth_url = module.params.get('auth_url')
+
+        # Only attempt Keycloak role deletion if auth_url is provided
+        if auth_url:
+            try:
+                keycloak_role_name = f"{module.params['name']}"
+                ssl_config = module.params.get('ssl_config', {})
+                token = module.params.get('token')
+
+                delete_keycloak_role(auth_url, token, keycloak_role_name, ssl_config)
+                logger.info(f"Associated Keycloak role '{keycloak_role_name}' deleted successfully")
+            except Exception as keycloak_error:
+                # Log the error but don't fail - PX-Backup role was already deleted
+                logger.warning(f"Failed to delete associated Keycloak role: {str(keycloak_error)}")
+        else:
+            logger.info(f"No auth_url provided - skipping Keycloak role deletion for '{module.params['name']}'")
+
         return response, True
     except Exception as e:
         module.fail_json(msg=f"Failed to delete role: {str(e)}")
@@ -341,7 +683,8 @@ def build_role_request(params: Dict[str, Any]) -> Dict[str, Any]:
         "metadata": {
             "name": params.get('name'),
             "org_id": params.get('org_id')
-        }
+        },
+        "role_id": params['role_id']
     }
 
     # Add rules if provided
@@ -486,6 +829,10 @@ def run_module():
         name=dict(type='str', required=False),
         org_id=dict(type='str', required=True),
         uid=dict(type='str', required=False),
+        role_id=dict(type='str', required=False),
+        auth_url=dict(type='str', required=False),
+        keycloak_description=dict(type='str', required=False),
+        keycloak_attributes=dict(type='dict', required=False, default={}),
         rules=dict(
             type='list',
             elements='dict',
@@ -566,7 +913,7 @@ def run_module():
     # Define required parameters for each operation
     operation_requirements = {
         'CREATE': ['name', 'rules'],
-        'UPDATE': ['name','rules'],
+        'UPDATE': ['name', 'rules'],
         'DELETE': ['name'],
         'INSPECT_ONE': ['name'],
         'INSPECT_ALL': ['org_id'],

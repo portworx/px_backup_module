@@ -34,6 +34,7 @@
             org_id: "{{ org_id | default('default') }}"
             labels: "{{ item.labels | default(omit) }}"
             rules: "{{ item.rules }}"
+            auth_url: "{{ pxcentral_auth_url | default(omit) }}"
             # SSL Certificate Parameters
             ssl_config: "{{ ssl_config.px_backup | default({}) }}"
           loop: "{{ roles }}"

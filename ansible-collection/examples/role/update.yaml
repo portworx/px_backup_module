@@ -34,6 +34,10 @@
             # Optional update parameters
             labels: "{{ item.labels | default(omit) }}"
             ownership: "{{ item.ownership | default(omit) }}"
+            # Keycloak integration parameters
+            auth_url: "{{ pxcentral_auth_url | default(omit) }}"
+            keycloak_description: "{{ item.keycloak_description | default(omit) }}"
+            keycloak_attributes: "{{ item.keycloak_attributes | default(omit) }}"
             # SSL Certificate Parameters
             ssl_config: "{{ ssl_config.px_backup | default({}) }}"
           register: role_result
