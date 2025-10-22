@@ -185,8 +185,19 @@ options:
             - Keycloak authentication server URL
             - For CREATE operation: required if role_id is not provided (used to automatically create Keycloak roles)
             - For DELETE operation: optional (if provided, the associated Keycloak role will also be deleted; if not provided, only PX-Backup role is deleted)
+            - Note: skip_keycloak_deletion takes precedence over auth_url for DELETE operations
         required: false
         type: str
+    skip_keycloak_deletion:
+        description:
+            - Skip deletion of the associated Keycloak role during DELETE operation
+            - When set to true, only the PX-Backup role will be deleted, preserving the Keycloak role
+            - This is useful when the Keycloak role is shared across multiple systems or when you want to preserve it for other purposes
+            - Takes precedence over auth_url setting for DELETE operations
+            - Only applicable for DELETE operation
+        required: false
+        type: bool
+        default: false
     keycloak_description:
         description:
             - Description for the auto-created Keycloak role
@@ -212,7 +223,7 @@ notes:
     - "Operation-specific required parameters:"
     - "CREATE: name, rules (role_id optional - if not provided and auth_url is provided, a Keycloak role will be automatically created)"    
     - "UPDATE: name, rules (role_id optional - if not provided and auth_url is provided, a Keycloak role will be automatically updated)"    
-    - "DELETE: org_id, name (role_id optional - if not provided and auth_url is provided, a Keycloak role will be automatically deleted)"    
+    - "DELETE: org_id, name (auth_url optional - if provided and skip_keycloak_deletion is false, the associated Keycloak role will be deleted)"
     - "INSPECT_ONE: org_id, name"
     - "INSPECT_ALL: org_id"
     - "PERMISSION: org_id"
@@ -648,9 +659,12 @@ def delete_role(module, client):
         )
 
         auth_url = module.params.get('auth_url')
+        skip_keycloak_deletion = module.params.get('skip_keycloak_deletion', False)
 
-        # Only attempt Keycloak role deletion if auth_url is provided
-        if auth_url:
+        # Check if Keycloak role deletion should be skipped
+        if skip_keycloak_deletion:
+            logger.info(f"Skipping Keycloak role deletion for '{module.params['name']}' due to skip_keycloak_deletion=true")
+        elif auth_url:
             try:
                 keycloak_role_name = f"{module.params['name']}"
                 ssl_config = module.params.get('ssl_config', {})
@@ -831,6 +845,7 @@ def run_module():
         uid=dict(type='str', required=False),
         role_id=dict(type='str', required=False),
         auth_url=dict(type='str', required=False),
+        skip_keycloak_deletion=dict(type='bool', required=False, default=False),
         keycloak_description=dict(type='str', required=False),
         keycloak_attributes=dict(type='dict', required=False, default={}),
         rules=dict(

@@ -56,6 +56,7 @@ The module supports the following operations:
 | ------------------- | ---------- | -------- | -------------------------- | ---------------------------------------------- |
 | auth_url           | string     | no       |                            | Keycloak authentication server URL             |
 | role_id            | string     | no       |                            | Existing Keycloak role ID to associate        |
+| skip_keycloak_deletion | boolean | no       | false                      | Skip deletion of associated Keycloak role during DELETE operation |
 | keycloak_description| string     | no       | "Role created via ansible" | Description for auto-created Keycloak role    |
 | keycloak_attributes | dictionary | no       | {}                         | Custom attributes for Keycloak role           |
 
@@ -71,8 +72,9 @@ The module supports the following operations:
 - If `auth_url` is not provided: Updates only the PX-Backup role
 
 **DELETE Operation:**
-- If `auth_url` is provided: Deletes both PX-Backup and associated Keycloak roles
-- If `auth_url` is not provided: Deletes only the PX-Backup role
+- If `skip_keycloak_deletion` is true: Deletes only the PX-Backup role (takes precedence over auth_url)
+- If `skip_keycloak_deletion` is false and `auth_url` is provided: Deletes both PX-Backup and associated Keycloak roles
+- If `skip_keycloak_deletion` is false and `auth_url` is not provided: Deletes only the PX-Backup role
 
 ### SSL/TLS Configuration
 
@@ -180,7 +182,7 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
     name: "backup-admin"
     auth_url: "{{ pxcentral_auth_url }}"
 
-# Delete only PX-Backup role, preserve Keycloak role
+# Delete only PX-Backup role, preserve Keycloak role (method 1: no auth_url)
 - name: Delete PX-Backup role only
   role:
     operation: DELETE
@@ -189,6 +191,17 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
     org_id: "default"
     name: "backup-admin"
     # No auth_url provided - Keycloak role preserved
+
+# Delete only PX-Backup role, preserve Keycloak role (method 2: skip flag)
+- name: Delete PX-Backup role only with skip flag
+  role:
+    operation: DELETE
+    api_url: "{{ px_backup_api_url }}"
+    token: "{{ px_backup_token }}"
+    org_id: "default"
+    name: "backup-admin"
+    auth_url: "{{ pxcentral_auth_url }}"
+    skip_keycloak_deletion: true
 ```
 
 ## Return Values
