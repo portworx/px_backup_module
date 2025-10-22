@@ -47,6 +47,32 @@ The module supports the following operations:
 | labels         | dictionary | no       |         | Label for the role                   |         |
 | validate_certs | boolean    | no       | `true`  | Whether to validate SSL certificates |         |
 
+### Keycloak Integration Parameters
+
+| Parameter           | Type       | Required | Default                    | Description                                    |
+| ------------------- | ---------- | -------- | -------------------------- | ---------------------------------------------- |
+| auth_url           | string     | no       |                            | Keycloak authentication server URL             |
+| role_id            | string     | no       |                            | Existing Keycloak role ID to associate        |
+| skip_keycloak_deletion | boolean | no       | false                      | Skip deletion of associated Keycloak role during DELETE operation |
+| keycloak_description| string     | no       | "Role created via ansible" | Description for auto-created Keycloak role    |
+| keycloak_attributes | dictionary | no       | {}                         | Custom attributes for Keycloak role           |
+
+#### Keycloak Integration Behavior
+
+**CREATE Operation:**
+- If `role_id` is provided: Associates the PX-Backup role with the existing Keycloak role
+- If `role_id` is not provided and `auth_url` is provided: Automatically creates a new Keycloak role
+- If neither is provided: Creates only the PX-Backup role
+
+**UPDATE Operation:**
+- If `auth_url` is provided with `keycloak_description` or `keycloak_attributes`: Updates the associated Keycloak role
+- If `auth_url` is not provided: Updates only the PX-Backup role
+
+**DELETE Operation:**
+- If `skip_keycloak_deletion` is true: Deletes only the PX-Backup role (takes precedence over auth_url)
+- If `skip_keycloak_deletion` is false and `auth_url` is provided: Deletes both PX-Backup and associated Keycloak roles
+- If `skip_keycloak_deletion` is false and `auth_url` is not provided: Deletes only the PX-Backup role
+
 ### SSL/TLS Configuration
 
 All modules support comprehensive SSL/TLS certificate management. See [SSL Certificate Configuration](../common/ssl_configuration.md) for:
@@ -76,6 +102,141 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 | ---------------- | -------------- | ---------- | --------- | --------------------------------------- |
 | rules.services | list(string) | yes      |         | Services that the role has access to  |
 | rules.apis     | list(string) | yes      |         | API actions that the role can perform |
+
+
+
+## Examples
+
+### Basic Role Creation
+
+```yaml
+- name: Create a basic role
+  role:
+    operation: CREATE
+    api_url: "{{ px_backup_api_url }}"
+    token: "{{ px_backup_token }}"
+    org_id: "default"
+    name: "backup-operator"
+    rules:
+      - services: ["backup"]
+        apis: ["create", "inspect*"]
+      - services: ["restore"]
+        apis: ["create", "inspect*"]
+```
+
+### Role Creation with Keycloak Integration
+
+```yaml
+- name: Create role with automatic Keycloak role creation
+  role:
+    operation: CREATE
+    api_url: "{{ px_backup_api_url }}"
+    token: "{{ px_backup_token }}"
+    org_id: "default"
+    name: "backup-admin"
+    auth_url: "{{ pxcentral_auth_url }}"
+    keycloak_description: "PX-Backup Administrator Role"
+    keycloak_attributes:
+      department: "IT"
+      environment: "production"
+    rules:
+      - services: ["backup", "restore", "schedule"]
+        apis: ["*"]
+```
+
+### Role Update with Keycloak Sync
+
+```yaml
+- name: Update role and sync with Keycloak
+  role:
+    operation: UPDATE
+    api_url: "{{ px_backup_api_url }}"
+    token: "{{ px_backup_token }}"
+    org_id: "default"
+    name: "backup-admin"
+    uid: "role-uuid-here"
+    auth_url: "{{ pxcentral_auth_url }}"
+    keycloak_description: "Updated PX-Backup Administrator Role"
+    keycloak_attributes:
+      department: "DevOps"
+      environment: "production"
+      updated_by: "ansible"
+    rules:
+      - services: ["backup", "restore", "schedule", "cloudcredential"]
+        apis: ["*"]
+```
+
+### Role Deletion Examples
+
+```yaml
+# Delete both PX-Backup and Keycloak roles
+- name: Delete role with Keycloak cleanup
+  role:
+    operation: DELETE
+    api_url: "{{ px_backup_api_url }}"
+    token: "{{ px_backup_token }}"
+    org_id: "default"
+    name: "backup-admin"
+    auth_url: "{{ pxcentral_auth_url }}"
+
+# Delete only PX-Backup role, preserve Keycloak role (method 1: no auth_url)
+- name: Delete PX-Backup role only
+  role:
+    operation: DELETE
+    api_url: "{{ px_backup_api_url }}"
+    token: "{{ px_backup_token }}"
+    org_id: "default"
+    name: "backup-admin"
+    # No auth_url provided - Keycloak role preserved
+
+# Delete only PX-Backup role, preserve Keycloak role (method 2: skip flag)
+- name: Delete PX-Backup role only with skip flag
+  role:
+    operation: DELETE
+    api_url: "{{ px_backup_api_url }}"
+    token: "{{ px_backup_token }}"
+    org_id: "default"
+    name: "backup-admin"
+    auth_url: "{{ pxcentral_auth_url }}"
+    skip_keycloak_deletion: true
+```
+
+## Return Values
+
+| Key     | Type   | Description                                    |
+| ------- | ------ | ---------------------------------------------- |
+| changed | bool   | Whether the operation resulted in changes      |
+| role    | dict   | Role details (for single role operations)     |
+| roles   | list   | List of roles (for INSPECT_ALL operation)     |
+| rules   | list   | Permission rules (for PERMISSION operation)   |
+| message | string | Operation result message                       |
+
+### Example Return Value
+
+```json
+{
+    "changed": true,
+    "role": {
+        "metadata": {
+            "name": "backup-admin",
+            "org_id": "default",
+            "uid": "role-uuid-here",
+            "create_time": "2024-01-01T00:00:00Z",
+            "labels": {
+                "environment": "production"
+            }
+        },
+        "role_id": "keycloak-role-uuid",
+        "rules": [
+            {
+                "services": ["backup", "restore"],
+                "apis": ["*"]
+            }
+        ]
+    },
+    "message": "Role created successfully"
+}
+```
 
 ## Error Handling
 

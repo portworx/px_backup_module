@@ -12,8 +12,8 @@
       assert:
         that:
           - px_backup_api_url is defined
-          - roles is defined
-          - roles | length > 0
+          - roles_create is defined
+          - roles_create | length > 0
         fail_msg: "Required variables must be defined"
 
   tasks:
@@ -24,7 +24,7 @@
         - name: Debug payload
           debug:
             var: item
-          loop: "{{ roles }}"
+          loop: "{{ roles_create }}"
         - name: Create role
           role:
             operation: CREATE
@@ -36,7 +36,7 @@
             rules: "{{ item.rules }}"
             # SSL Certificate Parameters
             ssl_config: "{{ ssl_config.px_backup | default({}) }}"
-          loop: "{{ roles }}"
+          loop: "{{ roles_create }}"
           register: role_result
           loop_control:
             label: "{{ item.name }}"
