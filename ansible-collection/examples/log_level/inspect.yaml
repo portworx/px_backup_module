@@ -7,17 +7,6 @@
     - "{{ inventory_dir}}/group_vars/common/all.yaml"
 
   vars:
-    # Log level scenarios
-    log_level_scenarios:
-      - name: "Enable debug logging"
-        level: "Debug"
-        description: "Most verbose logging for troubleshooting"
-      - name: "Set standard logging"
-        level: "Info"
-        description: "Standard informational logging"
-      - name: "Enable trace logging"
-        level: "Trace"
-        description: "Detailed trace logging for deep debugging"
   pre_tasks:
     - name: Validate required variables
       assert:

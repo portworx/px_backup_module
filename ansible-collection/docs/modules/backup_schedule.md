@@ -38,18 +38,19 @@ The module supports the following operations:
 
 ### Common Parameters
 
-| Parameter      | Type    | Required | Default | Description                             | Supported Versions |
-| ---------------- | --------- | ---------- | --------- | ----------------------------------------- | ------------------- |
-| api_url        | string  | yes      |         | PX-Backup API URL                       |
-| token          | string  | yes      |         | Authentication token                    |
-| operation      | string  | yes      |         | Operation to perform                    |
-| name           | string  | yes      |         | Name of the backup schedule             |
-| org_id         | string  | yes      |         | Organization ID                         |
-| uid            | string  | varies   |         | Unique identifier                       |
-| owner          | string  | no       |         | Owner name or uid                       |
-| validate_certs | boolean | no       | true    | Verify SSL certificates                 |
-| labels         | dict    | no       |         | Labels to attach to the Backup Schedule |
-| remark         | string  | no       |         | Last remark made during update operation|  2.10.0
+
+| Parameter      | Type    | Required | Default | Description                              | Supported Versions |
+| ---------------- | --------- | ---------- | --------- | ------------------------------------------ | -------------------- |
+| api_url        | string  | yes      |         | PX-Backup API URL                        |                    |
+| token          | string  | yes      |         | Authentication token                     |                    |
+| operation      | string  | yes      |         | Operation to perform                     |                    |
+| name           | string  | yes      |         | Name of the backup schedule              |                    |
+| org_id         | string  | yes      |         | Organization ID                          |                    |
+| uid            | string  | varies   |         | Unique identifier                        |                    |
+| owner          | string  | no       |         | Owner name or uid                        |                    |
+| validate_certs | boolean | no       | true    | Verify SSL certificates                  |                    |
+| labels         | dict    | no       |         | Labels to attach to the Backup Schedule  |                    |
+| remark         | string  | no       |         | Last remark made during update operation | 2.10.0             |
 
 ### SSL/TLS Configuration
 
