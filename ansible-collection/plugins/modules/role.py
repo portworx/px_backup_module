@@ -166,6 +166,49 @@ options:
                         description: Public access type
                         choices: ['Invalid', 'Read', 'Write', 'Admin']
                         type: str
+    role_id:
+        description:
+            - Keycloak role ID to associate with the PX-Backup role
+            - This Keycloak role ID will be associated with the PX-Backup role
+            - If not provided for CREATE operation, a Keycloak role will be automatically created
+            - This ensures proper integration between PX-Backup roles and Keycloak authentication
+            - Format: UUID string (e.g., 3fe6c733-6df6-4058-91b8-bcd3344c8564)
+        required: false
+        type: str
+    auth_url:
+        description:
+            - Keycloak authentication server URL
+            - For CREATE operation: required if role_id is not provided (used to automatically create Keycloak roles)
+            - For DELETE operation: optional (if provided, the associated Keycloak role will also be deleted; if not provided, only PX-Backup role is deleted)
+            - Note: skip_keycloak_deletion takes precedence over auth_url for DELETE operations
+        required: false
+        type: str
+    skip_keycloak_deletion:
+        description:
+            - Skip deletion of the associated Keycloak role during DELETE operation
+            - When set to true, only the PX-Backup role will be deleted, preserving the Keycloak role
+            - This is useful when the Keycloak role is shared across multiple systems or when you want to preserve it for other purposes
+            - Takes precedence over auth_url setting for DELETE operations
+            - Only applicable for DELETE operation
+        required: false
+        type: bool
+        default: false
+    keycloak_description:
+        description:
+            - Description for the auto-created Keycloak role
+            - Only used when role_id is not provided for CREATE operation
+            - Default: "Role created via ansible"
+        required: false
+        type: str
+        default: "Role created via ansible"
+    keycloak_attributes:
+        description:
+            - Custom attributes for the auto-created Keycloak role
+            - Only used when role_id is not provided for CREATE operation
+            - Dictionary of key-value pairs
+        required: false
+        type: dict
+        default: {}
 
 requirements:
     - python >= 3.9
@@ -173,9 +216,9 @@ requirements:
 
 notes:
     - "Operation-specific required parameters:"
-    - "CREATE: name, rules"
-    - "UPDATE: name, rules"
-    - "DELETE: org_id, name"
+    - "CREATE: name, rules (role_id optional - if not provided and auth_url is provided, a Keycloak role will be automatically created)"    
+    - "UPDATE: name, rules (role_id optional - if not provided and auth_url is provided, a Keycloak role will be automatically updated)"    
+    - "DELETE: org_id, name (auth_url optional - if provided and skip_keycloak_deletion is false, the associated Keycloak role will be deleted)"
     - "INSPECT_ONE: org_id, name"
     - "INSPECT_ALL: org_id"
     - "PERMISSION: org_id"
@@ -189,6 +232,52 @@ logger.addHandler(logging.NullHandler())
 class RoleError(Exception):
     """Base exception for role operations"""
     pass
+
+def delete_keycloak_role(auth_url, token, name, ssl_config=None):
+    """Delete a role from Keycloak."""
+    try:
+        # Ensure auth_url has protocol
+        if not auth_url.startswith(('http://', 'https://')):
+            auth_url = f"http://{auth_url}"
+
+        # Construct full URL
+        base_url = auth_url.rstrip('/')
+        url = f"{base_url}/auth/admin/realms/master/roles/{name}"
+
+        # Prepare headers
+        headers = {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': f'Bearer {token}'
+        }
+
+        # Extract SSL configuration
+        if ssl_config is None:
+            ssl_config = {}
+
+        verify_ssl = ssl_config.get('validate_certs', True)
+        ca_cert = ssl_config.get('ca_cert')
+        client_cert = ssl_config.get('client_cert')
+        client_key = ssl_config.get('client_key')
+
+        # Prepare SSL verification
+        verify = verify_ssl
+        if ca_cert:
+            verify = ca_cert
+
+        # Prepare client certificates
+        cert = None
+        if client_cert and client_key:
+            cert = (client_cert, client_key)
+
+        # Make the request
+        response = requests.delete(url, headers=headers, verify=verify, cert=cert)
+        response.raise_for_status()
+
+        return f"Keycloak role '{name}' deleted successfully"
+
+    except Exception as e:
+        raise Exception(f"Failed to delete Keycloak role '{name}': {str(e)}")
 
 class ValidationError(RoleError):
     """Raised when validation fails"""
@@ -317,11 +406,36 @@ def inspect_role(module, client):
 def delete_role(module, client):
     """Delete a role"""
     try:
+        # Standard delete by name approach
+        endpoint = f"v1/role/{module.params['org_id']}/{module.params['name']}"
+        params = {}
+
         response = client.make_request(
             'DELETE',
-            f"v1/role/{module.params['org_id']}/{module.params['name']}",
-            params={}
+            endpoint,
+            params=params
         )
+
+        auth_url = module.params.get('auth_url')
+        skip_keycloak_deletion = module.params.get('skip_keycloak_deletion', False)
+
+        # Check if Keycloak role deletion should be skipped
+        if skip_keycloak_deletion:
+            logger.info(f"Skipping Keycloak role deletion for '{module.params['name']}' due to skip_keycloak_deletion=true")
+        elif auth_url:
+            try:
+                keycloak_role_name = f"{module.params['name']}"
+                ssl_config = module.params.get('ssl_config', {})
+                token = module.params.get('token')
+
+                delete_keycloak_role(auth_url, token, keycloak_role_name, ssl_config)
+                logger.info(f"Associated Keycloak role '{keycloak_role_name}' deleted successfully")
+            except Exception as keycloak_error:
+                # Log the error but don't fail - PX-Backup role was already deleted
+                logger.warning(f"Failed to delete associated Keycloak role: {str(keycloak_error)}")
+        else:
+            logger.info(f"No auth_url provided - skipping Keycloak role deletion for '{module.params['name']}'")
+
         return response, True
     except Exception as e:
         module.fail_json(msg=f"Failed to delete role: {str(e)}")
@@ -486,6 +600,11 @@ def run_module():
         name=dict(type='str', required=False),
         org_id=dict(type='str', required=True),
         uid=dict(type='str', required=False),
+        role_id=dict(type='str', required=False),
+        auth_url=dict(type='str', required=False),
+        skip_keycloak_deletion=dict(type='bool', required=False, default=False),
+        keycloak_description=dict(type='str', required=False),
+        keycloak_attributes=dict(type='dict', required=False, default={}),
         rules=dict(
             type='list',
             elements='dict',
