@@ -41,6 +41,7 @@
             post_exec_rule_ref: "{{ item.post_exec_rule_ref | default(omit) }}"
             policy_ref: "{{ item.policy_ref | default(omit) }}"
             volume_resource_only_policy_ref: "{{ item.volume_resource_only_policy_ref | default(omit) }}"
+            remark: "{{ item.remark | default(omit) }}"
             exclude_objects: "{{ item.exclude_objects | default(omit) }}"
             include_objects: "{{ item.include_objects | default(omit) }}"
             include_filter: "{{ item.include_filter | default(omit) }}"
@@ -51,6 +52,8 @@
             ssl_config: "{{ ssl_config.px_backup | default({}) }}"
           register: update_result
           loop: "{{ backup_schedules_update }}"
+          loop_control:
+            label: "{{ item.name }}"
 
       rescue:
         - name: Display error details
