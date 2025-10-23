@@ -1,6 +1,6 @@
 ---
 # Define roles list
-roles:
+roles_create:
   # Example role 1
   - name: "test-role-1"
     labels:
