@@ -265,7 +265,6 @@ The module implements comprehensive error handling:
    - Token security
    - SSL certificate validation
    - Secret key protection
-
 2. **Best Practices**
 
    - Regular credential rotation
