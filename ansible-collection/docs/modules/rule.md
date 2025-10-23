@@ -10,7 +10,7 @@ The rule module manages rules in PX-Backup, enabling management of pre-exec and 
 
 ## Requirements
 
-* PX-Backup >= 2.8.3
+* PX-Backup >= 2.8.4
 * Stork >= 24.3.3
 * Python >= 3.9
 * The `requests` Python package

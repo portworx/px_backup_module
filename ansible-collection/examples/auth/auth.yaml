@@ -19,7 +19,7 @@
   register: token_response
   check_mode: no
   when: px_backup_token is not defined # Fetch token only if it's not already set
-  no_log: true  # Hide sensitive information in logs
+  no_log: false  # Hide sensitive information in logs
 
 # Set token fact only if we got a valid response
 - name: Set token fact

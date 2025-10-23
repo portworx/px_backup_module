@@ -12,7 +12,7 @@ The backup module provides comprehensive management of PX-Backup backups, includ
 
 ## Requirements
 
-* PX-Backup >= 2.8.3
+* PX-Backup >= 2.8.4
 * Stork >= 24.3.3
 * Python >= 3.9
 * The `requests` Python package
@@ -49,25 +49,26 @@ The module supports the following operations:
 ### Backup Configuration Parameters
 
 
-| Parameter                     | Type       | Required | Default  | Description                                                                    |
-| ------------------------------- | ------------ | ---------- | ---------- | -------------------------------------------------------------------------------- |
-| backup_location_ref           | dictionary | varies   |          | Reference to backup location                                                   |
-| cluster_ref                   | dictionary | varies   |          | Reference to cluster                                                           |
-| pre_exec_rule_ref             | dictionary | varies   |          | Reference to pre exec rule                                                     |
-| post_exec_rule_ref            | dictionary | varies   |          | Reference to post exec rule                                                    |
-| backup_type                   | string     | no       | 'Normal' | Type of backup ('Generic' or 'Normal')                                         |
-| namespaces                    | list       | no       |          | List of namespaces to backup                                                   |
-| label_selectors               | dictionary | no       |          | Label selectors to choose resources                                            |
-| resource_types                | list       | no       |          | List of resource types to backup                                               |
-| exclude_resource_types        | list       | no       |          | List of resource types to exclude                                              |
-| backup_object_type            | dictionary | no       |          | Backup object type configuration                                               |
-| ns_label_selectors            | string     | no       |          | Label selectors for namespaces                                                 |
-| direct_kdmp                   | boolean    | no       | false    | Take backup as direct kdmp                                                     |
-| skip_vm_auto_exec_rules       | boolean    | no       | false    | Skip auto rules for VirtualMachine backup object type                          |
-| volume_snapshot_class_mapping | dictionary | no       |          | Volume snapshot class mapping for CSI based backup                             |
-| backup_share                  | dictionary | varies   |          | Backup sharing configuration (required for UPDATE_BACKUP_SHARE)                |
-| parallel_backup               | boolean    | no       | `false`  | option to enable parallel schedule backups                                     |
-| keep_cr_status                | boolean    | no       | `false`  | option to enable to keep the CR status of the resources in the backup schedule |
+| Parameter                        | Type       | Required | Default  | Description                                                                    |
+| :--------------------------------- | ------------ | ---------- | ---------- | -------------------------------------------------------------------------------- |
+| backup_location_ref              | dictionary | varies   |          | Reference to backup location                                                   |
+| cluster_ref                      | dictionary | varies   |          | Reference to cluster                                                           |
+| pre_exec_rule_ref                | dictionary | varies   |          | Reference to pre exec rule                                                     |
+| post_exec_rule_ref               | dictionary | varies   |          | Reference to post exec rule                                                    |
+| backup_type                      | string     | no       | 'Normal' | Type of backup ('Generic' or 'Normal')                                         |
+| namespaces                       | list       | no       |          | List of namespaces to backup                                                   |
+| label_selectors                  | dictionary | no       |          | Label selectors to choose resources                                            |
+| resource_types                   | list       | no       |          | List of resource types to backup                                               |
+| exclude_resource_types           | list       | no       |          | List of resource types to exclude                                              |
+| backup_object_type               | dictionary | no       |          | Backup object type configuration                                               |
+| ns_label_selectors               | string     | no       |          | Label selectors for namespaces                                                 |
+| direct_kdmp                      | boolean    | no       | false    | Take backup as direct kdmp                                                     |
+| skip_vm_auto_exec_rules          | boolean    | no       | false    | Skip auto rules for VirtualMachine backup object type                          |
+| volume_snapshot_class_mapping    | dictionary | no       |          | Volume snapshot class mapping for CSI based backup                             |
+| backup_share                     | dictionary | varies   |          | Backup sharing configuration (required for UPDATE_BACKUP_SHARE)                |
+| parallel_backup                  | boolean    | no       | `false`  | option to enable parallel schedule backups                                     |
+| keep_cr_status                   | boolean    | no       | `false`  | option to enable to keep the CR status of the resources in the backup schedule |
+| advanced_resource_label_selector | string     | no       |          | Advanced label selector for resources (string format with operator support)    |
 
 #### backup_location_ref
 

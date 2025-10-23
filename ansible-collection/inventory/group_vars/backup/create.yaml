@@ -21,6 +21,7 @@ backups:
       - "services"
       - "configmaps"
     validate_certs: true
+    advanced_resource_label_selector: "env=prod"
 
   # Example backup 2: VM backup
   - name: "vm-backup"
@@ -35,6 +36,7 @@ backups:
       type: "VirtualMachine"
     skip_vm_auto_exec_rules: true
     validate_certs: true
+    advanced_resource_label_selector: "env=prod"
 
   # Example backup 3: Namespace backup with pre/post rules
   - name: "ns-backup"
@@ -55,3 +57,4 @@ backups:
       uid: "rule-456"
     backup_type: "Normal"
     validate_certs: true
+    advanced_resource_label_selector: "env=prod"
