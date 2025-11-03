@@ -233,47 +233,187 @@ class RoleError(Exception):
     """Base exception for role operations"""
     pass
 
+# Keycloak API Functions
+def make_keycloak_request(auth_url, endpoint, method='GET', data=None, params=None, token=None, ssl_config=None):
+    """
+    Make HTTP request to Keycloak Admin API with proper authentication and SSL handling.
+
+    Args:
+        auth_url (str): Base Keycloak authentication URL
+        endpoint (str): API endpoint path
+        method (str): HTTP method (GET, POST, PUT, DELETE)
+        data (dict): Request payload for POST/PUT operations
+        params (dict): Query parameters
+        token (str): Bearer authentication token
+        ssl_config (dict): SSL configuration options
+
+    Returns:
+        dict: Response data from Keycloak API
+
+    Raises:
+        Exception: If request fails or returns error status
+    """
+    # Ensure auth_url has protocol
+    if not auth_url.startswith(('http://', 'https://')):
+        auth_url = f"http://{auth_url}"
+
+    # Construct full URL
+    base_url = auth_url.rstrip('/')
+    url = f"{base_url}/auth/admin/realms/master/roles{endpoint}"
+
+    # Prepare headers
+    headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Authorization': f'Bearer {token}'
+    }
+
+    # Extract SSL configuration
+    if ssl_config is None:
+        ssl_config = {}
+
+    verify_ssl = ssl_config.get('validate_certs', True)
+    ca_cert = ssl_config.get('ca_cert')
+    client_cert = ssl_config.get('client_cert')
+    client_key = ssl_config.get('client_key')
+
+    # Prepare SSL verification
+    verify = verify_ssl
+    if ca_cert:
+        verify = ca_cert
+
+    # Prepare client certificate
+    cert = None
+    if client_cert and client_key:
+        cert = (client_cert, client_key)
+
+    try:
+        # Make the request
+        response = requests.request(
+            method=method,
+            url=url,
+            headers=headers,
+            json=data,
+            params=params,
+            verify=verify,
+            cert=cert,
+            timeout=30
+        )
+
+        # Check for HTTP errors
+        if response.status_code >= 400:
+            error_msg = f"HTTP {response.status_code}: {response.reason}"
+            try:
+                error_detail = response.json()
+                if 'error' in error_detail:
+                    error_msg += f" - {error_detail['error']}"
+                if 'error_description' in error_detail:
+                    error_msg += f": {error_detail['error_description']}"
+            except:
+                error_msg += f" - {response.text}"
+            raise Exception(error_msg)
+
+        # Return JSON response for successful requests
+        if response.status_code == 204:  # No Content (successful DELETE)
+            return {}
+
+        if response.content:
+            return response.json()
+        else:
+            return {}
+
+    except requests.exceptions.RequestException as e:
+        raise Exception(f"Request failed: {str(e)}")
+
+
+def convert_attributes_to_keycloak_format(attributes):
+    """Convert attributes from dict format to Keycloak format where values are arrays."""
+    if not attributes:
+        return {}
+
+    keycloak_attributes = {}
+    for key, value in attributes.items():
+        if isinstance(value, list):
+            keycloak_attributes[key] = value
+        else:
+            keycloak_attributes[key] = [str(value)]
+
+    return keycloak_attributes
+
+
+def convert_attributes_from_keycloak_format(keycloak_attributes):
+    """Convert attributes from Keycloak format (arrays) to simple dict format."""
+    if not keycloak_attributes:
+        return {}
+
+    simple_attributes = {}
+    for key, value_list in keycloak_attributes.items():
+        if isinstance(value_list, list) and len(value_list) > 0:
+            # If single value, return as string; if multiple values, return as list
+            simple_attributes[key] = value_list[0] if len(value_list) == 1 else value_list
+        else:
+            simple_attributes[key] = value_list
+
+    return simple_attributes
+
+
+def get_keycloak_role_by_name(auth_url, token, name, ssl_config=None):
+    """Get a specific role by name from Keycloak."""
+    try:
+        response = make_keycloak_request(
+            auth_url=auth_url,
+            endpoint=f'/{name}',
+            method='GET',
+            token=token,
+            ssl_config=ssl_config
+        )
+
+        # Convert attributes to simple format for user-friendly output
+        if 'attributes' in response:
+            response['attributes'] = convert_attributes_from_keycloak_format(response['attributes'])
+
+        return response
+
+    except Exception as e:
+        raise Exception(f"Failed to get Keycloak role '{name}': {str(e)}")
+
+
+def create_keycloak_role(auth_url, token, name, description=None, attributes=None, ssl_config=None):
+    """Create a new role in Keycloak."""
+    role_data = {
+        'name': name,
+        'description': description or '',
+        'attributes': convert_attributes_to_keycloak_format(attributes)
+    }
+
+    try:
+        make_keycloak_request(
+            auth_url=auth_url,
+            endpoint='',
+            method='POST',
+            data=role_data,
+            token=token,
+            ssl_config=ssl_config
+        )
+
+        # Get the created role details
+        created_role = get_keycloak_role_by_name(auth_url, token, name, ssl_config)
+        return created_role, f"Keycloak role '{name}' created successfully"
+
+    except Exception as e:
+        raise Exception(f"Failed to create Keycloak role '{name}': {str(e)}")
+
+
 def delete_keycloak_role(auth_url, token, name, ssl_config=None):
     """Delete a role from Keycloak."""
     try:
-        # Ensure auth_url has protocol
-        if not auth_url.startswith(('http://', 'https://')):
-            auth_url = f"http://{auth_url}"
-
-        # Construct full URL
-        base_url = auth_url.rstrip('/')
-        url = f"{base_url}/auth/admin/realms/master/roles/{name}"
-
-        # Prepare headers
-        headers = {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': f'Bearer {token}'
-        }
-
-        # Extract SSL configuration
-        if ssl_config is None:
-            ssl_config = {}
-
-        verify_ssl = ssl_config.get('validate_certs', True)
-        ca_cert = ssl_config.get('ca_cert')
-        client_cert = ssl_config.get('client_cert')
-        client_key = ssl_config.get('client_key')
-
-        # Prepare SSL verification
-        verify = verify_ssl
-        if ca_cert:
-            verify = ca_cert
-
-        # Prepare client certificates
-        cert = None
-        if client_cert and client_key:
-            cert = (client_cert, client_key)
-
-        # Make the request
-        response = requests.delete(url, headers=headers, verify=verify, cert=cert)
-        response.raise_for_status()
-
+        make_keycloak_request(
+            auth_url=auth_url,
+            endpoint=f'/{name}',
+            method='DELETE',
+            token=token,
+            ssl_config=ssl_config
+        )
         return f"Keycloak role '{name}' deleted successfully"
 
     except Exception as e:
@@ -318,6 +458,52 @@ def create_role(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict[str
     try:
         # Get module parameters directly
         params = dict(module.params)
+
+        # If role_id is not provided, create a Keycloak role automatically
+        if not params.get('role_id'):
+            if params.get('auth_url'):
+                # Prepare Keycloak role name
+                keycloak_role_name = params.get('name')
+                keycloak_description = params.get('description', 'Role created via ansible')
+                keycloak_attributes = params.get('keycloak_attributes', {})
+
+                # Add default attributes
+                if not keycloak_attributes:
+                    keycloak_attributes = {
+                        'px_backup_role': params.get('name'),
+                        'auto_generated': 'true',
+                        'created_by': 'ansible-automation'
+                    }
+
+                try:
+                    # First, check if the Keycloak role already exists
+                    try:
+                        keycloak_role = get_keycloak_role_by_name(
+                            auth_url=params.get('auth_url'),
+                            token=params.get('token'),
+                            name=keycloak_role_name,
+                            ssl_config=params.get('ssl_config', {})
+                        )
+                        params['role_id'] = keycloak_role.get('id')
+                        logger.info(f"Using existing Keycloak role '{keycloak_role_name}' with ID: {params['role_id']}")
+                    except Exception as inspect_error:
+                        # Role doesn't exist, create it
+                        logger.debug(f"Keycloak role '{keycloak_role_name}' not found, creating new role")
+                        keycloak_role, _ = create_keycloak_role(
+                            auth_url=params.get('auth_url'),
+                            token=params.get('token'),
+                            name=keycloak_role_name,
+                            description=keycloak_description,
+                            attributes=keycloak_attributes,
+                            ssl_config=params.get('ssl_config', {})
+                        )
+                        params['role_id'] = keycloak_role['id']
+                        logger.info(f"Auto-created Keycloak role '{keycloak_role_name}' with ID: {params['role_id']}")
+                except Exception as e:
+                    # Both inspection and creation failed
+                    module.fail_json(msg=f"Failed to get or create Keycloak role '{keycloak_role_name}': {str(e)}")
+            else:
+                logger.info(f"No auth_url provided - skipping Keycloak role creation for '{module.params['name']}'")
         role_request = build_role_request(params)
 
         # Make the create request
@@ -404,7 +590,7 @@ def inspect_role(module, client):
         module.fail_json(msg=f"Failed to inspect role: {str(e)}")
 
 def delete_role(module, client):
-    """Delete a role"""
+    """Delete a role and optionally its associated Keycloak role"""
     try:
         # Standard delete by name approach
         endpoint = f"v1/role/{module.params['org_id']}/{module.params['name']}"
@@ -455,7 +641,8 @@ def build_role_request(params: Dict[str, Any]) -> Dict[str, Any]:
         "metadata": {
             "name": params.get('name'),
             "org_id": params.get('org_id')
-        }
+        },
+        "role_id": params['role_id']
     }
 
     # Add rules if provided
