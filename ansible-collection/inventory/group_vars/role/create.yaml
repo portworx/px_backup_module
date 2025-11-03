@@ -22,3 +22,8 @@ roles_create:
     rules:
       - services: ['role']
         apis: ['inspect*', 'enumerate*']
+
+  - name: "test-role-3"
+    rules:
+      - services: ['role']
+        apis: ['inspect*', 'enumerate*']
