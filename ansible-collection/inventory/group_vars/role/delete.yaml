@@ -2,9 +2,6 @@
 roles_delete:
   - name: "test-role-1"
 
-  # Delete only PX-Backup role, keep Keycloak role intact (no Keycloak integration)
-  - name: "test-role-2"
-
   # Delete only PX-Backup role, explicitly skip Keycloak role deletion
   - name: "test-role-3"
     skip_keycloak_deletion: true
