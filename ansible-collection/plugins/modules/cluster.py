@@ -510,14 +510,35 @@ def enumerate_clusters(module: AnsibleModule, client: PXBackupClient) -> List[Di
             'only_backup_share': module.params.get('only_backup_share', False),
             'cloud_credential_ref': module.params.get('cloud_credential_ref', {}),
         }
-            
+
+        # Add new filtration features
+        if module.params.get('vm_volume_name'):
+            params['enumerate_options.vm_volume_name'] = module.params['vm_volume_name']
+
+        if module.params.get('exclude_failed_resource') is not None:
+            params['enumerate_options.exclude_failed_resource'] = module.params['exclude_failed_resource']
+
+        # Add resource_info filter
+        if module.params.get('resource_info'):
+            resource_info = module.params['resource_info']
+            if resource_info.get('name'):
+                params['enumerate_options.resource_info.name'] = resource_info['name']
+            if resource_info.get('namespace'):
+                params['enumerate_options.resource_info.namespace'] = resource_info['namespace']
+            if resource_info.get('group'):
+                params['enumerate_options.resource_info.group'] = resource_info['group']
+            if resource_info.get('kind'):
+                params['enumerate_options.resource_info.kind'] = resource_info['kind']
+            if resource_info.get('version'):
+                params['enumerate_options.resource_info.version'] = resource_info['version']
+
         response = client.make_request(
             method='GET',
             endpoint=f"v1/cluster/{module.params['org_id']}",
             params=params
         )
         return response.get('clusters', [])
-        
+
     except Exception as e:
         module.fail_json(msg=f"Failed to enumerate clusters: {str(e)}")
 
@@ -898,7 +919,31 @@ def run_module():
             )
         ),
         include_secrets=dict(type='bool', default=False),
-         # metadata-related arguments
+        # New filtration features
+        vm_volume_name=dict(
+            type='str',
+            required=False,
+            description='Filter VM that matches the resource_info and has volume vm_volume_name attached to it'
+        ),
+        exclude_failed_resource=dict(
+            type='bool',
+            required=False,
+            default=False,
+            description='Filter to exclude failed resources while enumerating objects'
+        ),
+        resource_info=dict(
+            type='dict',
+            required=False,
+            options=dict(
+                name=dict(type='str', required=False),
+                namespace=dict(type='str', required=False),
+                group=dict(type='str', required=False),
+                kind=dict(type='str', required=False),
+                version=dict(type='str', required=False)
+            ),
+            description='Filter to use resource name and namespace. Any cluster that contains the resource will be returned'
+        ),
+        # metadata-related arguments
         ownership=dict(
             type='dict',
             required=False,

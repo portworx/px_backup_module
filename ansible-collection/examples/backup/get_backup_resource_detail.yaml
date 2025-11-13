@@ -29,6 +29,14 @@
             org_id: "{{ org_id }}"
             name: "{{ name }}"
             uid: "{{ uid | default(omit) }}"
+            # Enhanced filtering options
+            force_resync: "{{ force_resync | default(false) }}"
+            sync_namespaces_only: "{{ sync_namespaces_only | default(false) }}"
+            max_objects: "{{ max_objects | default(omit) }}"
+            object_index: "{{ object_index | default(omit) }}"
+            resource_status_filter: "{{ resource_status_filter | default(omit) }}"
+            namespace_filter: "{{ namespace_filter | default(omit) }}"
+            virtual_machine_filter: "{{ virtual_machine_filter | default(omit) }}"
             # SSL Certificate Parameters
             ssl_config: "{{ ssl_config.px_backup | default({}) }}"
           register: backup_result
