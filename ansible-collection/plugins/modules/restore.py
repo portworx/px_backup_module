@@ -143,6 +143,123 @@ options:
             version:
                 description: Resource version
                 type: str
+    exclude_resources:
+        description: List of specific resources to exclude from restore
+        type: list
+        elements: dict
+        required: false
+        version_added: '2.10.0'
+        suboptions:
+            name:
+                description: Resource name
+                type: str
+            namespace:
+                description: Resource namespace
+                type: str
+            group:
+                description: Resource API group
+                type: str
+            kind:
+                description: Resource kind
+                type: str
+            version:
+                description: Resource version
+                type: str
+    filter:
+        description: Advanced filtering options for restore operations
+        type: dict
+        required: false
+        version_added: '2.10.0'
+        suboptions:
+            namespace_filter:
+                description: Namespace-based filtering options
+                type: dict
+                required: false
+                suboptions:
+                    namespace_name_pattern:
+                        description: Pattern to match namespace names
+                        type: str
+                        required: false
+                    include_namespaces:
+                        description: List of namespaces to include
+                        type: list
+                        elements: str
+                        required: false
+                    exclude_namespaces:
+                        description: List of namespaces to exclude
+                        type: list
+                        elements: str
+                        required: false
+                    include_resources:
+                        description: List of specific resources to include
+                        type: list
+                        elements: dict
+                        required: false
+                        suboptions:
+                            name:
+                                description: Resource name
+                                type: str
+                            namespace:
+                                description: Resource namespace
+                                type: str
+                            group:
+                                description: Resource API group
+                                type: str
+                            kind:
+                                description: Resource kind
+                                type: str
+                            version:
+                                description: Resource version
+                                type: str
+                    exclude_resources:
+                        description: List of specific resources to exclude
+                        type: list
+                        elements: dict
+                        required: false
+                        suboptions:
+                            name:
+                                description: Resource name
+                                type: str
+                            namespace:
+                                description: Resource namespace
+                                type: str
+                            group:
+                                description: Resource API group
+                                type: str
+                            kind:
+                                description: Resource kind
+                                type: str
+                            version:
+                                description: Resource version
+                                type: str
+                    gvks:
+                        description: Group-Version-Kind specifications for filtering
+                        type: list
+                        elements: dict
+                        required: false
+                        suboptions:
+                            group:
+                                description: API group
+                                type: str
+                            kind:
+                                description: Resource kind
+                                type: str
+                            version:
+                                description: API version
+                                type: str
+                    resource_name_pattern:
+                        description: Pattern to match resource names
+                        type: str
+                        required: false
+            virtual_machine_filter:
+                description: Virtual machine specific filtering options
+                type: dict
+                required: false
+                suboptions:
+                    vm_name_pattern:
+                        description: Pattern to match virtual machine names
+                        type: str
+                        required: false
     namespace_mapping:
         description: Mapping of source and destination namespaces during restore
         type: dict
@@ -384,7 +501,15 @@ def build_restore_request(params: Dict[str, Any], module: AnsibleModule, client:
         "rancher_project_mapping": params.get('rancher_project_mapping', {}),
         "rancher_project_name_mapping": params.get('rancher_project_name_mapping', {})
     })
-    
+
+    # Add new exclude_resources parameter
+    if params.get('exclude_resources'):
+        request["exclude_resources"] = params['exclude_resources']
+
+    # Add new filter parameter
+    if params.get('filter'):
+        request["filter"] = params['filter']
+
     if params.get('namespace_mapping'):
         request.update({"namespace_mapping": params.get('namespace_mapping')})
     
@@ -705,6 +830,75 @@ def run_module():
                 group=dict(type='str', required=True),
                 kind=dict(type='str', required=True),
                 version=dict(type='str', required=True)
+            )
+        ),
+        exclude_resources=dict(
+            type='list',
+            elements='dict',
+            required=False,
+            options=dict(
+                name=dict(type='str', required=True),
+                namespace=dict(type='str', required=True),
+                group=dict(type='str', required=True),
+                kind=dict(type='str', required=True),
+                version=dict(type='str', required=True)
+            )
+        ),
+        filter=dict(
+            type='dict',
+            required=False,
+            options=dict(
+                namespace_filter=dict(
+                    type='dict',
+                    required=False,
+                    options=dict(
+                        namespace_name_pattern=dict(type='str', required=False),
+                        include_namespaces=dict(type='list', elements='str', required=False),
+                        exclude_namespaces=dict(type='list', elements='str', required=False),
+                        include_resources=dict(
+                            type='list',
+                            elements='dict',
+                            required=False,
+                            options=dict(
+                                name=dict(type='str', required=True),
+                                namespace=dict(type='str', required=True),
+                                group=dict(type='str', required=True),
+                                kind=dict(type='str', required=True),
+                                version=dict(type='str', required=True)
+                            )
+                        ),
+                        exclude_resources=dict(
+                            type='list',
+                            elements='dict',
+                            required=False,
+                            options=dict(
+                                name=dict(type='str', required=True),
+                                namespace=dict(type='str', required=True),
+                                group=dict(type='str', required=True),
+                                kind=dict(type='str', required=True),
+                                version=dict(type='str', required=True)
+                            )
+                        ),
+                        gvks=dict(
+                            type='list',
+                            elements='dict',
+                            required=False,
+                            options=dict(
+                                group=dict(type='str', required=True),
+                                kind=dict(type='str', required=True),
+                                version=dict(type='str', required=True)
+                            )
+                        ),
+                        resource_name_pattern=dict(type='str', required=False)
+                    )
+                ),
+                virtual_machine_filter=dict(
+                    type='dict',
+                    required=False,
+                    options=dict(
+                        vm_name_pattern=dict(type='str', required=False)
+                    )
+                )
             )
         ),
         backup_object_type=dict(

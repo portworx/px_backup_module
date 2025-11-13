@@ -7,6 +7,8 @@ The restore module enables management of backup restoration operations in PX-Bac
 * Create and manage restores from PX-Backup backups
 * Support for default and custom restore configurations
 * Flexible resource selection and mapping
+* Advanced resource exclusion capabilities (v2.10.0+)
+* Enhanced filtering with namespace and VM patterns (v2.10.0+)
 * Namespace and storage class mapping capabilities
 * Rancher project integration
 
@@ -16,6 +18,19 @@ The restore module enables management of backup restoration operations in PX-Bac
 * Stork >= 25.3.0
 * Python >= 3.9
 * The `requests` Python package
+
+## API Changes Notice
+
+### Enhanced Features in v2.11.0+
+
+This module has been updated with enhanced restore capabilities:
+
+- **Resource Exclusion**: New `exclude_resources` parameter for selective restoration
+- **Advanced Filtering**: Enhanced namespace and VM filtering with pattern matching
+- **Improved Control**: Better granular control over what gets restored
+- **Enhanced Monitoring**: Improved status tracking and progress monitoring
+
+**Backward Compatibility**: All existing restore playbooks continue to work without modification. New filtering features are available when using compatible API versions.
 
 ## Operations
 
@@ -118,6 +133,14 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 | cluster_name_filter        | string  | no       |         | Filter by cluster name         |
 | include_detailed_resources | boolean | no       | false   | Include detailed resource info |
 
+### Filter Options
+
+| Filter Type | Description | Available Options |
+|-------------|-------------|-------------------|
+| `exclude_resources` | Exclude specific resources | name, namespace, group, kind, version |
+| `namespace_filter` | Filter by namespace criteria | namespace_name_pattern, include/exclude_namespaces, gvks, resource_name_pattern |
+| `virtual_machine_filter` | Filter VM resources | vm_name_pattern |
+
 ## Error Handling
 
 1. Parameter Validation
@@ -202,3 +225,130 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
    - Verify resource status
    - Review error messages
    - Monitor target cluster
+
+## Enhanced Filtering (v2.11.0+)
+
+The restore module now supports advanced filtering capabilities for more granular control over what gets restored.
+
+### Resource Exclusion
+
+Exclude specific resources from restore operations:
+
+```yaml
+- name: Create restore excluding sensitive resources
+  restore:
+    operation: CREATE
+    api_url: "{{ px_backup_api_url }}"
+    token: "{{ px_backup_token }}"
+    name: "selective-restore"
+    org_id: "default"
+    backup_ref:
+      name: "my-backup"
+    cluster_ref:
+      name: "target-cluster"
+    exclude_resources:
+      - name: "database-secret"
+        namespace: "default"
+        group: ""
+        kind: "Secret"
+        version: "v1"
+      - name: "temp-configmap"
+        namespace: "app"
+        group: ""
+        kind: "ConfigMap"
+        version: "v1"
+```
+
+### Namespace Filtering
+
+Filter resources based on namespace patterns and criteria:
+
+```yaml
+- name: Create restore with namespace filtering
+  restore:
+    operation: CREATE
+    api_url: "{{ px_backup_api_url }}"
+    token: "{{ px_backup_token }}"
+    name: "namespace-filtered-restore"
+    org_id: "default"
+    backup_ref:
+      name: "cluster-backup"
+    cluster_ref:
+      name: "target-cluster"
+    filter:
+      namespace_filter:
+        namespace_name_pattern: "prod-*"
+        exclude_namespaces:
+          - "kube-system"
+          - "kube-public"
+        gvks:
+          - group: "apps"
+            kind: "Deployment"
+            version: "v1"
+          - group: ""
+            kind: "Service"
+            version: "v1"
+        resource_name_pattern: "web-*"
+```
+
+### Virtual Machine Filtering
+
+Filter virtual machine resources during restore:
+
+```yaml
+- name: Create restore with VM filtering
+  restore:
+    operation: CREATE
+    api_url: "{{ px_backup_api_url }}"
+    token: "{{ px_backup_token }}"
+    name: "vm-filtered-restore"
+    org_id: "default"
+    backup_ref:
+      name: "vm-backup"
+    cluster_ref:
+      name: "vm-cluster"
+    filter:
+      virtual_machine_filter:
+        vm_name_pattern: "production-vm-*"
+```
+
+### Comprehensive Filtering
+
+Combine multiple filtering options for precise control:
+
+```yaml
+- name: Create restore with comprehensive filtering
+  restore:
+    operation: CREATE
+    api_url: "{{ px_backup_api_url }}"
+    token: "{{ px_backup_token }}"
+    name: "comprehensive-restore"
+    org_id: "default"
+    backup_ref:
+      name: "full-backup"
+    cluster_ref:
+      name: "target-cluster"
+    exclude_resources:
+      - name: "temp-secret"
+        namespace: "default"
+        group: ""
+        kind: "Secret"
+        version: "v1"
+    filter:
+      namespace_filter:
+        namespace_name_pattern: "app-*"
+        exclude_namespaces:
+          - "app-temp"
+        include_resources:
+          - name: "critical-deployment"
+            namespace: "app-prod"
+            group: "apps"
+            kind: "Deployment"
+            version: "v1"
+        gvks:
+          - group: "apps"
+            kind: "Deployment"
+            version: "v1"
+      virtual_machine_filter:
+        vm_name_pattern: "vm-prod-*"
+```
