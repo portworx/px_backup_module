@@ -6,8 +6,8 @@ Ansible collection for managing PX-Backup operations. This collection provides m
 
 - Ansible Core >= 2.17.6
 - Python >= 3.9
-- PX-Backup >= 2.9.0
-- Stork >= 25.3.0
+- PX-Backup >= 2.9.0 (unless mentioned)
+- Stork >= 25.3.0 (Unless mentioned)
 - Python Requests library
 
 ## Installation
