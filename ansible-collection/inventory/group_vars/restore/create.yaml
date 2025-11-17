@@ -18,3 +18,157 @@ restores:
       value: ""
     # storage_class_mapping:
     #   "px-db": "px-db"
+
+  # Example restore 2: Basic restore with resource exclusion (v2.10.0+)
+  - name: "basic-restore-with-exclusion"
+    backup_ref:
+      name: "one-big-backup"
+    cluster_ref:
+      name: "adarsh-ocp"
+    exclude_resources:
+      - name: "sensitive-secret"
+        namespace: "openshift"
+        group: ""
+        kind: "Secret"
+        version: "v1"
+      - name: "temp-configmap"
+        namespace: "openshift"
+        group: ""
+        kind: "ConfigMap"
+        version: "v1"
+
+#   # Example restore 3: Restore with namespace filtering (v2.10.0+)
+  - name: "namespace-filtered-restore-1"
+    backup_ref:
+      name: "one-big-backup"
+    cluster_ref:
+       name: "adarsh-ocp"
+    filter:
+      namespace_filter:
+        namespace_name_pattern: "openshift*"
+        exclude_namespaces:
+          - "kube-system"
+          - "kube-public"
+          - "px-system"
+        gvks:
+          - group: "apps"
+            kind: "Deployment"
+            version: "v1"
+          - group: ""
+            kind: "Service"
+            version: "v1"
+          - group: ""
+            kind: "PersistentVolumeClaim"
+            version: "v1"
+        resource_name_pattern: "config*"
+
+#   # Example restore 4: Restore with VM filtering (v2.10.0+)
+  - name: "vm-filtered-restore"
+    backup_ref:
+      name: "vm-backup"
+    cluster_ref:
+      name: "vm-cluster"
+    filter:
+      virtual_machine_filter:
+        vm_name_pattern: "production-vm-*"
+      namespace_filter:
+        include_namespaces:
+          - "vm-production"
+          - "vm-staging"
+
+#   # Example restore 5: Comprehensive restore with all filtering options (v2.10.0+)
+  - name: "comprehensive-filtered-restore"
+    backup_ref:
+      name: "full-backup"
+    cluster_ref:
+      name: "target-cluster"
+    exclude_resources:
+      - name: "temp-data"
+        namespace: "default"
+        group: ""
+        kind: "Secret"
+        version: "v1"
+      - name: "cache-config"
+        namespace: "app"
+        group: ""
+        kind: "ConfigMap"
+        version: "v1"
+    filter:
+      namespace_filter:
+        namespace_name_pattern: "app-*"
+        exclude_namespaces:
+          - "app-temp"
+          - "app-cache"
+        include_resources:
+          - name: "critical-deployment"
+            namespace: "app-prod"
+            group: "apps"
+            kind: "Deployment"
+            version: "v1"
+          - name: "database-statefulset"
+            namespace: "app-prod"
+            group: "apps"
+            kind: "StatefulSet"
+            version: "v1"
+        exclude_resources:
+          - name: "test-deployment"
+            namespace: "app-prod"
+            group: "apps"
+            kind: "Deployment"
+            version: "v1"
+        gvks:
+          - group: "apps"
+            kind: "Deployment"
+            version: "v1"
+          - group: "apps"
+            kind: "StatefulSet"
+            version: "v1"
+          - group: ""
+            kind: "Service"
+            version: "v1"
+        resource_name_pattern: "prod-*"
+      virtual_machine_filter:
+        vm_name_pattern: "vm-prod-*"
+    namespace_mapping:
+      "app-prod": "restored-app-prod"
+      "app-staging": "restored-app-staging"
+    storage_class_mapping:
+      "fast-ssd": "standard-ssd"
+      "slow-hdd": "standard-hdd"
+    replace_policy: "Delete"
+
+#   # Example restore 6: Restore with specific resource inclusion and exclusion (v2.10.0+)
+  - name: "selective-restore"
+    backup_ref:
+      name: "application-backup"
+    cluster_ref:
+      name: "staging-cluster"
+    include_resources:
+      - name: "web-deployment"
+        namespace: "default"
+        group: "apps"
+        kind: "Deployment"
+        version: "v1"
+      - name: "web-service"
+        namespace: "default"
+        group: ""
+        kind: "Service"
+        version: "v1"
+    exclude_resources:
+      - name: "debug-configmap"
+        namespace: "default"
+        group: ""
+        kind: "ConfigMap"
+        version: "v1"
+    filter:
+      namespace_filter:
+        include_namespaces:
+          - "default"
+          - "app"
+        gvks:
+          - group: "apps"
+            kind: "Deployment"
+            version: "v1"
+          - group: ""
+            kind: "Service"
+            version: "v1"

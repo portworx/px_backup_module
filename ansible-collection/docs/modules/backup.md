@@ -20,6 +20,19 @@ The backup module provides comprehensive management of PX-Backup backups, includ
 * Python >= 3.9
 * The `requests` Python package
 
+## API Changes Notice
+
+### Enhanced Features in v2.11.0+
+
+This module has been updated to support enhanced API capabilities:
+
+- **GetBackupResourceDetails**: Now uses POST method with advanced filtering options
+- **LastUpdateTimestamp Sorting**: Sort backups by last modification time for better chronological ordering
+- **Enhanced Filtering**: Support for namespace patterns, resource exclusions, and GVK filtering
+- **Improved Performance**: Optimized API calls for large datasets
+
+**Backward Compatibility**: All existing playbooks continue to work without modification. New features are available when using compatible API versions.
+
 ## Operations
 
 The module supports the following operations:
@@ -239,10 +252,10 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 #### Sort Option Format
 
 
-| Parameter  | Type   | Required | Choices                                                                 | Default             | Description      |
-| ------------ | -------- | ---------- | ------------------------------------------------------------------------- | --------------------- | ------------------ |
-| sort_by    | string | no       | 'CreationTimestamp', 'Name', 'ClusterName', 'Size', 'RestoreBackupName' | 'CreationTimestamp' | Field to sort by |
-| sort_order | string | no       | 'Ascending', 'Descending'                                               | 'Descending'        | Sort order       |
+| Parameter  | Type   | Required | Choices                                                                                    | Default             | Description      |
+| ------------ | -------- | ---------- | -------------------------------------------------------------------------------------------- | --------------------- | ------------------ |
+| sort_by    | string | no       | 'CreationTimestamp', 'Name', 'ClusterName', 'Size', 'RestoreBackupName', 'LastUpdateTimestamp' | 'CreationTimestamp' | Field to sort by |
+| sort_order | string | no       | 'Ascending', 'Descending'                                                                  | 'Descending'        | Sort order       |
 
 ## Return Values
 
@@ -361,6 +374,18 @@ backup:
       sort_by: "CreationTimestamp"
       sort_order: "Descending"
     max_objects: 50
+
+# List backups sorted by last update timestamp
+- name: List recently updated backups
+  backup:
+    operation: INSPECT_ALL
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    org_id: "default"
+    sort_option:
+      sort_by: "LastUpdateTimestamp"
+      sort_order: "Descending"
+    max_objects: 20
 ```
 
 ### Update Backup Sharing
@@ -398,6 +423,40 @@ backup:
     name: "vm-backup"
     org_id: "default"
     uid: "backup-uid"
+```
+
+#### Advanced Usage with Filtering
+
+```yaml
+- name: Get VM backup details with advanced filtering
+  backup:
+    operation: GET_BACKUP_RESOURCE_DETAILS
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    name: "vm-backup"
+    org_id: "default"
+    uid: "backup-uid"
+    # Enhanced filtering options
+    force_resync: false
+    sync_namespaces_only: false
+    max_objects: 100
+    object_index: 0
+    resource_status_filter:
+      - "Success"
+      - "Failed"
+    namespace_filter:
+      namespace_name_pattern: "prod-*"
+      include_namespaces:
+        - "production"
+        - "staging"
+      exclude_namespaces:
+        - "kube-system"
+      gvks:
+        - "apps/v1/Deployment"
+        - "v1/Pod"
+      resource_name_pattern: "app-*"
+    virtual_machine_filter:
+      vm_name_pattern: "vm-prod-*"
 ```
 
 ### Retry Failed Backup
