@@ -27,7 +27,7 @@ module: cloud_credential
 
 short_description: Manage cloud credential in PX-Backup
 
-version_added: "2.9.0"
+version_added: "2.10.0"
 
 description: 
     - Manage cloud credential in PX-Backup

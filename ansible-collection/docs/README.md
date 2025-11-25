@@ -115,7 +115,7 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 
 ## API Integration
 
-This collection integrates with PX-Backup API v2.9.0. For detailed API documentation, visit:
+This collection integrates with PX-Backup API v2.10.0. For detailed API documentation, visit:
 
 - [PX-Backup Proto File](https://github.com/portworx/px-backup-api/blob/master/pkg/apis/v1/api.proto)
 - [PX-Backup Product Documentation](https://docs.portworx.com/portworx-backup-on-prem)
