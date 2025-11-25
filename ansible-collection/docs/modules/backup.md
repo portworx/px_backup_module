@@ -15,7 +15,7 @@ The backup module provides comprehensive management of PX-Backup backups, includ
 
 ## Requirements
 
-* PX-Backup >= 2.9.0
+* PX-Backup >= 2.10.0
 * Stork >= 25.3.0
 * Python >= 3.9
 * The `requests` Python package

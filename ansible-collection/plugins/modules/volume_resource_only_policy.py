@@ -39,7 +39,7 @@ module: volume_resource_only_policy
 
 short_description: Manage volume resource only policies in PX-Backup
 
-version_added: "2.9.0"
+version_added: "2.10.0"
 
 description:
     - Manage volume resource only policies in PX-Backup using different operations

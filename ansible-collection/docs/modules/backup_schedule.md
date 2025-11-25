@@ -11,7 +11,7 @@ The backup schedule module enables management of automated backup schedules in P
 * Flexible scheduling policies and retention controls
 * Enhanced filtering and sorting in 2.9.0+
 * VM-specific backup capabilities
-* Cluster scope support (2.9.0+)
+* Cluster scope support (2.10.0+)
 
 ## Requirements
 
