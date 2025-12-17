@@ -851,7 +851,7 @@ def enumerate_backup_locations(name_filter=None, dry_run=False):
 
     if dry_run:
         logging.debug(f"[DRY RUN] Would enumerate backup locations")
-        return []
+        return {}
 
     # Prepare extra vars for the Ansible command
     extra_vars = {}
@@ -873,7 +873,7 @@ def enumerate_backup_locations(name_filter=None, dry_run=False):
 
     if result.returncode != 0:
         logging.error(f"Failed to enumerate backup locations")
-        return []
+        return {}
 
     # Extract backup locations from output
     stdout_text = result.stdout
