@@ -9,7 +9,6 @@
   tasks:
     - name: Login and fetch Px-Backup token
       include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
-      
     - name: List All Backup Schedule
       backup_schedule:
         operation: INSPECT_ALL
@@ -17,6 +16,4 @@
         token: "{{ px_backup_token }}"
         org_id: "{{ org_id }}"
         enumerate_options:
-          cluster_name_filter: "{{ enumerate_options.cluster_name_filter }}"
-          cluster_uid_filter: "{{ enumerate_options.cluster_uid_filter }}"
-          backup_object_type: "{{ enumerate_options.backup_object_type }}"
+          backup_object_type: "VirtualMachine"
