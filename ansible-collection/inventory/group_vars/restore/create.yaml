@@ -18,3 +18,19 @@ restores:
       value: ""
     # storage_class_mapping:
     #   "px-db": "px-db"
+  # Single File Restore Request
+  - name: "sfr-restore"
+    backup_ref:
+      name: "test1"
+    cluster_ref:
+      name: "pg-ocp"
+    replace_policy: "Retain"
+    #(Single File Restore only params)
+    is_sfr: true
+    file_level_restore_info: 
+      - volume_name: pvc-73bfd2cc-846e-4b45-befb-44cf89021f2a
+        virtual_machine_name: fio-vm-multi-disk
+        restore_files:
+          source_path: test-folder/USER.md
+          destination_path: "test-folder-restored/USER.md"
+          is_dir: false
