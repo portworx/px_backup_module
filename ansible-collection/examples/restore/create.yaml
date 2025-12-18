@@ -35,6 +35,9 @@
             include_resources: "{{ item.include_resources | default(omit) }}"
             # SSL Certificate Parameters
             ssl_config: "{{ ssl_config.px_backup | default({}) }}"
+            # SFR (Single File Restore) Parameters
+            is_sfr: "{{ item.is_sfr | default(false) }}"
+            file_level_restore_info: "{{ item.file_level_restore_info | default(omit) }}"
             replace_policy: "{{ item.replace_policy | default('Retain') }}"
             rancher_project_mapping: "{{ rancher_project_mapping | default(omit) }}"
             rancher_project_name_mapping: "{{ rancher_project_name_mapping | default(omit) }}"
