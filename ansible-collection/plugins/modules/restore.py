@@ -144,7 +144,9 @@ options:
                 description: Resource version
                 type: str
     namespace_mapping:
-        description: Mapping of source and destination namespaces during restore
+        description:
+            - Mapping of source and destination namespaces during restore
+            - Set namespace_mapping equal if is_sfr is set to true
         type: dict
         required: false
     storage_class_mapping:
@@ -155,6 +157,51 @@ options:
         description: Name or UID of the cluster
         type: str
         required: false
+    is_sfr:
+        description:
+            - Set to true for VirtualMachine file level restore
+            - Enables restoration of specific files/directories from VM backups
+            - Requires file_level_restore_info when set to true
+        required: false
+        type: bool
+        default: false
+        version_added: "2.11.0"
+    file_level_restore_info:
+        description: File level restore configuration for VM backups
+        type: dict
+        required: false
+        version_added: "2.11.0"
+        suboptions:
+            virtual_machine_name:
+                description: Name of the VM to restore files to
+                type: str
+                required: true
+            volume_name:
+                description: Source PVC name to restore files from
+                type: str
+                required: true
+            restore_files:
+                description: List of files/directories to restore
+                type: list
+                elements: dict
+                required: true
+                suboptions:
+                    source_path:
+                        description: Relative path to file/dir in volume
+                        type: str
+                        required: true
+                    destination_path:
+                        description: Absolute destination path (optional, defaults to source path)
+                        type: str
+                        required: false
+                    is_dir:
+                        description: True if source path is directory
+                        type: bool
+                        default: false
+                    partition_info:
+                        description: Partition info if volume is partitioned (e.g., vda1, sda14)
+                        type: str
+                        required: false
     ssl_config:
         description:
             - SSL configuration dictionary containing certificate settings
@@ -195,6 +242,7 @@ requirements:
 notes:
     - "Operation-specific required parameters:"
     - "CREATE: name, backup_ref, cluster_ref"
+    - "CREATE (SFR): name, backup_ref, cluster_ref, is_sfr=true, file_level_restore_info"
     - "DELETE: name, org_id"
     - "INSPECT_ONE: name, org_id"
     - "INSPECT_ALL: org_id"
@@ -258,6 +306,37 @@ def validate_params(params: Dict[str, Any], operation: str, required_params: Lis
         raise ValidationError(
             f"Operation '{operation}' requires parameters: {', '.join(missing)}")
 
+
+def validate_sfr_params(params: Dict[str, Any]) -> None:
+    """
+    Validate SFR-specific parameters
+
+    Args:
+        params: Module parameters
+
+    Raises:
+        ValidationError: If SFR validation fails
+    """
+    if params.get('is_sfr'):
+        if not params.get('file_level_restore_info'):
+            raise ValidationError("file_level_restore_info is required when is_sfr=true")
+
+        sfr_info = params['file_level_restore_info']
+        required_fields = ['virtual_machine_name', 'volume_name', 'restore_files']
+        for field in required_fields:
+            if not sfr_info.get(field):
+                raise ValidationError(f"file_level_restore_info.{field} is required for SFR")
+
+        # Validate restore_files array
+        restore_files = sfr_info.get('restore_files', [])
+        if not isinstance(restore_files, list) or len(restore_files) == 0:
+            raise ValidationError("file_level_restore_info.restore_files must be a non-empty list")
+
+        for i, file_info in enumerate(restore_files):
+            if not file_info.get('source_path'):
+                raise ValidationError(f"restore_files[{i}].source_path is required")
+
+
 def enumerate_restores(module: AnsibleModule, client: PXBackupClient) -> List[Dict[str, Any]]:
     """List all restores"""
     # First, let's log the input parameters for debugging
@@ -288,7 +367,8 @@ def enumerate_restores(module: AnsibleModule, client: PXBackupClient) -> List[Di
 
     if module.params.get('status'):
         params['enumerate_options.status'] = module.params['status']
-        
+
+
     # Remove None values
     params = {k: v for k, v in params.items() if v is not None}
     
@@ -402,6 +482,21 @@ def build_restore_request(params: Dict[str, Any], module: AnsibleModule, client:
         }
         request['replace_policy'] = replace_policy_map.get(params['replace_policy'], 0)
 
+    # Add SFR support
+    if params.get('is_sfr'):
+        request['is_sfr'] = params['is_sfr']
+        if params.get('file_level_restore_info'):
+            request['file_level_restore_info'] = params['file_level_restore_info']
+
+    # Add backup_object_type if provided
+    if params.get('backup_object_type'):
+        backup_object_type_map = {
+            'Invalid': 0,
+            'All': 1,
+            'VirtualMachine': 2
+        }
+        request['backup_object_type'] = backup_object_type_map.get(params['backup_object_type'], 0)
+
     return request
 
 def process_restore_response(response: Dict[str, Any]) -> Dict[str, Any]:
@@ -451,6 +546,10 @@ def process_restore_response(response: Dict[str, Any]) -> Dict[str, Any]:
                     result['restore_info'][key] = value or []
                 elif isinstance(value, bool):
                     result['restore_info'][key] = value
+                elif key == 'is_sfr':
+                    result['restore_info'][key] = value
+                elif key == 'file_level_restore_info':
+                    result['restore_info'][key] = value or {}
                 else:
                     result['restore_info'][key] = value
 
@@ -460,7 +559,7 @@ def create_restore(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict[
     """Create a new restore"""
     try:
         params = dict(module.params)
-        
+        validate_sfr_params(params)
         # Build request
         backup_request = build_restore_request(params, module, client)
         
@@ -718,6 +817,28 @@ def run_module():
             choices=['Invalid', 'Retain', 'Delete']
         ),
 
+        # Single File Restore (SFR) support
+        is_sfr=dict(type='bool', required=False, default=False),
+        file_level_restore_info=dict(
+            type='dict',
+            required=False,
+            options=dict(
+                virtual_machine_name=dict(type='str', required=True),
+                volume_name=dict(type='str', required=True),
+                restore_files=dict(
+                    type='list',
+                    elements='dict',
+                    required=True,
+                    options=dict(
+                        source_path=dict(type='str', required=True),
+                        destination_path=dict(type='str', required=False),
+                        is_dir=dict(type='bool', required=False, default=False),
+                        partition_info=dict(type='str', required=False)
+                    )
+                )
+            )
+        ),
+
         # Enumerate options
         max_objects=dict(type='int', required=False),
         name_filter=dict(type='str', required=False),
@@ -772,6 +893,8 @@ def run_module():
             ('operation', 'INSPECT_ONE', ['name', 'org_id']),
 
             ('operation', 'INSPECT_ALL', ['org_id']),
+
+            ('is_sfr', True, ['file_level_restore_info']),
         ]
     )
 
@@ -780,6 +903,8 @@ def run_module():
         operation = module.params['operation']
         validate_params(module.params, operation,
                         operation_requirements[operation])
+
+
 
         if module.check_mode:
             module.exit_json(**result)
