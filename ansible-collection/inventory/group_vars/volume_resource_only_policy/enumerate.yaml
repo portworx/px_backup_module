@@ -1,11 +1,49 @@
 # ansible-collection/inventory/group_vars/volume_resource_only_policy/enumerate.yaml
 ---
-# labels: 
+# Enhanced enumeration options demonstrating all available features
+
+# Basic enumeration with filtering and pagination
 enumerate_options:
   generic_enumerate_options:
-    max_objects: 10
-    name_filter: "nfs-filter"
-    object_index: 1
-    labels: 
-      purpose: "nfs-volume-exclusion"
+    max_objects: 50
+    name_filter: "prod-"
+    object_index: 0
+    labels:
+      environment: "production"
+      team: "platform"
+
+  # Enhanced sorting options (new feature)
+  sort_option:
+    sortBy: "LastUpdateTimestamp"
+    sortOrder: "Descending"
+
+  # Filter by specific volume types (new feature)
+  volume_types:
+    - "Portworx"
+    - "Csi"
+
+# Alternative enumeration configurations for different use cases
+enumerate_options_by_name:
+  generic_enumerate_options:
+    name_filter: "skip-"
+    max_objects: 25
+
+enumerate_options_by_creation_time:
+  generic_enumerate_options:
+    max_objects: 100
+  sort_option:
+    sortBy: "CreationTimestamp"
+    sortOrder: "Ascending"
+
+enumerate_options_nfs_only:
+  volume_types:
+    - "Nfs"
+  sort_option:
+    sortBy: "Name"
+    sortOrder: "Ascending"
+
+# Labels for top-level filtering (optional)
+labels:
+  purpose: "volume-exclusion"
+  managed_by: "ansible"
  
