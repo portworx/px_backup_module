@@ -11,11 +11,11 @@ The backup schedule module enables management of automated backup schedules in P
 * Flexible scheduling policies and retention controls
 * Enhanced filtering and sorting in 2.9.0+
 * VM-specific backup capabilities
-* Cluster scope support (2.9.0+)
+* Cluster scope support (2.11.0+)
 
 ## Requirements
 
-* PX-Backup >= 2.9.0
+* PX-Backup >= 2.11.0
 * Stork >= 25.3.0
 * Python >= 3.9
 * The `requests` Python package

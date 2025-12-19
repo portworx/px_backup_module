@@ -14,7 +14,7 @@ The log level module enables runtime management of PX-Backup service log levels 
 
 ## Requirements
 
-* PX-Backup >= 2.10.0
+* PX-Backup >= 2.11.0
 * Python >= 3.9
 * The `requests` Python package
 

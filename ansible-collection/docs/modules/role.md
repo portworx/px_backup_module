@@ -10,7 +10,7 @@ The role module manages roles in PX-Backup, enabling management of admin or user
 
 ## Requirements
 
-* PX-Backup >= 2.9.0
+* PX-Backup >= 2.11.0
 * Stork >= 25.3.0
 * Python >= 3.9
 * The `requests` Python package
