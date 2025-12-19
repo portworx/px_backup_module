@@ -178,6 +178,29 @@ options:
                             - Zero-based indexing (0 = first policy)
                         type: int
                         required: false
+            sort_option:
+                description: Sorting configuration for policy enumeration
+                type: dict
+                required: false
+                version_added: '2.11.0'
+                suboptions:
+                    sortBy:
+                        description: Field to sort by
+                        type: str
+                        choices: ['Invalid', 'CreationTimestamp', 'Name', 'ClusterName', 'Size', 'RestoreBackupName', 'LastUpdateTimestamp']
+                        default: 'Invalid'
+                    sortOrder:
+                        description: Sort order
+                        type: str
+                        choices: ['Invalid', 'Ascending', 'Descending']
+                        default: 'Invalid'
+            volume_types:
+                description: Filter policies by volume types
+                type: list
+                elements: str
+                required: false
+                version_added: '2.11.0'
+                choices: ['Invalid', 'Portworx', 'Csi', 'Nfs']
     ownership:
         description: Ownership configuration for the volume resource only policy
         required: false
@@ -259,6 +282,26 @@ EXAMPLES = r'''
     api_url: "https://px-backup.example.com"
     token: "{{ px_backup_token }}"
     org_id: "default"
+
+# List policies with enhanced filtering and sorting
+- name: List volume resource only policies with filtering
+  volume_resource_only_policy:
+    operation: INSPECT_ALL
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    org_id: "default"
+    enumerate_options:
+      generic_enumerate_options:
+        max_objects: 50
+        name_filter: "prod-"
+        labels:
+          environment: "production"
+      sort_option:
+        sortBy: "LastUpdateTimestamp"
+        sortOrder: "Descending"
+      volume_types:
+        - "Portworx"
+        - "Csi"
 
 # Update ownership of a volume resource only policy
 - name: Update volume resource only policy ownership
@@ -520,45 +563,53 @@ def update_ownership(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dic
 
 def enumerate_volume_resource_only_policies(module: AnsibleModule, client: PXBackupClient) -> List[Dict[str, Any]]:
     """List all volume resource only policies"""
-    params = {}
-    
-    # Handle top-level labels if provided
+
+    # Determine if we should use the new POST endpoint based on enhanced options
+    enumerate_options = module.params.get('enumerate_options', {})
+    request_body = {
+        "org_id": module.params['org_id']
+    }
+
+    # Handle top-level labels
     if module.params.get('labels'):
-        labels = module.params['labels']
-        # Pass labels as individual query parameters
-        for key, value in labels.items():
-            params[f'labels[{key}]'] = value
-    
-    enumerate_options = module.params.get('enumerate_options')
-    if enumerate_options and enumerate_options.get('generic_enumerate_options'):
-        generic_opts = enumerate_options['generic_enumerate_options']
-        
-        # Handle nested labels in enumerate_options
-        if generic_opts.get('labels'):
-            labels = generic_opts['labels']
-            # Pass each label as a separate parameter with proper formatting
-            for key, value in labels.items():
-                params[f'enumerate_options.generic_enumerate_options.labels[{key}]'] = value
-        
-        # Handle other fields
-        if generic_opts.get('max_objects') is not None:
-            params['enumerate_options.generic_enumerate_options.max_objects'] = generic_opts['max_objects']
-        
-        if generic_opts.get('name_filter'):
-            params['enumerate_options.generic_enumerate_options.name_filter'] = generic_opts['name_filter']
-        
-        if generic_opts.get('object_index') is not None:
-            params['enumerate_options.generic_enumerate_options.object_index'] = generic_opts['object_index']
-    
+        request_body["labels"] = module.params['labels']
+
+    # Build enumerate_options for the request
+    if enumerate_options:
+        request_enumerate_options = {}
+
+        # Handle generic enumerate options
+        if enumerate_options.get('generic_enumerate_options'):
+            generic_opts = enumerate_options['generic_enumerate_options']
+            request_enumerate_options.update({
+                k: v for k, v in generic_opts.items()
+                if v is not None and k in ['labels', 'max_objects', 'name_filter', 'object_index']
+            })
+
+        # Handle sort options
+        if enumerate_options.get('sort_option'):
+            sort_option = enumerate_options['sort_option']
+            request_enumerate_options["sort_option"] = {
+                "sortBy": {"type": sort_option.get('sortBy', 'Invalid')},
+                "sortOrder": {"type": sort_option.get('sortOrder', 'Invalid')}
+            }
+
+        # Handle volume types filtering
+        if enumerate_options.get('volume_types'):
+            request_enumerate_options["volume_types"] = enumerate_options['volume_types']
+
+        if request_enumerate_options:
+            request_body["enumerate_options"] = request_enumerate_options
+
     try:
         response = client.make_request(
-            'GET', 
-            f"v1/volumeresourceonlypolicy/{module.params['org_id']}", 
-            params=params
+            'POST',
+            f"v1/volumeresourceonlypolicy/{module.params['org_id']}/enumerate",
+            data=request_body
         )
         return response.get('volume_resource_only_policies', [])
     except Exception as e:
-        module.fail_json(msg=f"Failed to enumerate volume resource only policies: {str(e)}")
+        module.fail_json(msg=f"Failed to enumerate volume resource only policies (POST): {str(e)}")
 
 def inspect_volume_resource_only_policy(module: AnsibleModule, client: PXBackupClient) -> Dict[str, Any]:
     """Get details of a specific volume resource only policy"""
@@ -753,6 +804,28 @@ def run_module():
                         name_filter=dict(type='str', required=False),
                         object_index=dict(type='int', required=False)
                     )
+                ),
+                sort_option=dict(
+                    type='dict',
+                    required=False,
+                    options=dict(
+                        sortBy=dict(
+                            type='str',
+                            choices=['Invalid', 'CreationTimestamp', 'Name', 'ClusterName', 'Size', 'RestoreBackupName', 'LastUpdateTimestamp'],
+                            default='Invalid'
+                        ),
+                        sortOrder=dict(
+                            type='str',
+                            choices=['Invalid', 'Ascending', 'Descending'],
+                            default='Invalid'
+                        )
+                    )
+                ),
+                volume_types=dict(
+                    type='list',
+                    elements='str',
+                    required=False,
+                    choices=['Invalid', 'Portworx', 'Csi', 'Nfs']
                 )
             )
         ),
