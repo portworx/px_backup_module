@@ -11,3 +11,66 @@ schedule_policies:
         retain: 5
         incremental_count:
           count: 6
+  
+  # Multi-day weekly (NEW)
+  - name: "nt-weekday-backups"
+    schedule_policy:
+      supports_advanced_features: true
+      weekly:
+        day: "mon,wed,fri"          # Multiple days now supported
+        time: "11:00PM"
+        retain: 5
+
+  # Bi-weekly schedule (NEW)
+  - name: "nt-biweekly-backup"
+    schedule_policy:
+      supports_advanced_features: true
+      weekly:
+        day: "sunday"
+        time: "1:00AM"
+        retain: 10
+        bi_weekly: true              # NEW: alternate weeks
+
+  # Relative monthly - by week position (NEW)
+  - name: "nt-first-monday-backup"
+    schedule_policy:
+      supports_advanced_features: true
+      monthly:
+        relative_monthly_policy:     # NEW policy type
+          day: "mon"
+          weekly_index: "first"      # first/second/third/fourth/last
+          time: "3:00AM"
+          retain: 12
+
+  # Last Friday of month (NEW)
+  - name: "nt-last-friday-backup"
+    schedule_policy:
+      supports_advanced_features: true
+      monthly:
+        relative_monthly_policy:
+          day: "fri"
+          weekly_index: "last"
+          time: "11:00PM"
+          retain: 12
+
+  # Selective monthly - specific months (NEW)
+  - name: "nt-quarterly-backup"
+    schedule_policy:
+      supports_advanced_features: true
+      monthly:
+        selective_monthly_policy:    # NEW policy type
+          date: 15
+          time: "2:00AM"
+          retain: 4
+          months: "jan,apr,jul,oct"  # Only these months
+
+  # Selective monthly - every month (NEW)
+  - name: "nt-monthly-1st-backup"
+    schedule_policy:
+      supports_advanced_features: true
+      monthly:
+        selective_monthly_policy:
+          date: 1
+          time: "4:00AM"
+          retain: 12
+          # months omitted = every month
