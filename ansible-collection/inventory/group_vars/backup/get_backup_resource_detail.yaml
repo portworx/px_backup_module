@@ -1,5 +1,34 @@
 # ansible-collection/inventory/group_vars/backup/get_backup_resource_detail.yaml
 
-name: "vm-bkp-1"
-uid: "vm-bkp-uid"
+name: "backup-1"
+uid: "backup-1-uid"
+
+# Enhanced filtering options (optional)
+force_resync: false
+sync_namespaces_only: true
+max_objects: 100
+object_index: 0
+
+# Resource status filtering
+resource_status_filter:
+  - "Success"
+  - "Failed"
+
+# Namespace filtering example
+# NOTE: namespace_filter and virtual_machine_filter are mutually exclusive
+# Use only one of them in a single request
+namespace_filter:
+  namespace_name_pattern: "prod-*"
+  include_namespaces: # use either include_namespace or exclude_namespace
+    - "production"
+    - "staging"
+  gvks:
+    - "apps/v1/Deployment"
+    - "v1/Pod"
+    - "v1/Service"
+  resource_name_pattern: "config*"
+
+# Virtual machine filtering example (comment out namespace_filter above to use this)
+# virtual_machine_filter:
+#   vm_name_pattern: "vm-prod-*"
 

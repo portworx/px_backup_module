@@ -15,10 +15,23 @@ The backup module provides comprehensive management of PX-Backup backups, includ
 
 ## Requirements
 
-* PX-Backup >= 2.9.0
+* PX-Backup >= 2.11.0
 * Stork >= 25.3.0
 * Python >= 3.9
 * The `requests` Python package
+
+## API Changes Notice
+
+### Enhanced Features in v2.11.0
+
+This module has been updated to support enhanced API capabilities:
+
+- **GetBackupResourceDetails**: Now uses POST method with advanced filtering options
+- **LastUpdateTimestamp Sorting**: Sort backups by last modification time for better chronological ordering
+- **Enhanced Filtering**: Support for namespace patterns, resource exclusions, GVK filtering, and Virtual Machines for Restore Operation, leveraging the redesigned Backup Object Metadata.
+- **Improved Performance**: Optimized API calls for large datasets, by refactoring Backup dataset. Enhanced reArchitecture focusing on backups taken on version 2.11.0, streamlining `GetBackupResourceDetails` to support highly granular resource data, and allow restoration for such granular requests. 
+
+**Backward Compatibility**: Please note that API changes in recent PX-Backup versions may cause incompatibilities - ensure your module version matches your PX-Backup installation version for optimal compatibility.
 
 ## Operations
 
@@ -158,9 +171,7 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 | ----------------------------- | -------- | ---------- | -------------------- |
 | include_resources.name      | string | no       | Resource name      |
 | include_resources.namespace | string | no       | Resource namespace |
-| include_resources.group     | string | no       | Resource API group |
-| include_resources.kind      | string | no       | Resource kind      |
-| include_resources.version   | string | no       | Resource version   |
+| include_resources.gvk       | string | yes      | Group-Version-Kind string (e.g., "v1/Service", "apps/v1/Deployment") |
 
 ### Backup Sharing Configuration
 
@@ -228,6 +239,43 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 | backup_schedule_ref        | list       | no       |         | List of backup schedule references to filter by   |
 | sort_option                | dictionary | no       |         | Sorting configuration for backup enumeration      |
 
+### New Filtration Parameters (v2.11.0+)
+
+| Parameter                  | Type    | Required | Default | Description                    |
+| ---------------------------- | --------- | ---------- | --------- | -------------------------------- |
+| vm_volume_name             | string  | no       |         | Filter VM that matches the resource_info and has volume vm_volume_name attached to it |
+| exclude_failed_resource    | boolean | no       | false   | Filter to exclude failed resources while enumerating objects |
+
+### GET_BACKUP_RESOURCE_DETAILS Filtering Parameters
+
+| Parameter                  | Type       | Required | Default | Description                    |
+| ---------------------------- | ------------ | ---------- | --------- | -------------------------------- |
+| namespace_filter           | dictionary | no       |         | Advanced namespace filtering options (cannot be used with virtual_machine_filter) |
+| virtual_machine_filter     | dictionary | no       |         | Virtual machine filtering options (cannot be used with namespace_filter) |
+| resource_status_filter     | list       | no       |         | Filter resources by status (e.g., "Success", "Failed") |
+| force_resync               | boolean    | no       | false   | Force resynchronization of backup resource details |
+| sync_namespaces_only       | boolean    | no       | false   | Synchronize only namespace information |
+
+**Note**: `namespace_filter` and `virtual_machine_filter` are mutually exclusive and cannot be used together in the same request.
+
+#### namespace_filter Format
+
+| Parameter                           | Type   | Required | Description                    |
+| ------------------------------------- | -------- | ---------- | -------------------------------- |
+| namespace_filter.namespace_name_pattern | string | no       | Substring or regex pattern to match namespace names |
+| namespace_filter.include_namespaces | list   | no       | List of namespace names to include |
+| namespace_filter.exclude_namespaces | list   | no       | List of namespace names to exclude |
+| namespace_filter.gvks               | list   | no       | List of GVK strings to filter (e.g., "apps/v1/Deployment") |
+| namespace_filter.resource_name_pattern | string | no       | Substring or regex pattern to match resource names |
+| namespace_filter.include_resources  | list   | no       | List of specific resources to include |
+| namespace_filter.exclude_resources  | list   | no       | List of specific resources to exclude |
+
+#### virtual_machine_filter Format
+
+| Parameter                           | Type   | Required | Description                    |
+| ------------------------------------- | -------- | ---------- | -------------------------------- |
+| virtual_machine_filter.vm_name_pattern | string | no       | Substring or regex pattern to match VM names |
+
 #### Schedule Policy/Backup Schedule Reference Format
 
 
@@ -239,10 +287,10 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 #### Sort Option Format
 
 
-| Parameter  | Type   | Required | Choices                                                                 | Default             | Description      |
-| ------------ | -------- | ---------- | ------------------------------------------------------------------------- | --------------------- | ------------------ |
-| sort_by    | string | no       | 'CreationTimestamp', 'Name', 'ClusterName', 'Size', 'RestoreBackupName' | 'CreationTimestamp' | Field to sort by |
-| sort_order | string | no       | 'Ascending', 'Descending'                                               | 'Descending'        | Sort order       |
+| Parameter  | Type   | Required | Choices                                                                                    | Default             | Description      |
+| ------------ | -------- | ---------- | -------------------------------------------------------------------------------------------- | --------------------- | ------------------ |
+| sort_by    | string | no       | 'CreationTimestamp', 'Name', 'ClusterName', 'Size', 'RestoreBackupName', 'LastUpdateTimestamp' | 'CreationTimestamp' | Field to sort by |
+| sort_order | string | no       | 'Ascending', 'Descending'                                                                  | 'Descending'        | Sort order       |
 
 ## Return Values
 
@@ -361,6 +409,18 @@ backup:
       sort_by: "CreationTimestamp"
       sort_order: "Descending"
     max_objects: 50
+
+# List backups sorted by last update timestamp
+- name: List recently updated backups
+  backup:
+    operation: INSPECT_ALL
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    org_id: "default"
+    sort_option:
+      sort_by: "LastUpdateTimestamp"
+      sort_order: "Descending"
+    max_objects: 20
 ```
 
 ### Update Backup Sharing
@@ -400,6 +460,60 @@ backup:
     uid: "backup-uid"
 ```
 
+#### Advanced Usage with Namespace Filtering
+
+```yaml
+- name: Get backup details with namespace filtering
+  backup:
+    operation: GET_BACKUP_RESOURCE_DETAILS
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    name: "app-backup"
+    org_id: "default"
+    uid: "backup-uid"
+    # Enhanced filtering options
+    force_resync: false
+    sync_namespaces_only: false
+    max_objects: 100
+    object_index: 0
+    resource_status_filter:
+      - "Success"
+      - "Failed"
+    # Use namespace_filter for namespace-based filtering
+    namespace_filter:
+      namespace_name_pattern: "prod-*"
+      include_namespaces:
+        - "production"
+        - "staging"
+      gvks:
+        - "apps/v1/Deployment"
+        - "v1/Pod"
+      resource_name_pattern: "app-*"
+```
+
+#### Advanced Usage with Virtual Machine Filtering
+
+```yaml
+- name: Get backup details with VM filtering
+  backup:
+    operation: GET_BACKUP_RESOURCE_DETAILS
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    name: "vm-backup"
+    org_id: "default"
+    uid: "backup-uid"
+    # Enhanced filtering options
+    force_resync: false
+    max_objects: 100
+    object_index: 0
+    resource_status_filter:
+      - "Success"
+    # Use virtual_machine_filter for VM-based filtering
+    # NOTE: Cannot be used together with namespace_filter
+    virtual_machine_filter:
+      vm_name_pattern: "prod-vm-*"
+```
+
 ### Retry Failed Backup
 
 ```yaml
@@ -415,9 +529,7 @@ backup:
     include_resources:
       - name: "vm-1"
         namespace: "default"
-        group: "kubevirt.io"
-        kind: "VirtualMachine"
-        version: "v1"
+        gvk: "kubevirt.io/v1/VirtualMachine"
 ```
 
 ### Delete Backup
@@ -509,12 +621,57 @@ Common error scenarios:
    - Cloud provider restrictions
    - Storage capacity constraints
    - Network bandwidth considerations
+   - **Filter Exclusivity**: `namespace_filter` and `virtual_machine_filter` cannot be used together in GET_BACKUP_RESOURCE_DETAILS operations - they are mutually exclusive
 6. **Version Compatibility**
 
    - GET_BACKUP_RESOURCE_DETAILS requires newer PX-Backup versions
    - RETRY_BACKUP_RESOURCES requires newer PX-Backup versions
    - Some filtering options require specific versions
    - Check PX-Backup release notes for feature availability
+
+## GVK Format Guidelines
+
+When specifying Group-Version-Kind (GVK) in resource filtering:
+
+- **Core resources**: Use `"version/kind"` format (e.g., `"v1/Service"`, `"v1/Pod"`, `"v1/ConfigMap"`)
+- **Non-core resources**: Use `"group/version/kind"` format (e.g., `"apps/v1/Deployment"`, `"batch/v1/Job"`)
+- **Custom resources**: Use full `"group/version/kind"` format (e.g., `"kubevirt.io/v1/VirtualMachine"`)
+
+### Examples:
+
+```yaml
+include_resources:
+  # Core resources (no group)
+  - name: "my-service"
+    namespace: "default"
+    gvk: "v1/Service"
+  - name: "my-configmap"
+    namespace: "default"
+    gvk: "v1/ConfigMap"
+
+  # Apps group resources
+  - name: "my-deployment"
+    namespace: "production"
+    gvk: "apps/v1/Deployment"
+
+  # Batch resources
+  - name: "my-job"
+    namespace: "default"
+    gvk: "batch/v1/Job"
+
+  # Custom resources
+  - name: "my-vm"
+    namespace: "vms"
+    gvk: "kubevirt.io/v1/VirtualMachine"
+```
+
+### Server-Side Validation
+
+The Ansible module acts as a pure facilitator, allowing the PX-Backup server to handle all business logic validation:
+
+- **Ansible validates**: Required parameters, parameter types, SSL certificates
+- **Server validates**: Resource existence, parameter conflicts, business rules
+- **Result**: Clean separation of concerns with authoritative server validation
 
 ## Troubleshooting
 

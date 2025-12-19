@@ -8,16 +8,33 @@ The restore module enables management of backup restoration operations in PX-Bac
 * Support for default and custom restore configurations
 * Single File Restore (SFR) for VirtualMachine backups (PX-Backup 2.11.0+)
 * Flexible resource selection and mapping
+* Advanced resource exclusion capabilities (v2.11.0)
+* Enhanced filtering with namespace and VM patterns (v2.11.0)
 * Namespace and storage class mapping capabilities
 * Rancher project integration
 * Advanced enumeration filtering options
 
 ## Requirements
 
-* PX-Backup >= 2.9.0
+* PX-Backup >= 2.11.0
 * Stork >= 25.3.0
 * Python >= 3.9
 * The `requests` Python package
+
+## API Changes Notice
+
+### Enhanced Features in v2.11.0
+
+This module has been updated with comprehensive restore capabilities:
+
+- **Complete Resource Management**: `include_resources`, `exclude_resources`, `include_optional_resource_types`
+- **Advanced Filtering**: Full namespace and VM filtering with pattern matching, include/exclude lists, and GVK specifications
+- **Namespace Management**: `namespace_mapping`, `target_namespace_prefix`, `use_source_as_target_namespace` (mutually exclusive)
+- **VM Restore Options**: `skip_mac_masking`, `skip_vm_restart` for virtual machine restores
+- **Infrastructure Mapping**: Enhanced Rancher project mapping with both ID and name mapping
+- **Backup Object Types**: Support for `Invalid`, `All`, and `VirtualMachine` backup object types
+
+**Backward Compatibility**: Please note that API changes in recent PX-Backup versions may cause incompatibilities - ensure your module version matches your PX-Backup installation version for optimal compatibility.
 
 ## Operations
 
@@ -67,33 +84,38 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 ### Target Configuration
 
 
-| Parameter             | Type   | Required | Description                            |
-| ----------------------- | -------- | ---------- | ---------------------------------------- |
-| cluster_ref           | dict   | no       | Target cluster reference               |
-| cluster_ref.name      | string | yes      | Target cluster name                    |
-| cluster_ref.uid       | string | no       | Target cluster UID                     |
-| namespace_mapping     | dict   | no       | Source to target namespace mapping     |
-| storage_class_mapping | dict   | no       | Source to target storage class mapping |
+| Parameter                      | Type    | Required | Description                                      |
+| -------------------------------- | --------- | ---------- | -------------------------------------------------- |
+| cluster_ref                    | dict    | no       | Target cluster reference                         |
+| cluster_ref.name               | string  | yes      | Target cluster name                              |
+| cluster_ref.uid                | string  | no       | Target cluster UID                               |
+| namespace_mapping              | dict    | no       | Source to target namespace mapping               |
+| target_namespace_prefix        | string  | no       | Prefix for all target namespaces                |
+| use_source_as_target_namespace | boolean | no       | Use source namespace as target                   |
+| storage_class_mapping          | dict    | no       | Source to target storage class mapping          |
+
+**Note**: `namespace_mapping`, `target_namespace_prefix`, and `use_source_as_target_namespace` are mutually exclusive.
 
 ### Resource Selection
 
 
-| Parameter          | Type   | Required | Description                            | Choices                          |
-| -------------------- | -------- | ---------- | ---------------------------------------- | ---------------------------------- |
-| include_resources  | list   | no       | Specific resources to restore          |                                  |
-| backup_object_type | string | no       | Type of backup objects to restore      | `Invalid`,`All`,`VirtualMachine` |
-| replace_policy     | string | no       | Policy for handling existing resources | `Invalid`, `Retain`, `Delete`    |
+| Parameter                      | Type   | Required | Description                            | Choices                          |
+| -------------------------------- | -------- | ---------- | ---------------------------------------- | ---------------------------------- |
+| include_resources              | list   | no       | Specific resources to restore          |                                  |
+| exclude_resources              | list   | no       | Specific resources to exclude          |                                  |
+| include_optional_resource_types | list   | no       | Optional resource types to include     | `Jobs`, `CronJobs`, etc.         |
+| backup_object_type             | dict   | no       | Type of backup objects to restore      |                                  |
+| backup_object_type.type        | string | yes      | Backup object type                     | `Invalid`,`All`,`VirtualMachine` |
+| replace_policy                 | string | no       | Policy for handling existing resources | `Invalid`, `Retain`, `Delete`    |
 
-#### include_resources Entry Format
+#### Resource Entry Format (include_resources/exclude_resources)
 
 
-| Parameter                   | Type   | Required | Description        |
-| ----------------------------- | -------- | ---------- | -------------------- |
-| include_resources.name      | string | yes      | Resource name      |
-| include_resources.namespace | string | yes      | Resource namespace |
-| include_resources.group     | string | yes      | Resource API group |
-| include_resources.kind      | string | yes      | Resource kind      |
-| include_resources.version   | string | yes      | Resource version   |
+| Parameter                   | Type   | Required | Description                                    |
+| ----------------------------- | -------- | ---------- | ------------------------------------------------ |
+| name                        | string | yes      | Resource name                                  |
+| namespace                   | string | no       | Resource namespace (optional for cluster-scoped) |
+| gvk                         | string | yes      | Group-Version-Kind string (e.g., "v1/Service", "apps/v1/Deployment") |
 
 ### Rancher Integration
 
@@ -223,6 +245,50 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
           destination_path: "/tmp/mysql-logs/"
           is_dir: true
 ```
+
+### New Filtration Parameters (v2.11.0+)
+
+| Parameter                  | Type    | Required | Default | Description                    |
+| ---------------------------- | --------- | ---------- | --------- | -------------------------------- |
+| vm_volume_name             | string  | no       |         | Filter VM that matches the resource_info and has volume vm_volume_name attached to it |
+| exclude_failed_resource    | boolean | no       | false   | Filter to exclude failed resources while enumerating objects |
+
+### Advanced Filtering Options
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| filter | dict | no | Advanced filtering configuration |
+| filter.namespace_filter | dict | no | Namespace-based filtering |
+| filter.virtual_machine_filter | dict | no | Virtual machine filtering |
+
+#### Namespace Filter Options
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| namespace_name_pattern | string | no | Pattern to match namespace names (regex) |
+| include_namespaces | list | no | List of namespaces to include |
+| exclude_namespaces | list | no | List of namespaces to exclude |
+| include_resources | list | no | Specific resources to include |
+| exclude_resources | list | no | Specific resources to exclude |
+| gvks | list | no | Group-Version-Kind specifications |
+| resource_name_pattern | string | no | Pattern to match resource names |
+
+#### Virtual Machine Filter Options
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| vm_name_pattern | string | no | Pattern to match VM names |
+| os_name | list | no | List of OS names to include |
+| include_vms | list | no | Specific VMs to include |
+| exclude_vms | list | no | Specific VMs to exclude |
+
+#### Virtual Machine Restore Options
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| virtual_machine_restore_options | dict | no | | VM-specific restore options |
+| skip_mac_masking | boolean | no | false | Skip MAC address masking |
+| skip_vm_restart | boolean | no | false | Skip VM restart during restore |
 
 ## Error Handling
 
@@ -363,3 +429,292 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
    - Review error messages
    - Monitor target cluster
    - For SFR: Validate file paths and VM details
+
+## Enhanced Filtering (v2.11.0)
+The restore module now supports comprehensive filtering capabilities for granular control over what gets restored.
+
+### Resource Filtering
+
+Include or exclude specific resources from restore operations:
+
+```yaml
+- name: Create restore with resource selection
+  restore:
+    operation: CREATE
+    api_url: "{{ px_backup_api_url }}"
+    token: "{{ px_backup_token }}"
+    name: "selective-restore"
+    org_id: "default"
+    backup_ref:
+      name: "my-backup"
+    cluster_ref:
+      name: "target-cluster"
+    # Include specific resources
+    include_resources:
+      - name: "critical-deployment"
+        namespace: "production"
+        gvk: "apps/v1/Deployment"
+    # Exclude sensitive resources
+    exclude_resources:
+      - name: "database-secret"
+        namespace: "default"
+        gvk: "v1/Secret"
+    # Include optional resource types
+    include_optional_resource_types:
+      - "Jobs"
+      - "CronJobs"
+```
+
+### Namespace Management Options
+
+Choose from three mutually exclusive namespace management strategies:
+
+```yaml
+# Option 1: Direct namespace mapping
+- name: Create restore with namespace mapping
+  restore:
+    operation: CREATE
+    api_url: "{{ px_backup_api_url }}"
+    token: "{{ px_backup_token }}"
+    name: "mapped-restore"
+    org_id: "default"
+    backup_ref:
+      name: "cluster-backup"
+    cluster_ref:
+      name: "target-cluster"
+    namespace_mapping:
+      "source-ns": "target-ns"
+      "prod": "production"
+
+# Option 2: Namespace prefix
+- name: Create restore with namespace prefix
+  restore:
+    operation: CREATE
+    api_url: "{{ px_backup_api_url }}"
+    token: "{{ px_backup_token }}"
+    name: "prefixed-restore"
+    org_id: "default"
+    backup_ref:
+      name: "cluster-backup"
+    cluster_ref:
+      name: "target-cluster"
+    target_namespace_prefix: "restored-"
+
+# Option 3: Use source as target
+- name: Create restore using source namespaces
+  restore:
+    operation: CREATE
+    api_url: "{{ px_backup_api_url }}"
+    token: "{{ px_backup_token }}"
+    name: "source-target-restore"
+    org_id: "default"
+    backup_ref:
+      name: "cluster-backup"
+    cluster_ref:
+      name: "target-cluster"
+    use_source_as_target_namespace: true
+```
+
+### Advanced Filtering
+
+Use comprehensive filtering for precise control over what gets restored:
+
+```yaml
+- name: Create restore with namespace filtering
+  restore:
+    operation: CREATE
+    api_url: "{{ px_backup_api_url }}"
+    token: "{{ px_backup_token }}"
+    name: "namespace-filtered-restore"
+    org_id: "default"
+    backup_ref:
+      name: "cluster-backup"
+    cluster_ref:
+      name: "target-cluster"
+    filter:
+      namespace_filter:
+        namespace_name_pattern: "prod-*"
+        exclude_namespaces:
+          - "kube-system"
+          - "kube-public"
+        include_namespaces:
+          - "prod-web"
+          - "prod-api"
+        gvks:
+          - "apps/v1/Deployment"
+          - "v1/Service"
+          - "v1/ConfigMap"
+        resource_name_pattern: "web-*"
+        include_resources:
+          - name: "critical-deployment"
+            namespace: "prod-web"
+            gvk: "apps/v1/Deployment"
+      virtual_machine_filter:
+        vm_name_pattern: "prod-vm-*"
+        os_name: ["ubuntu", "centos"]
+        include_vms:
+          - name: "prod-vm-1"
+            namespace: "production"
+            os_name: "ubuntu"
+        exclude_vms:
+          - name: "prod-vm-test"
+            namespace: "production"
+```
+
+### Virtual Machine Restore Options
+
+Configure VM-specific restore behavior:
+
+```yaml
+- name: Create VM restore with custom options
+  restore:
+    operation: CREATE
+    api_url: "{{ px_backup_api_url }}"
+    token: "{{ px_backup_token }}"
+    name: "vm-restore-custom"
+    org_id: "default"
+    backup_ref:
+      name: "vm-backup"
+    cluster_ref:
+      name: "vm-cluster"
+    backup_object_type:
+      type: "VirtualMachine"
+    virtual_machine_restore_options:
+      skip_mac_masking: true
+      skip_vm_restart: false
+    filter:
+      virtual_machine_filter:
+        vm_name_pattern: "prod-vm-*"
+        os_name: ["ubuntu", "centos"]
+```
+
+### Complete Configuration Example
+
+Combine all available options for maximum control:
+
+```yaml
+- name: Create comprehensive restore with all options
+  restore:
+    operation: CREATE
+    api_url: "{{ px_backup_api_url }}"
+    token: "{{ px_backup_token }}"
+    name: "comprehensive-restore"
+    org_id: "default"
+    backup_ref:
+      name: "full-backup"
+      uid: "backup-uid-123"
+    cluster_ref:
+      name: "target-cluster"
+      uid: "cluster-uid-456"
+    replace_policy: "Retain"
+    target_namespace_prefix: "restored-"
+    storage_class_mapping:
+      "fast-ssd": "premium-ssd"
+      "standard": "gp2"
+    rancher_project_mapping:
+      key: "source-project-id"
+      value: "target-project-id"
+    rancher_project_name_mapping:
+      key: "source-project"
+      value: "target-project"
+    backup_object_type:
+      type: "All"
+    include_optional_resource_types:
+      - "Jobs"
+      - "CronJobs"
+    exclude_resources:
+      - name: "temp-secret"
+        namespace: "default"
+        gvk: "v1/Secret"
+    filter:
+      namespace_filter:
+        namespace_name_pattern: "prod-*"
+        exclude_namespaces: ["kube-system"]
+        gvks: ["apps/v1/Deployment", "v1/Service"]
+      virtual_machine_filter:
+        vm_name_pattern: "prod-vm-*"
+        os_name: ["ubuntu"]
+    virtual_machine_restore_options:
+      skip_mac_masking: true
+      skip_vm_restart: false
+```
+Filter restores by specific VM volume names:
+
+```yaml
+- name: Get restores for specific VM volume
+  restore:
+    operation: INSPECT_ALL
+    org_id: "default"
+    api_url: "{{ px_backup_api_url }}"
+    token: "{{ px_backup_token }}"
+    vm_volume_name: "production-vm-volume"
+```
+
+### Exclude Failed Resources
+
+Filter out failed resources from restore enumeration:
+
+```yaml
+- name: Get successful restores only
+  restore:
+    operation: INSPECT_ALL
+    org_id: "default"
+    api_url: "{{ px_backup_api_url }}"
+    token: "{{ px_backup_token }}"
+    exclude_failed_resource: true
+```
+
+### Combined Filtration
+
+Use both filtration parameters together:
+
+```yaml
+- name: Get successful restores for specific VM volume
+  restore:
+    operation: INSPECT_ALL
+    org_id: "default"
+    api_url: "{{ px_backup_api_url }}"
+    token: "{{ px_backup_token }}"
+    vm_volume_name: "critical-app-volume"
+    exclude_failed_resource: true
+    max_objects: 10
+    sort_option:
+      sort_by: "CreationTimestamp"
+      sort_order: "Descending"
+```
+
+### Advanced Filtering with Additional Parameters
+
+Combine new filtration with existing parameters:
+
+```yaml
+- name: Get filtered restores with comprehensive options
+  restore:
+    operation: INSPECT_ALL
+    org_id: "default"
+    api_url: "{{ px_backup_api_url }}"
+    token: "{{ px_backup_token }}"
+    vm_volume_name: "database-volume"
+    exclude_failed_resource: true
+    cluster_name_filter: "production-cluster"
+    status: ["Success"]
+    include_detailed_resources: false
+    backup_object_type:
+      type: "VirtualMachine"
+```
+
+### GVK Format Guidelines
+
+When specifying Group-Version-Kind (GVK) in filtering:
+
+- **Core resources**: Use `"version/kind"` format (e.g., `"v1/Service"`, `"v1/Pod"`)
+- **Non-core resources**: Use `"group/version/kind"` format (e.g., `"apps/v1/Deployment"`)
+- **Custom resources**: Use full `"group/version/kind"` format
+
+### Server-Side Validation
+
+The Ansible module acts as a pure facilitator, allowing the PX-Backup server to handle all business logic validation:
+
+- **Ansible validates**: Required parameters, parameter types, SSL certificates
+-  **Server validates**: Resource existence, parameter conflicts, business rules
+-  **Result**: Clean separation of concerns with authoritative server validation

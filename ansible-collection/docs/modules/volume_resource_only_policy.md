@@ -13,7 +13,7 @@ The volume_resource_only_policy module provides comprehensive management of PX-B
 
 ## Requirements
 
-* PX-Backup >= 2.9.0
+* PX-Backup >= 2.11.0
 * Stork >= 25.3.0
 * Python >= 3.9
 * The `requests` Python package
@@ -96,6 +96,7 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 | Parameter                                   | Type       | Required | Description                                             |
 | --------------------------------------------- | ------------ | ---------- | --------------------------------------------------------- |
 | enumerate_options.generic_enumerate_options | dictionary | no       | Common enumeration options for filtering and pagination |
+| enumerate_options.volume_types              | list       | no       | Filter policies by specific volume types                |
 
 #### generic_enumerate_options Structure
 
@@ -106,6 +107,34 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 | generic_enumerate_options.max_objects  | integer    | no       | Maximum number of policies to return (useful for pagination)      |
 | generic_enumerate_options.name_filter  | string     | no       | Filter policies by name using substring matching (case-sensitive) |
 | generic_enumerate_options.object_index | integer    | no       | Starting index for pagination (zero-based, used with max_objects) |
+| generic_enumerate_options.sort_option  | dictionary | no       | Sorting configuration for enumeration results                     |
+| generic_enumerate_options.time_range   | dictionary | no       | Filter policies by creation/update time range                     |
+
+#### sort_option Structure (Supported in PX-Backup 2.11.0+)
+
+
+| Parameter | Type   | Required | Choices                                                                                                    | Description                                  |
+| ----------- | -------- | ---------- | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------- |
+| sortBy    | string | no       | 'Invalid', 'CreationTimestamp', 'Name', 'ClusterName', 'Size', 'RestoreBackupName', 'LastUpdateTimestamp' | Field to sort by (default: 'Invalid')        |
+| sortOrder | string | no       | 'Invalid', 'Ascending', 'Descending'                                                                       | Sort direction (default: 'Invalid')          |
+
+#### time_range Structure
+
+
+| Parameter  | Type   | Required | Description                                                |
+| ------------ | -------- | ---------- | ------------------------------------------------------------ |
+| start_time | string | no       | Start time in RFC3339 format (e.g., "2024-01-01T00:00:00Z") |
+| end_time   | string | no       | End time in RFC3339 format (e.g., "2024-12-31T23:59:59Z")   |
+
+#### volume_types Values
+
+
+| Value    | Description                               |
+| ---------- | ------------------------------------------- |
+| Invalid  | Invalid volume type (not recommended)     |
+| Portworx | Filter policies for Portworx volumes      |
+| Csi      | Filter policies for CSI volumes           |
+| Nfs      | Filter policies for NFS volumes           |
 
 ### Ownership Configuration
 
@@ -282,6 +311,38 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
       generic_enumerate_options:
         max_objects: 20
         object_index: 20  # Start from 21st policy
+
+# List policies with sorting and volume type filtering
+- name: List policies sorted by last update time
+  volume_resource_only_policy:
+    operation: INSPECT_ALL
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    org_id: "default"
+    enumerate_options:
+      generic_enumerate_options:
+        sort_option:
+          sortBy: "LastUpdateTimestamp"
+          sortOrder: "Descending"
+      volume_types:
+        - "Portworx"
+        - "Csi"
+
+# List policies with time range filtering
+- name: List policies created in a specific time range
+  volume_resource_only_policy:
+    operation: INSPECT_ALL
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    org_id: "default"
+    enumerate_options:
+      generic_enumerate_options:
+        time_range:
+          start_time: "2024-01-01T00:00:00Z"
+          end_time: "2024-12-31T23:59:59Z"
+        sort_option:
+          sortBy: "CreationTimestamp"
+          sortOrder: "Ascending"
 ```
 
 ### Ownership Management
@@ -414,12 +475,105 @@ When dealing with large numbers of policies, use pagination:
         object_index: 20
 ```
 
+### Sorting Example
+
+Sort policies by different fields:
+
+```yaml
+# Sort by last update time (most recent first)
+- name: Get recently updated policies
+  volume_resource_only_policy:
+    operation: INSPECT_ALL
+    org_id: "default"
+    enumerate_options:
+      generic_enumerate_options:
+        sort_option:
+          sortBy: "LastUpdateTimestamp"
+          sortOrder: "Descending"
+
+# Sort by name alphabetically
+- name: Get policies sorted by name
+  volume_resource_only_policy:
+    operation: INSPECT_ALL
+    org_id: "default"
+    enumerate_options:
+      generic_enumerate_options:
+        sort_option:
+          sortBy: "Name"
+          sortOrder: "Ascending"
+```
+
+### Time Range Filtering Example
+
+Filter policies by creation or update time:
+
+```yaml
+# Get policies created in the last month
+- name: Get recent policies
+  volume_resource_only_policy:
+    operation: INSPECT_ALL
+    org_id: "default"
+    enumerate_options:
+      generic_enumerate_options:
+        time_range:
+          start_time: "2024-11-01T00:00:00Z"
+          end_time: "2024-12-01T00:00:00Z"
+        sort_option:
+          sortBy: "CreationTimestamp"
+          sortOrder: "Descending"
+```
+
+### Volume Type Filtering Example
+
+Filter policies by specific volume types:
+
+```yaml
+# Get only Portworx and CSI policies
+- name: Get cloud volume policies
+  volume_resource_only_policy:
+    operation: INSPECT_ALL
+    org_id: "default"
+    enumerate_options:
+      volume_types:
+        - "Portworx"
+        - "Csi"
+```
+
+### Combined Filtering Example
+
+Combine multiple filters for precise results:
+
+```yaml
+# Get production Portworx policies created in Q4 2024, sorted by name
+- name: Get specific policies
+  volume_resource_only_policy:
+    operation: INSPECT_ALL
+    org_id: "default"
+    enumerate_options:
+      generic_enumerate_options:
+        max_objects: 50
+        name_filter: "prod-"
+        labels:
+          environment: "production"
+        time_range:
+          start_time: "2024-10-01T00:00:00Z"
+          end_time: "2024-12-31T23:59:59Z"
+        sort_option:
+          sortBy: "Name"
+          sortOrder: "Ascending"
+      volume_types:
+        - "Portworx"
+```
+
 ### Filtering Best Practices
 
 1. **Combine Filters**: Use multiple filtering options together for precise results
 2. **Label-based Organization**: Use consistent labeling strategies for easier filtering
 3. **Name Patterns**: Adopt naming conventions that work well with substring filtering
 4. **Pagination**: Always use pagination for production environments with many policies
+5. **Time Range**: Use time_range to find recently created or updated policies (Supported in PX-Backup 2.11.0+)
+6. **Sorting**: Always specify sort_option when using pagination for consistent results
+7. **Volume Types**: Filter by volume_types to focus on specific infrastructure components (Supported in PX-Backup 2.11.0+)
 
 ## Error Handling
 

@@ -22,7 +22,7 @@ import logging
 from dataclasses import dataclass
 
 from ansible.module_utils.basic import AnsibleModule
-from ansible.module_utils.px_backup.api import PXBackupClient
+from ansible_collections.purepx.px_backup.plugins.module_utils.px_backup.api import PXBackupClient
 import requests
 
 # Constants for enum mappings
@@ -38,7 +38,7 @@ module: backup
 
 short_description: Manage backups in PX-Backup
 
-version_added: "2.9.0"
+version_added: "2.10.0"
 
 description:
     - Manage backups in PX-Backup using different operations
@@ -166,15 +166,10 @@ options:
             namespace:
                 description: Resource namespace
                 type: str
-            group:
-                description: Resource API group
+            gvk:
+                description: Resource GVK in format 'group/version/kind' or 'version/kind' for core resources
                 type: str
-            kind:
-                description: Resource kind
-                type: str
-            version:
-                description: Resource version
-                type: str
+                required: true
     backup_type:
         description: Type of backup
         type: str
@@ -387,7 +382,7 @@ options:
             sort_by:
                 description: Field to sort by
                 type: str
-                choices: ['CreationTimestamp', 'Name', 'ClusterName', 'Size', 'RestoreBackupName']
+                choices: ['CreationTimestamp', 'Name', 'ClusterName', 'Size', 'RestoreBackupName', 'LastUpdateTimestamp']
                 default: 'CreationTimestamp'
             sort_order:
                 description: Sort order
@@ -431,6 +426,102 @@ options:
         type: list
         elements: str
         required: false
+
+    force_resync:
+        description: Force resync of failed sync process for GET_BACKUP_RESOURCE_DETAILS operation
+        type: bool
+        required: false
+        default: false
+        version_added: "2.11.0"
+
+    sync_namespaces_only:
+        description: Sync only namespaces when set to true for GET_BACKUP_RESOURCE_DETAILS operation
+        type: bool
+        required: false
+        default: false
+        version_added: "2.11.0"
+
+    object_index:
+        description: Object index from which to start fetching for pagination
+        type: int
+        required: false
+        version_added: "2.11.0"
+
+    resource_status_filter:
+        description: Filter resources by status for GET_BACKUP_RESOURCE_DETAILS operation
+        type: list
+        elements: str
+        required: false
+        version_added: "2.11.0"
+
+    namespace_filter:
+        description:
+            - Advanced namespace filtering options for GET_BACKUP_RESOURCE_DETAILS operation
+            - Cannot be used together with virtual_machine_filter (mutually exclusive)
+        type: dict
+        required: false
+        version_added: "2.11.0"
+        suboptions:
+            namespace_name_pattern:
+                description: Substring or regex pattern to match namespace names
+                type: str
+            include_namespaces:
+                description: List of namespace names to include
+                type: list
+                elements: str
+            exclude_namespaces:
+                description: List of namespace names to exclude
+                type: list
+                elements: str
+            include_resources:
+                description: List of resources to include
+                type: list
+                elements: dict
+                suboptions:
+                    name:
+                        description: Resource name
+                        type: str
+                    namespace:
+                        description: Resource namespace
+                        type: str
+                    gvk:
+                        description: Resource GVK in format 'group/version/kind' or 'version/kind' for core resources
+                        type: str
+                        required: true
+            exclude_resources:
+                description: List of resources to exclude
+                type: list
+                elements: dict
+                suboptions:
+                    name:
+                        description: Resource name
+                        type: str
+                    namespace:
+                        description: Resource namespace
+                        type: str
+                    gvk:
+                        description: Resource GVK in format 'group/version/kind' or 'version/kind' for core resources
+                        type: str
+                        required: true
+            gvks:
+                description: List of Kubernetes Group/Version/Kind identifiers
+                type: list
+                elements: str
+            resource_name_pattern:
+                description: Substring or regex pattern to match resource names
+                type: str
+
+    virtual_machine_filter:
+        description:
+            - Virtual machine filtering options for GET_BACKUP_RESOURCE_DETAILS operation
+            - Cannot be used together with namespace_filter (mutually exclusive)
+        type: dict
+        required: false
+        version_added: "2.11.0"
+        suboptions:
+            vm_name_pattern:
+                description: Substring or regex pattern to match virtual machine names
+                type: str
 
 requirements:
     - python >= 3.9
@@ -492,6 +583,17 @@ EXAMPLES = r'''
       sort_by: "CreationTimestamp"
       sort_order: "Descending"
 
+# List backups sorted by last update timestamp
+- name: List backups sorted by last update time
+  backup:
+    operation: INSPECT_ALL
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    org_id: "default"
+    sort_option:
+      sort_by: "LastUpdateTimestamp"
+      sort_order: "Descending"
+
 # List backups filtered by schedule policy
 - name: List backups by schedule policy
   backup:
@@ -514,6 +616,41 @@ EXAMPLES = r'''
     name: "vm-backup"
     org_id: "default"
     uid: "backup-uid"
+
+# Get backup resource details with namespace filtering
+- name: Get backup details with namespace filtering
+  backup:
+    operation: GET_BACKUP_RESOURCE_DETAILS
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    name: "app-backup"
+    org_id: "default"
+    uid: "backup-uid"
+    namespace_filter:
+      namespace_name_pattern: "prod-*"
+      include_namespaces: ["production", "staging"]
+      exclude_namespaces: ["system"]
+      gvks: ["apps/v1/Deployment", "v1/Pod"]
+    resource_status_filter: ["Success", "Failed"]
+    max_objects: 100
+    force_resync: false
+    sync_namespaces_only: false
+
+# Get backup resource details with VM filtering
+# NOTE: virtual_machine_filter and namespace_filter are mutually exclusive
+- name: Get VM backup details with VM filtering
+  backup:
+    operation: GET_BACKUP_RESOURCE_DETAILS
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    name: "vm-backup"
+    org_id: "default"
+    uid: "backup-uid"
+    virtual_machine_filter:
+      vm_name_pattern: "vm-prod-*"
+    resource_status_filter: ["Success"]
+    max_objects: 100
+    force_resync: false
 
 # Retry failed backup
 - name: Retry failed VM backup
@@ -981,15 +1118,7 @@ def update_backup_share(module: AnsibleModule, client: PXBackupClient) -> Tuple[
 
 def enumerate_backups(module: AnsibleModule, client: PXBackupClient) -> List[Dict[str, Any]]:
     """List all backups with support for both GET and POST methods based on query complexity"""
-    
-    # Determine if we should use POST based on complex query parameters
-    use_post = (
-        module.params.get('schedule_policy_ref') or 
-        module.params.get('backup_schedule_ref') or
-        module.params.get('sort_option') is not None
-    )
-    
-    if use_post:
+    try:
         # Build enumerate_options for POST request
         enumerate_options = {
             "max_objects": str(module.params.get('max_objects')),
@@ -1001,7 +1130,7 @@ def enumerate_backups(module: AnsibleModule, client: PXBackupClient) -> List[Dic
             "owners": module.params.get('owners', []),
             "status": module.params.get('status', [])
         }
-        
+            
         # Add backup_object_type if provided
         if module.params.get('backup_object_type'):
             enumerate_options['backup_object_type'] = module.params['backup_object_type'].get('type')
@@ -1009,82 +1138,53 @@ def enumerate_backups(module: AnsibleModule, client: PXBackupClient) -> List[Dic
         # Add new 2.9.0 fields
         if module.params.get('schedule_policy_ref'):
             enumerate_options["schedule_policy_ref"] = module.params['schedule_policy_ref']
-            
+
         if module.params.get('backup_schedule_ref'):
             enumerate_options["backup_schedule_ref"] = module.params['backup_schedule_ref']
-            
+
         if module.params.get('sort_option'):
             sort_option = module.params['sort_option']
             enumerate_options["sort_option"] = {
                 "sortBy": {"type": sort_option.get('sort_by', 'CreationTimestamp')},
                 "sortOrder": {"type": sort_option.get('sort_order', 'Descending')}
             }
-        
+
+        # Add new filtration features
+        if module.params.get('vm_volume_name'):
+            enumerate_options["vm_volume_name"] = module.params['vm_volume_name']
+
+        if module.params.get('exclude_failed_resource') is not None:
+            enumerate_options["exclude_failed_resource"] = module.params['exclude_failed_resource']
+
+        # Add resource_info filter
+        if module.params.get('resource_info'):
+            resource_info = module.params['resource_info']
+            enumerate_options["resource_info"] = {
+                k: v for k, v in resource_info.items() if v is not None
+            }
+
         # Remove None values
         enumerate_options = {k: v for k, v in enumerate_options.items() if v is not None}
-        
+
         # Make POST request
         response = client.make_request(
             'POST',
             f"v1/backup/{module.params['org_id']}/enumerate",
             data={"enumerate_options": enumerate_options}
         )
-        
+
         return response.get('backups', [])
-    else:
-
-        # Build query parameters
-        params = {
-            'enumerate_options.cluster_name_filter': module.params.get('cluster_name_filter'),
-            'enumerate_options.cluster_uid_filter': module.params.get('cluster_uid_filter', '')
-        }
-
-        # Add other parameters if they exist
-        if module.params.get('max_objects'):
-            params['enumerate_options.max_objects'] = str(module.params['max_objects'])
-
-        if module.params.get('include_detailed_resources') is not None:
-            params['enumerate_options.include_detailed_resources'] = module.params['include_detailed_resources']
-
-        if module.params.get('name_filter'):
-            params['enumerate_options.name_filter'] = module.params['name_filter']
-
-        if module.params.get('labels'):
-            # For dictionary types, we might need to handle this differently
-            # depending on how the API expects labels
-            params['enumerate_options.labels'] = module.params['labels']
-
-        if module.params.get('owners'):
-            params['enumerate_options.owners'] = module.params['owners']
-        
-        if module.params.get('backup_object_type'):
-            params['backup_object_type'] = module.params['backup_object_type'].get('type')
-
-        if module.params.get('status'):
-            params['enumerate_options.status'] = module.params['status']
-
-        # Remove None values
-        params = {k: v for k, v in params.items() if v is not None}
-
-        logger.debug(f"Making request with params: {params}")
-
-        try:
-            response = client.make_request(
-                'GET',
-                f"v1/backup/{module.params['org_id']}",
-                params=params
-            )
-
-            return response.get('backups', [])
-        except Exception as e:
-            error_msg = str(e)
-            if isinstance(e, requests.exceptions.RequestException) and hasattr(e, 'response'):
-                try:
-                    error_detail = e.response.json()
-                    error_msg = f"{error_msg}: {error_detail}"
-                except ValueError:
-                    error_msg = f"{error_msg}: {e.response.text}"
-            module.fail_json(msg=f"Failed to enumerate backups: {error_msg}")
+    except Exception as e:
+        error_msg = str(e)
+        if isinstance(e, requests.exceptions.RequestException) and hasattr(e, 'response'):
+            try:
+                error_detail = e.response.json()
+                error_msg = f"{error_msg}: {error_detail}"
+            except ValueError:
+                error_msg = f"{error_msg}: {e.response.text}"
+            if hasattr(e.response, 'status_code'):
+                error_msg = f"API returned status code {e.response.status_code}: {error_msg}"
+        module.fail_json(msg=f"Failed to inspect backup: {error_msg}")
 
 
 def inspect_backup(module: AnsibleModule, client: PXBackupClient) -> Dict[str, Any]:
@@ -1223,14 +1323,50 @@ def needs_update(current: Dict[str, Any], desired: Dict[str, Any]) -> bool:
 def get_backup_resource_details(module: AnsibleModule, client: PXBackupClient) -> Dict[str, Any]:
     """Get detailed backup resource information for VirtualMachine backups"""
     try:
-        params = {
-            'uid': module.params.get('uid', '')
+        # Build request body for new POST API
+        request_body = {
+            "org_id": module.params['org_id'],
+            "name": module.params['name'],
+            "uid": module.params.get('uid','')
         }
-            
+        # Add optional parameters
+
+        if module.params.get('force_resync'):
+            request_body["force_resync"] = module.params['force_resync']
+
+        if module.params.get('sync_namespaces_only'):
+            request_body["sync_namespaces_only"] = module.params['sync_namespaces_only']
+
+        # Build filter object if any filter parameters are provided
+        filter_obj = {}
+
+        # Add namespace filter
+        if module.params.get('namespace_filter'):
+            filter_obj["namespace_filter"] = module.params['namespace_filter']
+
+        # Add virtual machine filter
+        if module.params.get('virtual_machine_filter'):
+            filter_obj["virtual_machine_filter"] = module.params['virtual_machine_filter']
+
+        # Add status filter
+        if module.params.get('resource_status_filter'):
+            filter_obj["status"] = module.params['resource_status_filter']
+
+        # Add pagination parameters
+        if module.params.get('max_objects'):
+            filter_obj["max_objects"] = str(module.params['max_objects'])
+
+        if module.params.get('object_index'):
+            filter_obj["object_index"] = str(module.params['object_index'])
+
+        # Add filter to request if any filter parameters were provided
+        if filter_obj:
+            request_body["filter"] = filter_obj
+
         response = client.make_request(
-            'GET',
-            f"v1/backup/getbackupresourcedetails/{module.params['org_id']}/{module.params['name']}",
-            params=params
+            'POST',
+            "v1/backup/getbackupresourcedetails",
+            data=request_body
         )
         
         return {
@@ -1502,9 +1638,7 @@ def run_module():
             options=dict(
                 name=dict(type='str', required=False),
                 namespace=dict(type='str', required=False),
-                group=dict(type='str', required=False),
-                kind=dict(type='str', required=False),
-                version=dict(type='str', required=False)
+                gvk=dict(type='str', required=True)
             )
         ),
         backup_type=dict(
@@ -1546,7 +1680,7 @@ def run_module():
             options=dict(
                 sort_by=dict(
                     type='str',
-                    choices=['CreationTimestamp', 'Name', 'ClusterName', 'Size', 'RestoreBackupName'],
+                    choices=['CreationTimestamp', 'Name', 'ClusterName', 'Size', 'RestoreBackupName', 'LastUpdateTimestamp'],
                     default='CreationTimestamp'
                 ),
                 sort_order=dict(
@@ -1617,6 +1751,76 @@ def run_module():
         cluster_uid_filter=dict(type='str', required=False),
         owners=dict(type='list', elements='str', required=False),
         status=dict(type='list', elements='str', required=False),
+
+        # Enhanced GetBackupResourceDetails options
+        force_resync=dict(type='bool', required=False, default=False),
+        sync_namespaces_only=dict(type='bool', required=False, default=False),
+        object_index=dict(type='int', required=False),
+        resource_status_filter=dict(type='list', elements='str', required=False),
+
+        # Advanced filtering options
+        namespace_filter=dict(
+            type='dict',
+            required=False,
+            options=dict(
+                namespace_name_pattern=dict(type='str'),
+                include_namespaces=dict(type='list', elements='str'),
+                exclude_namespaces=dict(type='list', elements='str'),
+                include_resources=dict(
+                    type='list',
+                    elements='dict',
+                    options=dict(
+                        name=dict(type='str'),
+                        namespace=dict(type='str'),
+                        gvk=dict(type='str', required=True)
+                    )
+                ),
+                exclude_resources=dict(
+                    type='list',
+                    elements='dict',
+                    options=dict(
+                        name=dict(type='str'),
+                        namespace=dict(type='str'),
+                        gvk=dict(type='str', required=True)
+                    )
+                ),
+                gvks=dict(type='list', elements='str'), # accepts the GroupVersionKind as a string 'v1/Secret', 'apps/v1/Deployment'
+                resource_name_pattern=dict(type='str')
+            )
+        ),
+
+        virtual_machine_filter=dict(
+            type='dict',
+            required=False,
+            options=dict(
+                vm_name_pattern=dict(type='str')
+            )
+        ),
+
+        # New filtration features
+        vm_volume_name=dict(
+            type='str',
+            required=False,
+            description='Filter VM that matches the resource_info and has volume vm_volume_name attached to it'
+        ),
+        exclude_failed_resource=dict(
+            type='bool',
+            required=False,
+            default=False,
+            description='Filter to exclude failed resources while enumerating objects'
+        ),
+        resource_info=dict(
+            type='dict',
+            required=False,
+            options=dict(
+                name=dict(type='str', required=False),
+                namespace=dict(type='str', required=False),
+                group=dict(type='str', required=False),
+                kind=dict(type='str', required=False),
+                version=dict(type='str', required=False)
+            ),
+            description='Filter to use resource name and namespace. Any backup that contains the resource will be returned'
+        ),
 
         #  ssl cert implementation
         ssl_config=dict(

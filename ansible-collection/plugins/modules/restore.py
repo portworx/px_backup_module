@@ -24,7 +24,7 @@ import os
 os.environ['PYTHONUNBUFFERED'] = '1'
 
 from ansible.module_utils.basic import AnsibleModule
-from ansible.module_utils.px_backup.api import PXBackupClient
+from ansible_collections.purepx.px_backup.plugins.module_utils.px_backup.api import PXBackupClient
 import requests
 import sys
 
@@ -34,7 +34,7 @@ module: restore
 
 short_description: Manage restores in PX-Backup
 
-version_added: "2.9.0"
+version_added: "2.10.0"
 
 description:
     - Manage restores in PX-Backup using different operations
@@ -123,7 +123,7 @@ options:
                 description: UID of the cluster
                 type: str
     include_resources:
-        description: List of specific resources to include in backup
+        description: List of specific resources to include in restore
         type: list
         elements: dict
         required: false
@@ -134,15 +134,135 @@ options:
             namespace:
                 description: Resource namespace
                 type: str
-            group:
-                description: Resource API group
+            gvk:
+                description: Resource GVK in format 'group/version/kind' or 'version/kind' for core resources
                 type: str
-            kind:
-                description: Resource kind
+                required: true
+    exclude_resources:
+        description: List of specific resources to exclude from restore
+        type: list
+        elements: dict
+        required: false
+        version_added: '2.11.0'
+        suboptions:
+            name:
+                description: Resource name
                 type: str
-            version:
-                description: Resource version
+            namespace:
+                description: Resource namespace
                 type: str
+            gvk:
+                description: Resource GVK in format 'group/version/kind' or 'version/kind' for core resources
+                type: str
+                required: true
+    filter:
+        description: Advanced filtering options for restore operations
+        type: dict
+        required: false
+        version_added: '2.11.0'
+        suboptions:
+            namespace_filter:
+                description: Namespace-based filtering options
+                type: dict
+                required: false
+                suboptions:
+                    namespace_name_pattern:
+                        description: Pattern to match namespace names
+                        type: str
+                        required: false
+                    include_namespaces:
+                        description: List of namespaces to include
+                        type: list
+                        elements: str
+                        required: false
+                    exclude_namespaces:
+                        description: List of namespaces to exclude
+                        type: list
+                        elements: str
+                        required: false
+                    include_resources:
+                        description: List of specific resources to include
+                        type: list
+                        elements: dict
+                        required: false
+                        suboptions:
+                            name:
+                                description: Resource name
+                                type: str
+                            namespace:
+                                description: Resource namespace
+                                type: str
+                            gvk:
+                                description: Resource GVK in format 'group/version/kind' or 'version/kind' for core resources
+                                type: str
+                                required: true
+                    exclude_resources:
+                        description: List of specific resources to exclude
+                        type: list
+                        elements: dict
+                        required: false
+                        suboptions:
+                            name:
+                                description: Resource name
+                                type: str
+                            namespace:
+                                description: Resource namespace
+                                type: str
+                            gvk:
+                                description: Resource GVK in format 'group/version/kind' or 'version/kind' for core resources
+                                type: str
+                                required: true
+                    gvks:
+                        description: Group-Version-Kind specifications for filtering
+                        type: list
+                        elements: str
+                        required: false
+                    resource_name_pattern:
+                        description: Pattern to match resource names
+                        type: str
+                        required: false
+            virtual_machine_filter:
+                description: Virtual machine specific filtering options
+                type: dict
+                required: false
+                suboptions:
+                    vm_name_pattern:
+                        description: Pattern to match virtual machine names (e.g., "*" for all, "pxb-" or any valid regex)
+                        type: str
+                        required: false
+                    os_name:
+                        description: List of OS names to include for filtering
+                        type: list
+                        elements: str
+                        required: false
+                    include_vms:
+                        description: List of specific VMs to include for filtering
+                        type: list
+                        elements: dict
+                        required: false
+                        suboptions:
+                            name:
+                                description: Virtual machine name
+                                type: str
+                                required: true
+                            namespace:
+                                description: Virtual machine namespace
+                                type: str
+                                required: false
+                    exclude_vms:
+                        description: List of specific VMs to exclude from filtering
+                        type: list
+                        elements: dict
+                        required: false
+                        suboptions:
+                            name:
+                                description: Virtual machine name
+                                type: str
+                                required: true
+                            namespace:
+                                description: Virtual machine namespace
+                                type: str
+                                required: false
     namespace_mapping:
         description:
             - Mapping of source and destination namespaces during restore
@@ -202,6 +322,36 @@ options:
                         description: Partition info if volume is partitioned (e.g., vda1, sda14)
                         type: str
                         required: false
+    sort_option:
+        description: Sorting configuration for restore enumeration
+        type: dict
+        required: false
+        version_added: '2.11.0'
+        suboptions:
+            sort_by:
+                description: Field to sort by
+                type: str
+                choices: ['CreationTimestamp', 'Name', 'ClusterName', 'Size', 'RestoreBackupName', 'LastUpdateTimestamp']
+                default: 'CreationTimestamp'
+            sort_order:
+                description: Sort order
+                type: str
+                choices: ['Ascending', 'Descending']
+                default: 'Descending'
+    virtual_machine_restore_options:
+        description: Virtual machine specific restore options
+        type: dict
+        required: false
+        version_added: '2.11.0'
+        suboptions:
+            skip_mac_masking:
+                description: Skip MAC address masking while restoring virtual machines
+                type: bool
+                default: false
+            skip_vm_restart:
+                description: Skip VM restart during virtual machine restore
+                type: bool
+                default: false
     ssl_config:
         description:
             - SSL configuration dictionary containing certificate settings
@@ -368,6 +518,32 @@ def enumerate_restores(module: AnsibleModule, client: PXBackupClient) -> List[Di
     if module.params.get('status'):
         params['enumerate_options.status'] = module.params['status']
 
+    # Add sorting options if provided
+    if module.params.get('sort_option'):
+        sort_option = module.params['sort_option']
+        params['enumerate_options.sort_option.sortBy.type'] = sort_option.get('sort_by', 'CreationTimestamp')
+        params['enumerate_options.sort_option.sortOrder.type'] = sort_option.get('sort_order', 'Descending')
+
+    # Add new filtration features
+    if module.params.get('vm_volume_name'):
+        params['enumerate_options.vm_volume_name'] = module.params['vm_volume_name']
+
+    if module.params.get('exclude_failed_resource') is not None:
+        params['enumerate_options.exclude_failed_resource'] = module.params['exclude_failed_resource']
+
+    # Add resource_info filter
+    if module.params.get('resource_info'):
+        resource_info = module.params['resource_info']
+        if resource_info.get('name'):
+            params['enumerate_options.resource_info.name'] = resource_info['name']
+        if resource_info.get('namespace'):
+            params['enumerate_options.resource_info.namespace'] = resource_info['namespace']
+        if resource_info.get('group'):
+            params['enumerate_options.resource_info.group'] = resource_info['group']
+        if resource_info.get('kind'):
+            params['enumerate_options.resource_info.kind'] = resource_info['kind']
+        if resource_info.get('version'):
+            params['enumerate_options.resource_info.version'] = resource_info['version']
 
     # Remove None values
     params = {k: v for k, v in params.items() if v is not None}
@@ -464,7 +640,63 @@ def build_restore_request(params: Dict[str, Any], module: AnsibleModule, client:
         "rancher_project_mapping": params.get('rancher_project_mapping', {}),
         "rancher_project_name_mapping": params.get('rancher_project_name_mapping', {})
     })
+
+    # Add enhanced parameters for target namespace selection
+    if params.get('target_namespace_prefix'):
+        request["target_namespace_prefix"] = params['target_namespace_prefix']
+
+    if params.get('use_source_as_target_namespace'):
+        request["use_source_as_target_namespace"] = params['use_source_as_target_namespace']
     
+    # Add enhanced parameters for resource type selection
+    if params.get('include_optional_resource_types'):
+        request["include_optional_resource_types"] = params['include_optional_resource_types']
+
+    if params.get('backup_object_type'):
+        request["backup_object_type"] = params['backup_object_type']
+
+    # Add new exclude_resources parameter
+    if params.get('exclude_resources'):
+        request["exclude_resources"] = params['exclude_resources']
+
+    # Add filter parameter with enhanced VM filtering
+    filter_obj = {}
+
+    # Add namespace filter if provided
+    if params.get('namespace_filter'):
+        filter_obj["namespace_filter"] = params['namespace_filter']
+
+    # Add enhanced virtual machine filter if provided
+    if params.get('virtual_machine_filter'):
+        vm_filter = {}
+        vm_filter_params = params['virtual_machine_filter']
+
+        if vm_filter_params.get('vm_name_pattern'):
+            vm_filter["vm_name_pattern"] = vm_filter_params['vm_name_pattern']
+
+        if vm_filter_params.get('os_name'):
+            vm_filter["os_name"] = vm_filter_params['os_name']
+
+        if vm_filter_params.get('include_vms'):
+            vm_filter["include_vms"] = vm_filter_params['include_vms']
+
+        if vm_filter_params.get('exclude_vms'):
+            vm_filter["exclude_vms"] = vm_filter_params['exclude_vms']
+
+        if vm_filter:
+            filter_obj["virtual_machine_filter"] = vm_filter
+
+    # Add legacy filter parameter for backward compatibility
+    if params.get('filter'):
+        filter_obj.update(params['filter'])
+
+    if filter_obj:
+        request["filter"] = filter_obj
+
+    # Add virtual machine restore options
+    if params.get('virtual_machine_restore_options'):
+        request["virtual_machine_restore_options"] = params['virtual_machine_restore_options']
+
     if params.get('namespace_mapping'):
         request.update({"namespace_mapping": params.get('namespace_mapping')})
     
@@ -788,9 +1020,27 @@ def run_module():
             type='dict',
             required=False,
         ),
-        
+
+        # Namespace target options (mutually exclusive)
+        target_namespace_prefix=dict(
+            type='str',
+            required=False
+        ),
+
+        use_source_as_target_namespace=dict(
+            type='bool',
+            required=False
+        ),
+
         storage_class_mapping=dict(
             type='dict',
+            required=False
+        ),
+
+        # Optional resource types
+        include_optional_resource_types=dict(
+            type='list',
+            elements='str',
             required=False
         ),
         
@@ -800,16 +1050,100 @@ def run_module():
             required=False,
             options=dict(
                 name=dict(type='str', required=True),
-                namespace=dict(type='str', required=True),
-                group=dict(type='str', required=True),
-                kind=dict(type='str', required=True),
-                version=dict(type='str', required=True)
+                namespace=dict(type='str', required=False),
+                gvk=dict(type='str', required=True)
+            )
+        ),
+        exclude_resources=dict(
+            type='list',
+            elements='dict',
+            required=False,
+            options=dict(
+                name=dict(type='str', required=True),
+                namespace=dict(type='str', required=False),
+                gvk=dict(type='str', required=True)
+            )
+        ),
+        filter=dict(
+            type='dict',
+            required=False,
+            options=dict(
+                namespace_filter=dict(
+                    type='dict',
+                    required=False,
+                    options=dict(
+                        namespace_name_pattern=dict(type='str', required=False),
+                        include_namespaces=dict(type='list', elements='str', required=False),
+                        exclude_namespaces=dict(type='list', elements='str', required=False),
+                        include_resources=dict(
+                            type='list',
+                            elements='dict',
+                            required=False,
+                            options=dict(
+                                name=dict(type='str', required=True),
+                                namespace=dict(type='str', required=False),
+                                gvk=dict(type='str', required=True)
+                            )
+                        ),
+                        exclude_resources=dict(
+                            type='list',
+                            elements='dict',
+                            required=False,
+                            options=dict(
+                                name=dict(type='str', required=True),
+                                namespace=dict(type='str', required=False),
+                                gvk=dict(type='str', required=True)
+                            )
+                        ),
+                        gvks=dict(
+                            type='list',
+                            elements='str',
+                            required=False,
+                            description='List of GVK strings in format "group/version/kind" (e.g., "apps/v1/Deployment")'
+                        ),
+                        resource_name_pattern=dict(type='str', required=False)
+                    )
+                ),
+                virtual_machine_filter=dict(
+                    type='dict',
+                    required=False,
+                    options=dict(
+                        vm_name_pattern=dict(type='str', required=False),
+                        os_name=dict(type='list', elements='str', required=False),
+                        include_vms=dict(
+                            type='list',
+                            elements='dict',
+                            required=False,
+                            options=dict(
+                                name=dict(type='str', required=True),
+                                namespace=dict(type='str', required=False),
+                                os_name=dict(type='str', required=False)
+                            )
+                        ),
+                        exclude_vms=dict(
+                            type='list',
+                            elements='dict',
+                            required=False,
+                            options=dict(
+                                name=dict(type='str', required=True),
+                                namespace=dict(type='str', required=False),
+                                os_name=dict(type='str', required=False)
+                            )
+                        )
+                    )
+                )
             )
         ),
         backup_object_type=dict(
-            type='str',
+            type='dict',
             required=False,
-            choices=['Invalid', 'All', 'VirtualMachine']
+            options=dict(
+                type=dict(
+                    type='str',
+                    required=True,
+                    choices=['Invalid', 'All', 'VirtualMachine']
+                )
+            )
         ),
         replace_policy = dict(
             type='str',
@@ -848,6 +1182,55 @@ def run_module():
         cluster_uid_filter=dict(type='str', required=False),
         owners=dict(type='list', elements='str', required=False),
         status=dict(type='list', elements='str', required=False),
+
+        # Sorting options
+        sort_option=dict(type='dict', required=False, options=dict(
+            sort_by=dict(
+                type='str',
+                choices=['CreationTimestamp', 'Name', 'ClusterName', 'Size', 'RestoreBackupName', 'LastUpdateTimestamp'],
+                default='CreationTimestamp'
+            ),
+            sort_order=dict(
+                type='str',
+                choices=['Ascending', 'Descending'],
+                default='Descending'
+            )
+        )),
+
+        # Virtual machine restore options
+        virtual_machine_restore_options=dict(
+            type='dict',
+            required=False,
+            options=dict(
+                skip_mac_masking=dict(type='bool', default=False),
+                skip_vm_restart=dict(type='bool', default=False)
+            )
+        ),
+
+        # New filtration features
+        vm_volume_name=dict(
+            type='str',
+            required=False,
+            description='Filter VM that matches the resource_info and has volume vm_volume_name attached to it'
+        ),
+        exclude_failed_resource=dict(
+            type='bool',
+            required=False,
+            default=False,
+            description='Filter to exclude failed resources while enumerating objects'
+        ),
+        resource_info=dict(
+            type='dict',
+            required=False,
+            options=dict(
+                name=dict(type='str', required=False),
+                namespace=dict(type='str', required=False),
+                group=dict(type='str', required=False),
+                kind=dict(type='str', required=False),
+                version=dict(type='str', required=False)
+            ),
+            description='Filter to use resource name and namespace. Any restore that contains the resource will be returned'
+        ),
 
         # SSL cert implementation
         ssl_config=dict(

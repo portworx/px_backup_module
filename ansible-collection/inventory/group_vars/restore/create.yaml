@@ -18,7 +18,7 @@ restores:
       value: ""
     # storage_class_mapping:
     #   "px-db": "px-db"
-  # Single File Restore Request
+  #  Example restore 1a: Single File Restore Request 
   - name: "sfr-restore"
     backup_ref:
       name: "test1"
@@ -34,3 +34,268 @@ restores:
           source_path: test-folder/USER.md
           destination_path: "test-folder-restored/USER.md"
           is_dir: false
+
+  # Example restore 2: Basic restore with resource exclusion (v2.11.0)
+  - name: "basic-restore-with-exclusion"
+    backup_ref:
+      name: "one-big-backup"
+    cluster_ref:
+      name: "adarsh-ocp"
+    exclude_resources:
+      - name: "sensitive-secret"
+        namespace: "openshift"
+        gvk: "v1/Secret"
+      - name: "temp-configmap"
+        namespace: "openshift"
+        gvk: "v1/ConfigMap"
+
+#   # Example restore 3: Restore with namespace filtering (v2.11.0)
+  - name: "namespace-filtered-restore-1"
+    backup_ref:
+      name: "one-big-backup"
+    cluster_ref:
+       name: "adarsh-ocp"
+    filter:
+      namespace_filter:
+        namespace_name_pattern: "openshift*"
+        exclude_namespaces:
+          - "kube-system"
+          - "kube-public"
+          - "px-system"
+        gvks:
+          - "apps/v1/Deployment"
+          - "v1/Service"
+          - "v1/PersistentVolumeClaim"
+        resource_name_pattern: "config*"
+
+#   # Example restore 4: Restore with VM filtering (v2.11.0)
+  - name: "vm-filtered-restore"
+    backup_ref:
+      name: "vm-backup"
+    cluster_ref:
+      name: "vm-cluster"
+    filter:
+      virtual_machine_filter:
+        vm_name_pattern: "production-vm-.*"
+    namespace_mapping: 
+      "vm-production": "vm-production"
+      "vm-staging": "vm-staging"
+
+  # Example restore 5: Namespace filtering only (v2.11.0+)
+  - name: "comprehensive-filtered-restore"
+    backup_ref:
+      name: "full-backup"
+    cluster_ref:
+      name: "target-cluster"
+    exclude_resources:
+      - name: "temp-data"
+        namespace: "default"
+        gvk: "v1/Secret"
+      - name: "cache-config"
+        namespace: "app"
+        gvk: "v1/ConfigMap"
+    filter:
+      namespace_filter:
+        namespace_name_pattern: "app-.*" 
+        exclude_namespaces:
+          - "app-temp"
+          - "app-cache"
+        include_resources:
+          - name: "critical-deployment"
+            namespace: "app-prod"
+            gvk: "apps/v1/Deployment"
+          - name: "database-statefulset"
+            namespace: "app-prod"
+            gvk: "apps/v1/StatefulSet"
+        exclude_resources:
+          - name: "test-deployment"
+            namespace: "app-prod"
+            gvk: "apps/v1/Deployment"
+        gvks:
+          - "apps/v1/Deployment"
+          - "apps/v1/StatefulSet"
+          - "v1/Service"
+        resource_name_pattern: "prod-.*"
+    namespace_mapping:
+      "app-prod": "restored-app-prod"
+      "app-staging": "restored-app-staging"
+    storage_class_mapping:
+      "fast-ssd": "standard-ssd"
+      "slow-hdd": "standard-hdd"
+    replace_policy: "Delete"
+
+  # Example restore 6: Restore with specific resource inclusion and exclusion (v2.11.0+)
+  - name: "selective-restore"
+    backup_ref:
+      name: "application-backup"
+    cluster_ref:
+      name: "staging-cluster"
+    include_resources:
+      - name: "web-deployment"
+        namespace: "default"
+        gvk: "apps/v1/Deployment"
+      - name: "web-service"
+        namespace: "default"
+        gvk: "v1/Service"
+    exclude_resources:
+      - name: "debug-configmap"
+        namespace: "default"
+        gvk: "v1/ConfigMap"
+    filter:
+      namespace_filter:
+        include_namespaces:
+          - "default"
+          - "app"
+        gvks:
+          - "apps/v1/Deployment"
+          - "v1/Service"
+
+  # Example restore 7: VM filtering with os_name parameter (v2.11.0+)
+  - name: "vm-os-filtered-restore"
+    backup_ref:
+      name: "vm-backup-mixed-os"
+    cluster_ref:
+      name: "vm-cluster"
+    filter:
+      virtual_machine_filter:
+        vm_name_pattern: "prod-*"
+        os_name:
+          - "ubuntu"
+          - "centos"
+          - "rhel"
+    virtual_machine_restore_options:
+      skip_mac_masking: true
+      skip_vm_restart: false
+
+  # Example restore 8: VM filtering with include_vms and exclude_vms (v2.11.0+)
+  - name: "vm-selective-restore"
+    backup_ref:
+      name: "vm-backup-comprehensive"
+    cluster_ref:
+      name: "vm-cluster"
+    filter:
+      virtual_machine_filter:
+        include_vms:
+          - name: "critical-vm-1"
+            namespace: "production"
+          - name: "critical-vm-2"
+            namespace: "production"
+          - name: "database-vm"
+            namespace: "data"
+        exclude_vms:
+          - name: "test-vm"
+            namespace: "production"
+          - name: "temp-vm"
+            namespace: "staging"
+    virtual_machine_restore_options:
+      skip_mac_masking: false
+      skip_vm_restart: true
+
+  # Example restore 9: Complete VM filtering with all parameters (v2.11.0+)
+  - name: "vm-comprehensive-filtering"
+    backup_ref:
+      name: "vm-backup-full"
+    cluster_ref:
+      name: "vm-cluster"
+    filter:
+      virtual_machine_filter:
+        vm_name_pattern: "app-*"
+        os_name:
+          - "ubuntu"
+          - "windows"
+        include_vms:
+          - name: "app-web-vm"
+            namespace: "frontend"
+          - name: "app-db-vm"
+            namespace: "backend"
+        exclude_vms:
+          - name: "app-test-vm"
+            namespace: "frontend"
+    virtual_machine_restore_options:
+      skip_mac_masking: true
+      skip_vm_restart: true
+    namespace_mapping:
+      "frontend": "restored-frontend"
+      "backend": "restored-backend"
+
+  # Example restore 10: Advanced namespace filtering with all resource options (v2.11.0+)
+  - name: "advanced-namespace-resource-filtering"
+    backup_ref:
+      name: "complex-backup"
+    cluster_ref:
+      name: "target-cluster"
+    filter:
+      namespace_filter:
+        namespace_name_pattern: "microservice-*"
+        include_namespaces:
+          - "microservice-auth"
+          - "microservice-api"
+          - "microservice-data"
+        exclude_namespaces:
+          - "microservice-test"
+          - "microservice-temp"
+        include_resources:
+          - name: "auth-deployment"
+            namespace: "microservice-auth"
+            gvk: "apps/v1/Deployment"
+          - name: "api-service"
+            namespace: "microservice-api"
+            gvk: "v1/Service"
+          - name: "data-pvc"
+            namespace: "microservice-data"
+            gvk: "v1/PersistentVolumeClaim"
+        exclude_resources:
+          - name: "debug-pod"
+            namespace: "microservice-auth"
+            gvk: "v1/Pod"
+          - name: "temp-job"
+            namespace: "microservice-api"
+            gvk: "batch/v1/Job"
+        gvks:
+          - "apps/v1/Deployment"
+          - "apps/v1/StatefulSet"
+          - "v1/Service"
+          - "v1/PersistentVolumeClaim"
+        resource_name_pattern: "prod-*"
+    namespace_mapping:
+      "microservice-auth": "restored-auth"
+      "microservice-api": "restored-api"
+      "microservice-data": "restored-data"
+    storage_class_mapping:
+      "fast-ssd": "premium-ssd"
+      "standard": "basic"
+
+  # Example restore 11: Cluster-scoped resources (no namespace) (v2.11.0+)
+  - name: "cluster-scoped-resources-restore"
+    backup_ref:
+      name: "cluster-backup"
+    cluster_ref:
+      name: "target-cluster"
+    include_resources:
+      - name: "custom-cluster-role"
+        gvk: "rbac.authorization.k8s.io/v1/ClusterRole"
+      - name: "storage-class-fast"
+        gvk: "storage.k8s.io/v1/StorageClass"
+      - name: "persistent-volume-1"
+        gvk: "v1/PersistentVolume"
+    exclude_resources:
+      - name: "temp-cluster-role"
+        gvk: "rbac.authorization.k8s.io/v1/ClusterRole"
+
+  # Example restore 12: Core API resources (empty group) (v2.11.0+)
+  - name: "core-api-resources-restore"
+    backup_ref:
+      name: "core-resources-backup"
+    cluster_ref:
+      name: "target-cluster"
+    filter:
+      namespace_filter:
+        include_namespaces:
+          - "default"
+          - "kube-system"
+        gvks:
+          - "v1/Service"
+          - "v1/ConfigMap"
+          - "v1/Secret"
+          - "v1/PersistentVolumeClaim"
+        resource_name_pattern: "app-*"

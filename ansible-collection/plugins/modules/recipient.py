@@ -20,7 +20,7 @@ import logging
 from dataclasses import dataclass
 
 from ansible.module_utils.basic import AnsibleModule
-from ansible.module_utils.px_backup.api import PXBackupClient
+from ansible_collections.purepx.px_backup.plugins.module_utils.px_backup.api import PXBackupClient
 import requests
 
 DOCUMENTATION = r'''
@@ -29,7 +29,7 @@ module: recipient
 
 short_description: Manage alert recipients in PX-Backup
 
-version_added: "2.9.0"
+version_added: "2.10.0"
 
 description: 
     - Manage alert recipients in PX-Backup using different operations

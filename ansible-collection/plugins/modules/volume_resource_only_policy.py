@@ -22,7 +22,7 @@ import logging
 from dataclasses import dataclass
 
 from ansible.module_utils.basic import AnsibleModule
-from ansible.module_utils.px_backup.api import PXBackupClient
+from ansible_collections.purepx.px_backup.plugins.module_utils.px_backup.api import PXBackupClient
 import requests
 
 # Constants for enum mappings
@@ -143,7 +143,7 @@ options:
         required: false
         type: dict
     enumerate_options:
-        description: 
+        description:
             - Options for controlling enumeration behavior when listing volume resource only policies
             - Used with INSPECT_ALL operation to filter and limit results
             - All suboptions are optional and can be combined for advanced filtering
@@ -161,7 +161,7 @@ options:
                         type: dict
                         required: false
                     max_objects:
-                        description: 
+                        description:
                             - Maximum number of policies to return in the response
                             - Useful for pagination and limiting large result sets
                             - Must be a positive integer
@@ -172,28 +172,42 @@ options:
                         type: str
                         required: false
                     object_index:
-                        description: 
+                        description:
                             - Starting index for pagination when retrieving policies
                             - Used with max_objects for pagination through large result sets
                             - Zero-based indexing (0 = first policy)
                         type: int
                         required: false
-            sort_option:
-                description: Sorting configuration for policy enumeration
-                type: dict
-                required: false
-                version_added: '2.11.0'
-                suboptions:
-                    sortBy:
-                        description: Field to sort by
-                        type: str
-                        choices: ['Invalid', 'CreationTimestamp', 'Name', 'ClusterName', 'Size', 'RestoreBackupName', 'LastUpdateTimestamp']
-                        default: 'Invalid'
-                    sortOrder:
-                        description: Sort order
-                        type: str
-                        choices: ['Invalid', 'Ascending', 'Descending']
-                        default: 'Invalid'
+                    sort_option:
+                        description: Sorting configuration for policy enumeration
+                        type: dict
+                        required: false
+                        version_added: '2.11.0'
+                        suboptions:
+                            sortBy:
+                                description: Field to sort by
+                                type: str
+                                choices: ['Invalid', 'CreationTimestamp', 'Name', 'ClusterName', 'Size', 'RestoreBackupName', 'LastUpdateTimestamp']
+                                default: 'Invalid'
+                            sortOrder:
+                                description: Sort order
+                                type: str
+                                choices: ['Invalid', 'Ascending', 'Descending']
+                                default: 'Invalid'
+                    time_range:
+                        description: Time range for filtering policies by creation/update time
+                        type: dict
+                        required: false
+                        version_added: '2.11.0'
+                        suboptions:
+                            start_time:
+                                description: Start time for the time range filter (RFC3339 format)
+                                type: str
+                                required: false
+                            end_time:
+                                description: End time for the time range filter (RFC3339 format)
+                                type: str
+                                required: false
             volume_types:
                 description: Filter policies by volume types
                 type: list
@@ -296,9 +310,9 @@ EXAMPLES = r'''
         name_filter: "prod-"
         labels:
           environment: "production"
-      sort_option:
-        sortBy: "LastUpdateTimestamp"
-        sortOrder: "Descending"
+        sort_option:
+          sortBy: "LastUpdateTimestamp"
+          sortOrder: "Descending"
       volume_types:
         - "Portworx"
         - "Csi"
@@ -581,20 +595,36 @@ def enumerate_volume_resource_only_policies(module: AnsibleModule, client: PXBac
         # Handle generic enumerate options
         if enumerate_options.get('generic_enumerate_options'):
             generic_opts = enumerate_options['generic_enumerate_options']
-            request_enumerate_options.update({
-                k: v for k, v in generic_opts.items()
-                if v is not None and k in ['labels', 'max_objects', 'name_filter', 'object_index']
-            })
+            generic_enumerate_options = {}
 
-        # Handle sort options
-        if enumerate_options.get('sort_option'):
-            sort_option = enumerate_options['sort_option']
-            request_enumerate_options["sort_option"] = {
-                "sortBy": {"type": sort_option.get('sortBy', 'Invalid')},
-                "sortOrder": {"type": sort_option.get('sortOrder', 'Invalid')}
-            }
+            # Add simple fields
+            for field in ['labels', 'max_objects', 'name_filter', 'object_index']:
+                if field in generic_opts and generic_opts[field] is not None:
+                    generic_enumerate_options[field] = generic_opts[field]
 
-        # Handle volume types filtering
+            # Handle sort_option (nested within generic_enumerate_options)
+            if generic_opts.get('sort_option'):
+                sort_option = generic_opts['sort_option']
+                generic_enumerate_options["sort_option"] = {
+                    "sortBy": {"type": sort_option.get('sortBy', 'Invalid')},
+                    "sortOrder": {"type": sort_option.get('sortOrder', 'Invalid')}
+                }
+
+            # Handle time_range (nested within generic_enumerate_options)
+            if generic_opts.get('time_range'):
+                time_range = generic_opts['time_range']
+                time_range_obj = {}
+                if time_range.get('start_time'):
+                    time_range_obj['start_time'] = time_range['start_time']
+                if time_range.get('end_time'):
+                    time_range_obj['end_time'] = time_range['end_time']
+                if time_range_obj:
+                    generic_enumerate_options['time_range'] = time_range_obj
+
+            if generic_enumerate_options:
+                request_enumerate_options['generic_enumerate_options'] = generic_enumerate_options
+
+        # Handle volume types filtering (at top level of enumerate_options)
         if enumerate_options.get('volume_types'):
             request_enumerate_options["volume_types"] = enumerate_options['volume_types']
 
@@ -802,22 +832,30 @@ def run_module():
                         labels=dict(type='dict', required=False),
                         max_objects=dict(type='int', required=False),
                         name_filter=dict(type='str', required=False),
-                        object_index=dict(type='int', required=False)
-                    )
-                ),
-                sort_option=dict(
-                    type='dict',
-                    required=False,
-                    options=dict(
-                        sortBy=dict(
-                            type='str',
-                            choices=['Invalid', 'CreationTimestamp', 'Name', 'ClusterName', 'Size', 'RestoreBackupName', 'LastUpdateTimestamp'],
-                            default='Invalid'
+                        object_index=dict(type='int', required=False),
+                        sort_option=dict(
+                            type='dict',
+                            required=False,
+                            options=dict(
+                                sortBy=dict(
+                                    type='str',
+                                    choices=['Invalid', 'CreationTimestamp', 'Name', 'ClusterName', 'Size', 'RestoreBackupName', 'LastUpdateTimestamp'],
+                                    default='Invalid'
+                                ),
+                                sortOrder=dict(
+                                    type='str',
+                                    choices=['Invalid', 'Ascending', 'Descending'],
+                                    default='Invalid'
+                                )
+                            )
                         ),
-                        sortOrder=dict(
-                            type='str',
-                            choices=['Invalid', 'Ascending', 'Descending'],
-                            default='Invalid'
+                        time_range=dict(
+                            type='dict',
+                            required=False,
+                            options=dict(
+                                start_time=dict(type='str', required=False),
+                                end_time=dict(type='str', required=False)
+                            )
                         )
                     )
                 ),
