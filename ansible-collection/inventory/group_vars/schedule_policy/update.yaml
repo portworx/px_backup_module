@@ -11,3 +11,37 @@ schedule_policy_updates:
     labels:
       environment: "generic"
       team: "generic-team"
+
+  # Update to multi-day weekly
+  - name: "nt-weekday-backups"
+    uid: "30172963-8919-4d4a-9a60-dd10f9a772fe"
+    schedule_policy:
+      supports_advanced_features: true
+      weekly:
+        day: "mon,tue,wed,thu,fri"  # Changed from mon,wed,fri
+        time: "10:00PM"              # Changed time
+        retain: 7                    # Changed retain
+
+  # Update relative monthly
+  - name: "nt-first-monday-backup"
+    uid: "3c3aac53-c17e-47f4-9350-05d689090cd6"
+    schedule_policy:
+      supports_advanced_features: true
+      monthly:
+        relative_monthly_policy:
+          day: "mon"
+          weekly_index: "second"     # Changed from first to second
+          time: "4:00AM"             # Changed time
+          retain: 6                  # Changed retain
+
+  # Update selective monthly - add more months
+  - name: "nt-quarterly-backup"
+    uid: "8009b9c1-f820-43d6-8d7b-e346c1364085"
+    schedule_policy:
+      supports_advanced_features: true
+      monthly:
+        selective_monthly_policy:
+          date: 15
+          time: "3:00AM"
+          retain: 6
+          months: "jan,feb,apr,may,jul,aug,oct,nov"  # Expanded from quarterly
