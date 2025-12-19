@@ -57,7 +57,7 @@
             output_base_filename: >-
               {{ output_filename_prefix | default('output') }}
               {%- if add_timestamp | bool -%}
-              _{{ ansible_date_time.epoch }}
+              _{{ ansible_facts["date_time"]["epoch"] }}
               {%- endif -%}
 
         # Include format-specific tasks for file output
