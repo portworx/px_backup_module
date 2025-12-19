@@ -559,7 +559,18 @@ def enumerate_backup_schedules(module, client, operation):
                     request_body["enumerate_options"]["sort_option"] = enumerate_options.get('sort_option')
                 if enumerate_options.get('object_index'):
                     request_body["enumerate_options"]["object_index"] = enumerate_options.get('object_index')
-            
+                # Add new filtration features
+                if enumerate_options.get('vm_volume_name'):
+                    request_body["enumerate_options"]["vm_volume_name"] = enumerate_options.get('vm_volume_name')
+                if enumerate_options.get('exclude_failed_resource') is not None:
+                    request_body["enumerate_options"]["exclude_failed_resource"] = enumerate_options.get('exclude_failed_resource')
+                # Add resource_info filter
+                if enumerate_options.get('resource_info'):
+                    resource_info = enumerate_options['resource_info']
+                    request_body["enumerate_options"]["resource_info"] = {
+                        k: v for k, v in resource_info.items() if v is not None
+                    }
+
             # Add references if provided
             if backup_location_ref:
                 request_body["backup_location_ref"] = backup_location_ref
@@ -650,7 +661,25 @@ def enumerate_backup_schedules(module, client, operation):
                 params['enumerate_options.owners'] = enumerate_options.get('owners')
             if enumerate_options.get('status'):
                 params['enumerate_options.status'] = enumerate_options.get('status')
-            
+            # Add new filtration features
+            if enumerate_options.get('vm_volume_name'):
+                params['enumerate_options.vm_volume_name'] = enumerate_options.get('vm_volume_name')
+            if enumerate_options.get('exclude_failed_resource') is not None:
+                params['enumerate_options.exclude_failed_resource'] = enumerate_options.get('exclude_failed_resource')
+            # Add resource_info filter
+            if enumerate_options.get('resource_info'):
+                resource_info = enumerate_options['resource_info']
+                if resource_info.get('name'):
+                    params['enumerate_options.resource_info.name'] = resource_info['name']
+                if resource_info.get('namespace'):
+                    params['enumerate_options.resource_info.namespace'] = resource_info['namespace']
+                if resource_info.get('group'):
+                    params['enumerate_options.resource_info.group'] = resource_info['group']
+                if resource_info.get('kind'):
+                    params['enumerate_options.resource_info.kind'] = resource_info['kind']
+                if resource_info.get('version'):
+                    params['enumerate_options.resource_info.version'] = resource_info['version']
+
         try:
             response = client.make_request('GET', f"v1/backupschedule/{module.params['org_id']}", params=params)
             return response.get('backup_schedules', [])
@@ -1098,6 +1127,31 @@ def run_module():
                 ),
                 all_clusters=dict(type='bool')
             )
+        ),
+
+        # New filtration features
+        vm_volume_name=dict(
+            type='str',
+            required=False,
+            description='Filter VM that matches the resource_info and has volume vm_volume_name attached to it'
+        ),
+        exclude_failed_resource=dict(
+            type='bool',
+            required=False,
+            default=False,
+            description='Filter to exclude failed resources while enumerating objects'
+        ),
+        resource_info=dict(
+            type='dict',
+            required=False,
+            options=dict(
+                name=dict(type='str', required=False),
+                namespace=dict(type='str', required=False),
+                group=dict(type='str', required=False),
+                kind=dict(type='str', required=False),
+                version=dict(type='str', required=False)
+            ),
+            description='Filter to use resource name and namespace. Any backup schedule that contains the resource will be returned'
         ),
     )
 
