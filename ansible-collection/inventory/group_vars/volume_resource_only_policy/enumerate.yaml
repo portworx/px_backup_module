@@ -11,39 +11,15 @@ enumerate_options:
     labels:
       environment: "production"
       team: "platform"
+    #  Sort optioning option (Enhanced Option)
+    sort_option:
+      sortBy: "LastUpdateTimestamp"  # Options: Invalid, CreationTimestamp, Name, ClusterName, Size, RestoreBackupName, LastUpdateTimestamp
+      sortOrder: "Descending"         # Options: Invalid, Ascending, Descending
+    time_range: #   policies created/updated within a specific time range
+      start_time: "2024-01-01T00:00:00Z"
+      end_time: "2024-12-31T23:59:59Z"
 
-  # Enhanced sorting options (new feature)
-  sort_option:
-    sortBy: "LastUpdateTimestamp"
-    sortOrder: "Descending"
-
-  # Filter by specific volume types (new feature)
+  # Filter by specific volume types
   volume_types:
     - "Portworx"
     - "Csi"
-
-# Alternative enumeration configurations for different use cases
-enumerate_options_by_name:
-  generic_enumerate_options:
-    name_filter: "skip-"
-    max_objects: 25
-
-enumerate_options_by_creation_time:
-  generic_enumerate_options:
-    max_objects: 100
-  sort_option:
-    sortBy: "CreationTimestamp"
-    sortOrder: "Ascending"
-
-enumerate_options_nfs_only:
-  volume_types:
-    - "Nfs"
-  sort_option:
-    sortBy: "Name"
-    sortOrder: "Ascending"
-
-# Labels for top-level filtering (optional)
-labels:
-  purpose: "volume-exclusion"
-  managed_by: "ansible"
- 
