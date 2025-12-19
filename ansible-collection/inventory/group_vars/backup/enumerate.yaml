@@ -30,3 +30,6 @@ backup_schedule_ref:
 sort_option:
   sort_by: "Name"  
   sort_order: "Ascending"    
+#
+# Filter can be used to avoid information overload,
+exclude_failed_resource: true
