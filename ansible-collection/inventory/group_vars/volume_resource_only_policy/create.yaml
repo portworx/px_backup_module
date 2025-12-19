@@ -90,3 +90,10 @@ volume_resource_only_policies:
     labels:
       environment: "test"
       team: "qa"
+
+  # Policy with minimal configuration
+  - name: "minimal-skip-policy"
+    volume_types:
+      - "Invalid"  # Skip invalid volume types
+    labels:
+      purpose: "cleanup"
