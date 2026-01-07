@@ -12,10 +12,9 @@ import yaml
 
 def run_ansible_playbook(playbook, extra_vars=None):
     """Run an Ansible playbook with given extra variables."""
-    cmd = [
-        "ansible-playbook", playbook, "-vvvv",
-        "--extra-vars", json.dumps(extra_vars)
-    ]
+    cmd = ["ansible-playbook", playbook, "-vvvv"]
+    if extra_vars:
+        cmd.extend(["--extra-vars", json.dumps(extra_vars)])
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
 
@@ -34,8 +33,8 @@ def run_ansible_playbook(playbook, extra_vars=None):
         LOG_FILE = "ansible_failure.log"
         with open(LOG_FILE, "a") as log:
             log.write(f"--- Error in {playbook} ---\n")
-            log.write(e.stdout)
-            log.write("\n\n")
+            log.write(e.stdout or "")
+            log.write(f"\nstderr: {e.stderr or ''}\n\n")
         return None, e.stderr
 
 
@@ -43,7 +42,7 @@ def fetch_schedules():
     """Runs the enumerate playbook to fetch all schedules."""
 
     output, error = run_ansible_playbook("examples/backup_schedule/enumerate_schedule.yaml")
-    if error:
+    if error or output is None:
         print(f"Error fetching schedules: {error}")
         return None
 
@@ -51,35 +50,38 @@ def fetch_schedules():
     ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
     cleaned_output = ansi_escape.sub('', output)
 
-    # Look for the "Display as JSON" task output (from output_handler)
+    # Look for the "List All Backup Schedule" task output
     task_pattern = (
-        r"(TASK \[Display as JSON\][\s\S]*?)"
+        r"(TASK \[List All Backup Schedule\][\s\S]*?)"
         r"(?=TASK \[|PLAY RECAP|$)"
     )
     task_match = re.search(task_pattern, cleaned_output)
     if not task_match:
-        print("Error: Could not find 'Display as JSON' task output")
+        print("Error: Could not find 'List All Backup Schedule' task output")
         return None
 
     task_block = task_match.group(1)
 
-    # Extract JSON from the msg field
-    msg_pattern = r'msg:\s*\|-?\s*\n([\s\S]*?)(?=\nRead vars_file|\nTASK \[|\nPLAY RECAP|\Z)'
-    msg_match = re.search(msg_pattern, task_block)
-    if not msg_match:
-        print("Error: Could not extract JSON from 'Display as JSON' task")
-        return None
+    # Extract backup_schedules from the YAML-like output
+    # Look for backup_schedules: followed by a list
+    schedules_pattern = r'backup_schedules:\s*(\[[\s\S]*?\])\s*\n\s+changed:'
+    schedules_match = re.search(schedules_pattern, task_block)
+    if schedules_match:
+        try:
+            # Parse the YAML array
+            schedules_yaml = schedules_match.group(1)
+            parsed_data = yaml.safe_load(schedules_yaml)
+            return parsed_data if parsed_data else []
+        except yaml.YAMLError as e:
+            print(f"Error parsing YAML: {e}")
+            return []
 
-    # Remove leading whitespace from each line (Ansible indents the JSON)
-    raw_json_lines = msg_match.group(1).split('\n')
-    raw_json = '\n'.join(line.strip() for line in raw_json_lines if line.strip())
-
-    try:
-        parsed_data = json.loads(raw_json)
-        return parsed_data
-    except json.JSONDecodeError as e:
-        print(f"Error parsing JSON: {e}")
+    # Check if it's an empty list
+    if 'backup_schedules: []' in task_block:
         return []
+
+    print("Error: Could not extract backup_schedules from task output")
+    return None
 
 def filter_schedules(schedules, pattern, cluster_name):
     """Filters schedules matching the given pattern."""
@@ -188,10 +190,10 @@ def update_schedules(matching_schedules):
 
 if __name__ == "__main__":
     # Accept two command line arguments: pattern
-    # Example usage: python delete_schedules.py <pattern>
+    # Example usage: python update_schedules.py <pattern> <cluster_name>
     import sys
     if len(sys.argv) != 3:
-        print("Usage: python delete_schedules.py <pattern>")
+        print("Usage: python update_schedules.py <pattern> <cluster_name>")
         sys.exit(1)
 
     pattern = sys.argv[1]

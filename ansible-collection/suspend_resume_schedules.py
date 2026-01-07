@@ -53,6 +53,46 @@ logging.basicConfig(
 )
 
 
+def extract_json_from_console(cleaned_output):
+    """
+    Extracts JSON data from the Ansible output. First tries to read from a JSON file
+    if file output is enabled, otherwise extracts from console output.
+
+    Args:
+        cleaned_output (str): The cleaned Ansible output (ANSI codes removed).
+
+    Returns:
+        dict: Parsed JSON data, or None if extraction fails.
+    """
+    # First try to find JSON file path if file output is enabled
+    json_file_pattern = r"JSON file saved to:\s*(.+\.json)"
+    json_file_match = re.search(json_file_pattern, cleaned_output)
+    if json_file_match:
+        json_file_path = json_file_match.group(1).strip()
+        if os.path.exists(json_file_path):
+            try:
+                with open(json_file_path, 'r') as f:
+                    return json.load(f)
+            except json.JSONDecodeError as e:
+                logging.warning(f"Failed to parse JSON from file: {str(e)}")
+
+    # Fall back to extracting from console output
+    task_pattern = (
+        r"TASK \[Display as JSON\][\s\S]*?"
+        r"msg:\s*\|-?\s*\n([\s\S]*?)"
+        r"(?=Read `vars_file`|Read vars_file|\nTASK \[|\nPLAY RECAP|\Z)"
+    )
+    task_match = re.search(task_pattern, cleaned_output)
+    if task_match:
+        raw_json_lines = task_match.group(1).split('\n')
+        raw_json = '\n'.join(line.strip() for line in raw_json_lines if line.strip())
+        try:
+            return json.loads(raw_json)
+        except json.JSONDecodeError as e:
+            logging.warning(f"Failed to parse JSON from console output: {str(e)}")
+    return None
+
+
 def enumerate_backup_schedules(cluster_name: str = None, cluster_uid: str = None, org_id: str = "default") -> List[Dict[str, Any]]:
     """
     Enumerate backup schedules in PX-Backup using Ansible
@@ -105,27 +145,14 @@ def enumerate_backup_schedules(cluster_name: str = None, cluster_uid: str = None
     ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
     cleaned_output = ansi_escape.sub('', stdout_text)
 
-    # Find the JSON file path from the Ansible output
-    json_file_pattern = r"JSON file saved to:\s*(.+\.json)"
-    json_file_match = re.search(json_file_pattern, cleaned_output)
+    # Extract JSON from console output
+    parsed_data = extract_json_from_console(cleaned_output)
 
-    if not json_file_match:
-        logging.error("Could not find JSON output file path in Ansible output")
+    if parsed_data is None:
+        logging.error("Could not extract JSON from Ansible output")
         return []
 
-    json_file_path = json_file_match.group(1).strip()
-
-    if not os.path.exists(json_file_path):
-        logging.error(f"JSON file not found: {json_file_path}")
-        return []
-
-    try:
-        with open(json_file_path, 'r') as f:
-            parsed_data = json.load(f)
-        return parsed_data.get("backup_schedules", [])
-    except json.JSONDecodeError as e:
-        logging.error(f"Failed to parse backup schedules JSON: {e}")
-        return []
+    return parsed_data.get("backup_schedules", [])
 
 
 def update_schedules(matching_schedules, suspend=False):
@@ -266,27 +293,14 @@ def enumerate_schedule_policies(name_filter=None):
     ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
     cleaned_output = ansi_escape.sub('', stdout_text)
 
-    # Find the JSON file path from the Ansible output
-    json_file_pattern = r"JSON file saved to:\s*(.+\.json)"
-    json_file_match = re.search(json_file_pattern, cleaned_output)
+    # Extract JSON from console output
+    parsed_data = extract_json_from_console(cleaned_output)
 
-    if not json_file_match:
-        logging.error("Could not find JSON output file path in Ansible output")
+    if parsed_data is None:
+        logging.error("Could not extract JSON from Ansible output")
         return []
 
-    json_file_path = json_file_match.group(1).strip()
-
-    if not os.path.exists(json_file_path):
-        logging.error(f"JSON file not found: {json_file_path}")
-        return []
-
-    try:
-        with open(json_file_path, 'r') as f:
-            parsed_data = json.load(f)
-        return parsed_data.get('schedule_policies', [])
-    except json.JSONDecodeError as e:
-        logging.error(f"Failed to parse schedule policies JSON: {e}")
-        return []
+    return parsed_data.get('schedule_policies', [])
 
 
 def filter_schedules_by_policy(schedules: List[Dict], policy_names: List[str]) -> List[Dict]:

@@ -114,6 +114,46 @@ def extract_json_array(text, key):
     return None
 
 
+def extract_json_from_console(cleaned_output):
+    """
+    Extracts JSON data from the Ansible output. First tries to read from a JSON file
+    if file output is enabled, otherwise extracts from console output.
+
+    Args:
+        cleaned_output (str): The cleaned Ansible output (ANSI codes removed).
+
+    Returns:
+        dict: Parsed JSON data, or None if extraction fails.
+    """
+    # First try to find JSON file path if file output is enabled
+    json_file_pattern = r"JSON file saved to:\s*(.+\.json)"
+    json_file_match = re.search(json_file_pattern, cleaned_output)
+    if json_file_match:
+        json_file_path = json_file_match.group(1).strip()
+        if os.path.exists(json_file_path):
+            try:
+                with open(json_file_path, 'r') as f:
+                    return json.load(f)
+            except json.JSONDecodeError as e:
+                logging.warning(f"Failed to parse JSON from file: {str(e)}")
+
+    # Fall back to extracting from console output
+    task_pattern = (
+        r"TASK \[Display as JSON\][\s\S]*?"
+        r"msg:\s*\|-?\s*\n([\s\S]*?)"
+        r"(?=Read `vars_file`|Read vars_file|\nTASK \[|\nPLAY RECAP|\Z)"
+    )
+    task_match = re.search(task_pattern, cleaned_output)
+    if task_match:
+        raw_json_lines = task_match.group(1).split('\n')
+        raw_json = '\n'.join(line.strip() for line in raw_json_lines if line.strip())
+        try:
+            return json.loads(raw_json)
+        except json.JSONDecodeError as e:
+            logging.warning(f"Failed to parse JSON from console output: {str(e)}")
+    return None
+
+
 def generate_report(args, results=None, error=None, policy_result=None, vm_map=None):
     """
     Generate a report of the script execution
@@ -678,37 +718,14 @@ def enumerate_backup_locations(name_filter=None, dry_run=False):
     ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
     cleaned_output = ansi_escape.sub('', stdout_text)
 
-    task_pattern = (
-        r"(TASK \[Backup Location Enumerate call\][\s\S]*?)"
-        r"(?=TASK \[|PLAY RECAP|$)"
-    )
-    task_match = re.search(task_pattern, cleaned_output)
-    if not task_match:
-        logging.error("Could not find 'TASK [Backup Location Enumerate call]' block in the output.")
+    # Extract JSON from console output
+    parsed_data = extract_json_from_console(cleaned_output)
+
+    if parsed_data is None:
+        logging.error("Could not extract JSON from Ansible output")
         return {}
 
-    task_block = task_match.group(1)
-
-    # Find the "ok: [localhost] =>" line and extract the YAML output that follows
-    ok_pattern = r'ok:\s*\[localhost\]\s*=>\s*\n([\s\S]*?)(?=\nTASK \[|\nPLAY RECAP|\nRead vars_file|\Z)'
-    ok_match = re.search(ok_pattern, task_block)
-    if not ok_match:
-        logging.error("No 'ok: [localhost]' output found in 'TASK [Backup Location Enumerate call]' block.")
-        return {}
-
-    yaml_output = ok_match.group(1)
-
-    try:
-        # Parse the YAML output directly
-        parsed = yaml.safe_load(yaml_output)
-        if parsed and 'backup_locations' in parsed:
-            return parsed
-        else:
-            logging.error("No 'backup_locations' key found in parsed output.")
-            return {}
-    except yaml.YAMLError as exc:
-        logging.error(f"Failed to parse backup_locations YAML: {exc}")
-        return {}
+    return parsed_data
 
 
 def get_backup_location_by_name(location_name, dry_run=False):
@@ -793,28 +810,15 @@ def enumerate_schedule_policies(name_filter=None, dry_run=False):
     ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
     cleaned_output = ansi_escape.sub('', stdout_text)
 
-    # Find the JSON file path from the Ansible output
-    json_file_pattern = r"JSON file saved to:\s*(.+\.json)"
-    json_file_match = re.search(json_file_pattern, cleaned_output)
+    # Extract JSON from console output
+    parsed_data = extract_json_from_console(cleaned_output)
 
-    if not json_file_match:
-        logging.error("Could not find JSON output file path in Ansible output")
+    if parsed_data is None:
+        logging.error("Could not extract JSON from Ansible output")
         return []
 
-    json_file_path = json_file_match.group(1).strip()
-
-    if not os.path.exists(json_file_path):
-        logging.error(f"JSON file not found: {json_file_path}")
-        return []
-
-    try:
-        with open(json_file_path, 'r') as f:
-            parsed_data = json.load(f)
-        policies = parsed_data.get('schedule_policies', [])
-        return policies
-    except json.JSONDecodeError as e:
-        logging.error(f"Failed to parse schedule policies JSON: {e}")
-        return []
+    policies = parsed_data.get('schedule_policies', [])
+    return policies
 
 
 def check_policy_exists(policy_name, dry_run=False):
@@ -917,28 +921,21 @@ def create_schedule_policy(policy_name, policy_time, dry_run=False):
         logging.error(f"No output from Ansible playbook for policy {policy_name}.")
         return None, None
 
-    # Locate the "Create schedule policy" task output
-    task_match = re.search(r"TASK \[Create schedule policy].*?\n(.*?)\nTASK ", stdout_text, re.DOTALL)
-    if not task_match:
-        logging.error(f"Could not find 'Create schedule policy' task output for policy {policy_name}.")
-        return None, None
-    task_output = task_match.group(1)
+    # Clean ANSI codes and extract JSON
+    ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
+    cleaned_output = ansi_escape.sub('', stdout_text)
 
-    # Extract JSON from the task output
-    json_match = re.search(r'(\{.*\})', task_output, re.DOTALL)
-    if not json_match:
-        logging.error(f"Could not extract JSON from 'Create schedule policy' task output for policy {policy_name}.")
-        return None, None
-    raw_json = json_match.group(1).strip()
-
-    try:
-        decoder = json.JSONDecoder()
-        parsed_json, idx = decoder.raw_decode(raw_json)
+    parsed_json = extract_json_from_console(cleaned_output)
+    if parsed_json:
         logging.info(f"Created schedule policy successfully - {policy_name}")
+        # Try direct schedule_policy path first
         policy_uid = parsed_json.get("schedule_policy", {}).get("metadata", {}).get("uid")
+        # If not found, try results[0].schedule_policy path (for loop-based playbooks)
+        if not policy_uid and "results" in parsed_json and parsed_json["results"]:
+            policy_uid = parsed_json["results"][0].get("schedule_policy", {}).get("metadata", {}).get("uid")
         return policy_name, policy_uid
-    except json.JSONDecodeError as e:
-        logging.error(f"JSON parsing failed for policy {policy_name}: {str(e)}")
+    else:
+        logging.error(f"Could not extract JSON from Ansible output for policy {policy_name}.")
         return None, None
 
 
@@ -999,7 +996,7 @@ def create_vm_backup_schedule(vm, namespace: list, policy_name, policy_uid, back
 
     # Define backup config
     backup_object_type = {
-        "type": "VirtualMachine"
+        "type": "VM"
     }
 
     # Construct labels dictionary
@@ -1160,44 +1157,30 @@ def inspect_cluster(cluster_name, cluster_uid, dry_run=False):
     ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
     cleaned_output = ansi_escape.sub('', stdout_text)
 
-    # Find the JSON file path from the Ansible output
-    json_file_pattern = r"JSON file saved to:\s*(.+\.json)"
-    json_file_match = re.search(json_file_pattern, cleaned_output)
+    # Extract JSON from console output
+    parsed_data = extract_json_from_console(cleaned_output)
 
-    if not json_file_match:
-        raise ValueError("Could not find JSON output file path in Ansible output")
+    if parsed_data is None:
+        raise ValueError("Could not extract JSON from Ansible output")
 
-    json_file_path = json_file_match.group(1).strip()
+    # Handle loop output with 'results' array
+    if 'results' in parsed_data and parsed_data['results']:
+        first_result = parsed_data['results'][0]
+        cluster_data = first_result.get('cluster', {})
+    elif 'cluster' in parsed_data:
+        cluster_data = parsed_data['cluster']
+    else:
+        raise ValueError("No 'cluster' or 'results' key found in parsed output")
 
-    if not os.path.exists(json_file_path):
-        raise ValueError(f"JSON file not found: {json_file_path}")
+    # Handle nested cluster structure (cluster.cluster)
+    if isinstance(cluster_data, dict) and 'cluster' in cluster_data:
+        cluster_data = cluster_data['cluster']
 
-    # Read the JSON file generated by Ansible
-    try:
-        with open(json_file_path, 'r') as f:
-            parsed_data = json.load(f)
-
-        # Handle loop output with 'results' array
-        if 'results' in parsed_data and parsed_data['results']:
-            first_result = parsed_data['results'][0]
-            cluster_data = first_result.get('cluster', {})
-        elif 'cluster' in parsed_data:
-            cluster_data = parsed_data['cluster']
-        else:
-            raise ValueError("No 'cluster' or 'results' key found in parsed output")
-
-        # Handle nested cluster structure (cluster.cluster)
-        if isinstance(cluster_data, dict) and 'cluster' in cluster_data:
-            cluster_data = cluster_data['cluster']
-
-        output_file = f"cluster_data_{cluster_name}.json"
-        with open(output_file, "w") as json_file:
-            json.dump(cluster_data, json_file, indent=4)
-        logging.info(f"Extracted cluster data successfully.")
-        return output_file
-
-    except json.JSONDecodeError as e:
-        raise ValueError(f"JSON parsing failed: {str(e)}")
+    output_file = f"cluster_data_{cluster_name}.json"
+    with open(output_file, "w") as json_file:
+        json.dump(cluster_data, json_file, indent=4)
+    logging.info(f"Extracted cluster data successfully.")
+    return output_file
 
 
 def create_kubeconfig(cluster_file, dry_run=False):

@@ -99,6 +99,46 @@ def extract_json_array(text, key):
     return None
 
 
+def extract_json_from_console(cleaned_output):
+    """
+    Extracts JSON data from the Ansible output. First tries to read from a JSON file
+    if file output is enabled, otherwise extracts from console output.
+
+    Args:
+        cleaned_output (str): The cleaned Ansible output (ANSI codes removed).
+
+    Returns:
+        dict: Parsed JSON data, or None if extraction fails.
+    """
+    # First try to find JSON file path if file output is enabled
+    json_file_pattern = r"JSON file saved to:\s*(.+\.json)"
+    json_file_match = re.search(json_file_pattern, cleaned_output)
+    if json_file_match:
+        json_file_path = json_file_match.group(1).strip()
+        if os.path.exists(json_file_path):
+            try:
+                with open(json_file_path, 'r') as f:
+                    return json.load(f)
+            except json.JSONDecodeError as e:
+                logging.warning(f"Failed to parse JSON from file: {str(e)}")
+
+    # Fall back to extracting from console output
+    task_pattern = (
+        r"TASK \[Display as JSON\][\s\S]*?"
+        r"msg:\s*\|-?\s*\n([\s\S]*?)"
+        r"(?=Read `vars_file`|Read vars_file|\nTASK \[|\nPLAY RECAP|\Z)"
+    )
+    task_match = re.search(task_pattern, cleaned_output)
+    if task_match:
+        raw_json_lines = task_match.group(1).split('\n')
+        raw_json = '\n'.join(line.strip() for line in raw_json_lines if line.strip())
+        try:
+            return json.loads(raw_json)
+        except json.JSONDecodeError as e:
+            logging.warning(f"Failed to parse JSON from console output: {str(e)}")
+    return None
+
+
 def enumerate_cluster(cluster_name):
     logging.info("Running Ansible playbook for enumerate clusters")
 
@@ -121,32 +161,18 @@ def enumerate_cluster(cluster_name):
     ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
     cleaned_output = ansi_escape.sub('', stdout_text)
 
-    # Find the JSON file path from the Ansible output
-    json_file_pattern = r"JSON file saved to:\s*(.+\.json)"
-    json_file_match = re.search(json_file_pattern, cleaned_output)
+    # Extract JSON from console output
+    parsed_json = extract_json_from_console(cleaned_output)
 
-    if not json_file_match:
-        logging.error("Could not find JSON output file path in Ansible output.")
+    if parsed_json is None:
+        logging.error("Could not extract JSON from Ansible output.")
         exit(1)
 
-    json_file_path = json_file_match.group(1).strip()
-
-    if not os.path.exists(json_file_path):
-        logging.error(f"JSON file not found: {json_file_path}")
-        exit(1)
-
-    # Parse JSON and find the cluster
-    try:
-        with open(json_file_path, 'r') as f:
-            parsed_json = json.load(f)
-        # loop through the clusters and check if the cluster name is matching
-        for cluster in parsed_json.get("clusters", []):
-            if cluster.get("metadata", {}).get("name") == cluster_name:
-                cluster_uid = cluster.get("metadata", {}).get("uid")
-                return cluster_uid
-
-    except json.JSONDecodeError as e:
-        logging.error(f"JSON parsing failed: {str(e)}")
+    # loop through the clusters and check if the cluster name is matching
+    for cluster in parsed_json.get("clusters", []):
+        if cluster.get("metadata", {}).get("name") == cluster_name:
+            cluster_uid = cluster.get("metadata", {}).get("uid")
+            return cluster_uid
 
 def get_all_backups(cluster_name_filter, cluster_uid):
     logging.debug(f"[INFO] Running Ansible playbook for enumerate backups")
@@ -179,22 +205,20 @@ def get_all_backups(cluster_name_filter, cluster_uid):
     ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
     cleaned_output = ansi_escape.sub('', stdout_text)
 
-    # Find the JSON file path from the Ansible output
-    json_file_pattern = r"JSON file saved to:\s*(.+\.json)"
-    json_file_match = re.search(json_file_pattern, cleaned_output)
+    # Extract JSON from console output
+    parsed_json = extract_json_from_console(cleaned_output)
 
-    if not json_file_match:
-        logging.error("[ERROR] Could not find JSON output file path in Ansible output.")
+    if parsed_json is None:
+        logging.error("[ERROR] Could not extract JSON from Ansible output.")
         logging.debug(f"Ansible output: {cleaned_output}")
         exit(1)
 
-    json_file_path = json_file_match.group(1).strip()
+    # Save to a file for downstream processing
+    json_file_path = f"backups_{cluster_name_filter}_{cluster_uid}.json"
+    with open(json_file_path, 'w') as f:
+        json.dump(parsed_json, f, indent=4)
 
-    if not os.path.exists(json_file_path):
-        logging.error(f"[ERROR] JSON file not found: {json_file_path}")
-        exit(1)
-
-    logging.debug(f"[SUCCESS] Found backup data file: {json_file_path}")
+    logging.debug(f"[SUCCESS] Saved backup data to: {json_file_path}")
     return json_file_path
 
 
@@ -303,20 +327,18 @@ def inspect_backup(backup_name, backup_uid):
     ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
     cleaned_output = ansi_escape.sub('', stdout_text)
 
-    # Find the JSON file path from the Ansible output
-    json_file_pattern = r"JSON file saved to:\s*(.+\.json)"
-    json_file_match = re.search(json_file_pattern, cleaned_output)
+    # Extract JSON from console output
+    parsed_json = extract_json_from_console(cleaned_output)
 
-    if not json_file_match:
-        logging.error("Could not find JSON output file path in Ansible output.")
+    if parsed_json is None:
+        logging.error("Could not extract JSON from Ansible output.")
         logging.debug(f"Ansible output: {cleaned_output}")
         exit(1)
 
-    json_file_path = json_file_match.group(1).strip()
-
-    if not os.path.exists(json_file_path):
-        logging.error(f"JSON file not found: {json_file_path}")
-        exit(1)
+    # Save to a file for downstream processing
+    json_file_path = f"backup_data_{backup_name}_{backup_uid}.json"
+    with open(json_file_path, 'w') as f:
+        json.dump(parsed_json, f, indent=4)
 
     logging.info(f"Extracted backup data successfully. File: {json_file_path}")
     return json_file_path
@@ -413,28 +435,14 @@ def inspect_backup_schedule(name, uid, org_id="default", verbose=False):
         ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
         cleaned_output = ansi_escape.sub('', stdout_text)
 
-        # Find the JSON file path from the Ansible output
-        json_file_pattern = r"JSON file saved to:\s*(.+\.json)"
-        json_file_match = re.search(json_file_pattern, cleaned_output)
+        # Extract JSON from console output
+        parsed = extract_json_from_console(cleaned_output)
 
-        if not json_file_match:
-            logging.error("Could not find JSON output file path in Ansible output.")
+        if parsed is None:
+            logging.error("Could not extract JSON from Ansible output.")
             return {}
 
-        json_file_path = json_file_match.group(1).strip()
-
-        if not os.path.exists(json_file_path):
-            logging.error(f"JSON file not found: {json_file_path}")
-            return {}
-
-        # Parse JSON and return
-        try:
-            with open(json_file_path, 'r') as f:
-                parsed = json.load(f)
-            return parsed
-        except json.JSONDecodeError as exc:
-            logging.error(f"Failed to parse backup schedule JSON: {exc}")
-            return {}
+        return parsed
 
     except Exception as e:
         logging.error(f"Exception when inspecting backup schedule: {str(e)}")
@@ -656,46 +664,31 @@ def inspect_cluster(cluster_name):
     ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
     cleaned_output = ansi_escape.sub('', stdout_text)
 
-    # Find the JSON file path from the Ansible output
-    json_file_pattern = r"JSON file saved to:\s*(.+\.json)"
-    json_file_match = re.search(json_file_pattern, cleaned_output)
+    # Extract JSON from console output
+    parsed_data = extract_json_from_console(cleaned_output)
 
-    if not json_file_match:
-        logging.error("Could not find JSON output file path in Ansible output.")
+    if parsed_data is None:
+        logging.error("Could not extract JSON from Ansible output.")
         exit(1)
 
-    json_file_path = json_file_match.group(1).strip()
-
-    if not os.path.exists(json_file_path):
-        logging.error(f"JSON file not found: {json_file_path}")
+    # Handle loop output with 'results' array
+    if 'results' in parsed_data and parsed_data['results']:
+        first_result = parsed_data['results'][0]
+        cluster_data = first_result.get('cluster', {})
+    elif 'cluster' in parsed_data:
+        cluster_data = parsed_data['cluster']
+    else:
+        logging.error("No 'cluster' or 'results' key found in parsed output.")
         exit(1)
 
-    # Parse JSON and extract the cluster UID
-    try:
-        with open(json_file_path, 'r') as f:
-            parsed_data = json.load(f)
+    # Handle nested cluster structure (cluster.cluster)
+    if isinstance(cluster_data, dict) and 'cluster' in cluster_data:
+        cluster_data = cluster_data['cluster']
 
-        # Handle loop output with 'results' array
-        if 'results' in parsed_data and parsed_data['results']:
-            first_result = parsed_data['results'][0]
-            cluster_data = first_result.get('cluster', {})
-        elif 'cluster' in parsed_data:
-            cluster_data = parsed_data['cluster']
-        else:
-            logging.error("No 'cluster' or 'results' key found in parsed output.")
-            exit(1)
-
-        # Handle nested cluster structure (cluster.cluster)
-        if isinstance(cluster_data, dict) and 'cluster' in cluster_data:
-            cluster_data = cluster_data['cluster']
-
-        # UID is stored in metadata.uid
-        cluster_uid = cluster_data.get("metadata", {}).get("uid")
-        logging.debug("Extracted cluster data successfully.")
-        return cluster_uid
-
-    except json.JSONDecodeError as e:
-        logging.error(f"JSON parsing failed: {str(e)}")
+    # UID is stored in metadata.uid
+    cluster_uid = cluster_data.get("metadata", {}).get("uid")
+    logging.debug("Extracted cluster data successfully.")
+    return cluster_uid
 
 def map_failed_vms_by_namespace(data):
     failed_volume_map = defaultdict(set)
