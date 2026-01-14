@@ -3,6 +3,9 @@
 px_backup_api_url: "https://px-backup-svc-exposed.com"
 px_backup_token: "eyJhbGciOiJSUzI1..."  # Skip if providing username and password
 org_id: "default"
+
+# Authentication settings (only required if px_backup_token is NOT set above)
+# If px_backup_token is provided, the following auth settings are optional
 pxcentral_auth_url: "https://px-auth-svc-exposed.com"
 pxcentral_client_id: "client_id"
 pxcentral_username: "username"
