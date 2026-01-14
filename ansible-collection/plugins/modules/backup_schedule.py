@@ -190,7 +190,7 @@ options:
             type:
                 description: Type of backup object
                 type: str
-                choices: ['Invalid', 'NS', 'VM', 'All']
+                choices: ['Invalid', 'NS', 'VM', 'VirtualMachine', 'All']
                 required: true
     volume_snapshot_class_mapping:
         description: Volume Snapshot Class Mapping
@@ -953,7 +953,7 @@ def run_module():
             type='dict',
             required=False,
             options=dict(
-                type=dict(type='str', choices=['Invalid', 'NS', 'VM', 'All'], required=True),
+                type=dict(type='str', choices=['Invalid', 'NS', 'VM', 'VirtualMachine', 'All'], required=True),
             ),
         ),
         cluster_ref=dict(
