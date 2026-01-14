@@ -164,8 +164,26 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 | Parameter                     | Type   | Required | Default | Description                                          |
 | ------------------------------- | -------- | ---------- | --------- | ------------------------------------------------------ |
 | backup_object_type            | dict   | no       |         | Backup object configuration                          |
-| backup_object_type.type       | string | no       |         | Type of backup object (`Invalid`, `NS`, `VM`, `All`) |
+| backup_object_type.type       | string | no       |         | Type of backup object (see values below) |
 | volume_snapshot_class_mapping | dict   | no       |         | Volume snapshot class mappings                       |
+
+#### backup_object_type.type Values
+
+| Value           | Description                                                                 |
+| --------------- | --------------------------------------------------------------------------- |
+| `All`           | Backup all object types (Kubernetes resources and VMs)                      |
+| `VirtualMachine`| Backup virtual machine objects only (API-consistent value)                  |
+| `VM`            | Alias for `VirtualMachine` 
+| `NS`            | namespace backup (backs up all objects in namespace)     |
+| `Invalid`       | Invalid/unset backup object type                                            |
+
+> **Note:** Both `VirtualMachine` and `VM` are accepted and map to the same API value. Use `VirtualMachine` for consistency with the PX-Backup API, or `VM` as a shorthand alias.
+
+**Example:**
+```yaml
+backup_object_type:
+  type: "VirtualMachine"  # For VM-specific backups
+```
 
 ### Ownership Parameters
 
