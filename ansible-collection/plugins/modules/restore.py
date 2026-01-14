@@ -513,7 +513,9 @@ def enumerate_restores(module: AnsibleModule, client: PXBackupClient) -> List[Di
 
     # Add backup_object_type if provided
     if module.params.get('backup_object_type'):
-        params['enumerate_options.backup_object_type'] = module.params['backup_object_type']
+        backup_object_type = module.params['backup_object_type']
+        if isinstance(backup_object_type, dict) and backup_object_type.get('type'):
+            params['enumerate_options.backup_object_type'] = backup_object_type['type']
 
     if module.params.get('status'):
         params['enumerate_options.status'] = module.params['status']

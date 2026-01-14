@@ -7,6 +7,7 @@
       - pxcentral_username is defined
       - pxcentral_password is defined
     fail_msg: "Required variables must be defined"
+  when: px_backup_token is not defined  # Skip validation when token is already provided
 
 - name: Request bearer token
   auth:
