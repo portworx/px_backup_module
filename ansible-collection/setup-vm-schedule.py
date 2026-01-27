@@ -64,7 +64,12 @@ def generate_report(args, results=None, error=None, policy_result=None, vm_map=N
     report.append("COMMAND LINE ARGUMENTS:")
     report.append(f"  Cluster: {args.cluster_name}")
     report.append(f"  Backup Location: {args.backup_location}")
-    report.append(f"  Time Series: {args.time_series}")
+    if args.time_series:
+        report.append(f"  Time Series: {args.time_series}")
+    else:
+        report.append(f"  Start Time: {args.start_time}")
+        report.append(f"  Interval (minutes): {args.interval_minutes}")
+        report.append(f"  Number of Policies: {args.num_policies}")
     report.append(f"  Namespaces: {args.namespaces if args.namespaces else 'All namespaces'}")
     report.append(f"  Dry Run: {args.dry_run}")
     report.append("")
@@ -223,7 +228,12 @@ def print_summary(args, results=None, policy_result=None, vm_map=None):
     print(f"{'=' * 16:^80}")
     print(f"Cluster:         {args.cluster_name}")
     print(f"Backup Location: {args.backup_location}")
-    print(f"Time Series:     {args.time_series}")
+    if args.time_series:
+        print(f"Time Series:     {args.time_series}")
+    else:
+        print(f"Start Time:      {args.start_time}")
+        print(f"Interval (min):  {args.interval_minutes}")
+        print(f"Num Policies:    {args.num_policies}")
     print(f"Dry Run:         {'Yes' if args.dry_run else 'No'}")
     
     # Policy information
@@ -342,7 +352,12 @@ def log_summary(args, results=None, policy_result=None, vm_map=None):
     logging.info(f"{'=' * 16:^80}")
     logging.info(f"Cluster:         {args.cluster_name}")
     logging.info(f"Backup Location: {args.backup_location}")
-    logging.info(f"Time Series:     {args.time_series}")
+    if args.time_series:
+        logging.info(f"Time Series:     {args.time_series}")
+    else:
+        logging.info(f"Start Time:      {args.start_time}")
+        logging.info(f"Interval (min):  {args.interval_minutes}")
+        logging.info(f"Num Policies:    {args.num_policies}")
     logging.info(f"Dry Run:         {'Yes' if args.dry_run else 'No'}")
 
     if policy_result:
@@ -1101,7 +1116,7 @@ def inspect_cluster(cluster_name, cluster_uid, dry_run=False):
     logging.debug(f"Command completed with return code: {result.returncode}")
 
     if result.returncode != 0:
-        raise ValueError(f"Cluster inspection failed with return code {result.returncode}")
+        raise ValueError(f"Cluster inspection failed with return code {result.stdout}")
 
     stdout_text = result.stdout
     if not stdout_text:
@@ -1220,10 +1235,10 @@ def get_inventory(ns_list, kubeconfig_file, label_selector=None, dry_run=False):
         # Always load the actual inventory
         config.load_kube_config(kubeconfig_file)
         # Setup the cert
-        configuration = client.Configuration.get_default_copy()
-        configuration.ssl_ca_cert = "ca.crt"
-        api_client = client.ApiClient(configuration)
-        custom_api = client.CustomObjectsApi(api_client)
+        # configuration = client.Configuration.get_default_copy()
+        # configuration.ssl_ca_cert = "ca.crt"
+        # api_client = client.ApiClient(configuration)
+        custom_api = client.CustomObjectsApi()
 
         group = "kubevirt.io"
         version = "v1"
@@ -1293,7 +1308,49 @@ def parse_time_series(time_series):
         # Create datetime object with today's date and the specified time
         time_obj = datetime.now().replace(hour=hours, minute=minutes, second=0, microsecond=0)
         times.append(time_obj)
-    
+
+    return times
+
+
+def generate_time_series_from_interval(start_time_str, interval_minutes, num_policies):
+    """
+    Generate a list of times based on start time, interval, and number of policies.
+
+    Args:
+        start_time_str (str): Start time in 24-hour format (e.g., "0100" for 1:00 AM)
+        interval_minutes (int): Interval in minutes between each policy schedule time
+        num_policies (int): Number of schedule policies to create
+
+    Returns:
+        list: List of datetime objects representing the generated times
+    """
+    times = []
+
+    if not start_time_str or not interval_minutes or not num_policies:
+        return times
+
+    # Validate start time format
+    start_time_str = start_time_str.strip()
+    if not re.match(r'^([01][0-9]|2[0-3])([0-5][0-9])$', start_time_str):
+        logging.error(f"Invalid start time format: {start_time_str}. Expected format is HHMM in 24-hour format (e.g., 0100, 2345)")
+        return times
+
+    # Extract hours and minutes from start time
+    start_hours = int(start_time_str[:2])
+    start_minutes = int(start_time_str[2:])
+
+    # Create the start datetime object
+    start_time = datetime.now().replace(hour=start_hours, minute=start_minutes, second=0, microsecond=0)
+
+    # Generate times for each policy
+    for i in range(num_policies):
+        policy_time = start_time + timedelta(minutes=i * interval_minutes)
+        # Handle day overflow - wrap around to stay within a 24-hour period
+        if policy_time.hour >= 24 or (policy_time.day != start_time.day):
+            # Wrap around to the next day's equivalent time
+            policy_time = policy_time.replace(day=start_time.day)
+        times.append(policy_time)
+
     return times
 
 
@@ -1444,13 +1501,16 @@ def main():
     parser.add_argument("--cluster-uid", required=True, help="UID of the cluster to use (required)")
     parser.add_argument("--backup-location", required=True, help="Name of the backup location to use (required)")
     parser.add_argument("--namespaces", nargs="+", help="List of namespaces to check (e.g., 'ns1' 'ns2')")
-    parser.add_argument("--time-series", required=True, help="Comma-separated list of times in 24-hour format (e.g., '0100,0245,0350')")
+    parser.add_argument("--time-series", required=False, help="Comma-separated list of times in 24-hour format (e.g., '0100,0245,0350')")
+    parser.add_argument("--start-time", required=False, help="Start time in 24-hour format (e.g., '0100' for 1:00 AM)")
+    parser.add_argument("--interval-minutes", type=int, required=False, help="Interval in minutes between each policy schedule time")
+    parser.add_argument("--num-policies", type=int, required=False, help="Number of schedule policies to create (defaults to total VM count if not specified)")
     parser.add_argument("--output", type=str, default="vm_schedule_result.json", help="Output file for backup results")
     parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose logging")
     parser.add_argument('--csiDriver_map',"-d", type=str, help='Map input in the form csiDriver1:VSC1,csiDriver2:VSC2')
     parser.add_argument("--label-selector", help="Kubernetes label selector string, e.g., 'env=prod,app!=myapp'")
-    parser.add_argument("--use-label-mode", action="store_true", default=False, help="Use single label selector per backup schedule instead of per-VM scheduling"
-)
+    parser.add_argument("--use-label-mode", action="store_true", default=False, help="Use single label selector per backup schedule instead of per-VM scheduling")
+    parser.add_argument("--dry-run", action="store_true", default=False, help="Run in dry-run mode without making any changes")
 
     args = parser.parse_args()
 
@@ -1461,24 +1521,36 @@ def main():
         logging.error("--use-label-mode was specified but no --label-selector was provided.")
         sys.exit("Error: --use-label-mode requires --label-selector to be set.")
 
+    # Validate that either --time-series OR (--start-time, --interval-minutes) are provided
+    # Note: --num-policies is optional; if not provided, it defaults to the total number of VMs
+    has_time_series = args.time_series is not None
+    has_interval_args = args.start_time is not None and args.interval_minutes is not None
+
+    if not has_time_series and not has_interval_args:
+        sys.exit("Error: You must provide either --time-series OR (--start-time and --interval-minutes)")
+
+    if has_time_series and (args.start_time is not None or args.interval_minutes is not None or args.num_policies is not None):
+        sys.exit("Error: You cannot provide both --time-series and interval-based arguments (--start-time, --interval-minutes, --num-policies). Choose one method.")
+
     mode = "label" if args.use_label_mode else "vm"
 
-    # removing dry run option
-    args.dry_run = False
     if args.dry_run:
         logging.info("Running in DRY RUN mode. No changes will be made.")
     print(f"Logs are getting captured at {LOG_FILE}")
 
     try:
-        # Parse time series
-        time_series_str = args.time_series
-        time_series = parse_time_series(time_series_str)
-        
-        if not time_series:
-            raise ValueError("No valid times provided in time-series. Expected format is HHMM in 24-hour format (e.g., 0100,2345)")
-            
-        logging.info(f"Using time series: {', '.join(t.strftime('%H:%M') for t in time_series)}")
-        
+        # If using --time-series, parse it now
+        # If using interval-based args, we'll generate the time series after getting VM inventory
+        time_series = None
+        if has_time_series:
+            # Parse time series from comma-separated string
+            time_series_str = args.time_series
+            time_series = parse_time_series(time_series_str)
+
+            if not time_series:
+                raise ValueError("No valid times provided in time-series. Expected format is HHMM in 24-hour format (e.g., 0100,2345)")
+            logging.info(f"Using time series: {', '.join(t.strftime('%H:%M') for t in time_series)}")
+
         # Get cluster info
         cluster_name = args.cluster_name
         cluster_uid = args.cluster_uid
@@ -1518,11 +1590,11 @@ def main():
                     # Load the kubeconfig
                     config.load_kube_config(kubeconfig_file)
                     # Setup the cert
-                    configuration = client.Configuration.get_default_copy()
-                    configuration.ssl_ca_cert = "ca.crt"
-                    api_client = client.ApiClient(configuration)
+                    # configuration = client.Configuration.get_default_copy()
+                    # configuration.ssl_ca_cert = "ca.crt"
+                    # api_client = client.ApiClient(configuration)
                     # Create the API client
-                    v1 = client.CoreV1Api(api_client)
+                    v1 = client.CoreV1Api()
                     # List all namespaces
                     namespaces = v1.list_namespace()
                     ns_list = [ns.metadata.name for ns in namespaces.items]
@@ -1536,14 +1608,31 @@ def main():
                 ns_list = ["default", "kube-system"]
                 
         vm_map = get_inventory(ns_list, kubeconfig_file, args.label_selector , dry_run=args.dry_run)
-        
+
         # Count total VMs
         total_vm_count = sum(len(vms) for vms in vm_map.values())
         logging.info(f"Found {total_vm_count} VMs across namespaces")
-        
+
         if total_vm_count == 0:
             raise ValueError(f"No VMs found in the specified namespaces. [{','.join(ns_list)}] Please verify the cluster has virtual machines.")
-        
+
+        # If using interval-based scheduling, generate time series now that we know the VM count
+        if time_series is None:
+            # Determine number of policies: use --num-policies if provided, otherwise use total VM count
+            num_policies = args.num_policies if args.num_policies is not None else total_vm_count
+            logging.info(f"Using {num_policies} policies (--num-policies={'specified' if args.num_policies else 'defaulted to VM count'})")
+
+            time_series = generate_time_series_from_interval(
+                args.start_time,
+                args.interval_minutes,
+                num_policies
+            )
+
+            if not time_series:
+                raise ValueError("Failed to generate time series from provided arguments. Check --start-time format (HHMM) and --interval-minutes values.")
+
+            logging.info(f"Using time series: {', '.join(t.strftime('%H:%M') for t in time_series)}")
+
         # Create policies for time series
         policy_result = create_policies_for_time_series(time_series, dry_run=args.dry_run)
         
