@@ -38,122 +38,6 @@ logging.basicConfig(
 )
 
 
-def extract_json_object(text, key):
-    """
-    Extract a JSON object for a given key from text using brace matching.
-
-    Args:
-        text: The text to search in
-        key: The JSON key to find (e.g., "cluster", "backup")
-
-    Returns:
-        The extracted JSON string, or None if not found
-    """
-    # Find the key pattern: "key": {
-    pattern = rf'"{key}"\s*:\s*\{{'
-    match = re.search(pattern, text)
-    if not match:
-        return None
-
-    # Find the opening brace position
-    brace_start = text.find('{', match.start())
-    if brace_start == -1:
-        return None
-
-    # Use brace matching to find the complete JSON object
-    brace_depth = 0
-    i = brace_start
-    while i < len(text):
-        if text[i] == '{':
-            brace_depth += 1
-        elif text[i] == '}':
-            brace_depth -= 1
-            if brace_depth == 0:
-                # Found matching closing brace
-                return text[brace_start:i + 1]
-        i += 1
-
-    return None
-
-
-def extract_json_array(text, key):
-    """
-    Extract a JSON array for a given key from text using bracket matching.
-
-    Args:
-        text: The text to search in
-        key: The JSON key to find (e.g., "clusters", "backups")
-
-    Returns:
-        The extracted JSON string, or None if not found
-    """
-    # Find the key pattern: "key": [
-    pattern = rf'"{key}"\s*:\s*\['
-    match = re.search(pattern, text)
-    if not match:
-        return None
-
-    # Find the opening bracket position
-    bracket_start = text.find('[', match.start())
-    if bracket_start == -1:
-        return None
-
-    # Use bracket matching to find the complete JSON array
-    bracket_depth = 0
-    i = bracket_start
-    while i < len(text):
-        if text[i] == '[':
-            bracket_depth += 1
-        elif text[i] == ']':
-            bracket_depth -= 1
-            if bracket_depth == 0:
-                # Found matching closing bracket
-                return text[bracket_start:i + 1]
-        i += 1
-
-    return None
-
-
-def extract_json_from_console(cleaned_output):
-    """
-    Extracts JSON data from the Ansible output. First tries to read from a JSON file
-    if file output is enabled, otherwise extracts from console output.
-
-    Args:
-        cleaned_output (str): The cleaned Ansible output (ANSI codes removed).
-
-    Returns:
-        dict: Parsed JSON data, or None if extraction fails.
-    """
-    # First try to find JSON file path if file output is enabled
-    json_file_pattern = r"JSON file saved to:\s*(.+\.json)"
-    json_file_match = re.search(json_file_pattern, cleaned_output)
-    if json_file_match:
-        json_file_path = json_file_match.group(1).strip()
-        if os.path.exists(json_file_path):
-            try:
-                with open(json_file_path, 'r') as f:
-                    return json.load(f)
-            except json.JSONDecodeError as e:
-                logging.warning(f"Failed to parse JSON from file: {str(e)}")
-
-    # Fall back to extracting from console output
-    task_pattern = (
-        r"TASK \[Display as JSON\][\s\S]*?"
-        r"msg:\s*\|-?\s*\n([\s\S]*?)"
-        r"(?=Read `vars_file`|Read vars_file|\nTASK \[|\nPLAY RECAP|\Z)"
-    )
-    task_match = re.search(task_pattern, cleaned_output)
-    if task_match:
-        raw_json_lines = task_match.group(1).split('\n')
-        raw_json = '\n'.join(line.strip() for line in raw_json_lines if line.strip())
-        try:
-            return json.loads(raw_json)
-        except json.JSONDecodeError as e:
-            logging.warning(f"Failed to parse JSON from console output: {str(e)}")
-    return None
-
-
 def generate_report(args, results=None, error=None, policy_result=None, vm_map=None):
     """
     Generate a report of the script execution
@@ -180,7 +64,12 @@ def generate_report(args, results=None, error=None, policy_result=None, vm_map=N
     report.append("COMMAND LINE ARGUMENTS:")
     report.append(f"  Cluster: {args.cluster_name}")
     report.append(f"  Backup Location: {args.backup_location}")
-    report.append(f"  Time Series: {args.time_series}")
+    if args.time_series:
+        report.append(f"  Time Series: {args.time_series}")
+    else:
+        report.append(f"  Start Time: {args.start_time}")
+        report.append(f"  Interval (minutes): {args.interval_minutes}")
+        report.append(f"  Number of Policies: {args.num_policies}")
     report.append(f"  Namespaces: {args.namespaces if args.namespaces else 'All namespaces'}")
     report.append(f"  Dry Run: {args.dry_run}")
     report.append("")
@@ -339,7 +228,12 @@ def print_summary(args, results=None, policy_result=None, vm_map=None):
     print(f"{'=' * 16:^80}")
     print(f"Cluster:         {args.cluster_name}")
     print(f"Backup Location: {args.backup_location}")
-    print(f"Time Series:     {args.time_series}")
+    if args.time_series:
+        print(f"Time Series:     {args.time_series}")
+    else:
+        print(f"Start Time:      {args.start_time}")
+        print(f"Interval (min):  {args.interval_minutes}")
+        print(f"Num Policies:    {args.num_policies}")
     print(f"Dry Run:         {'Yes' if args.dry_run else 'No'}")
     
     # Policy information
@@ -458,7 +352,12 @@ def log_summary(args, results=None, policy_result=None, vm_map=None):
     logging.info(f"{'=' * 16:^80}")
     logging.info(f"Cluster:         {args.cluster_name}")
     logging.info(f"Backup Location: {args.backup_location}")
-    logging.info(f"Time Series:     {args.time_series}")
+    if args.time_series:
+        logging.info(f"Time Series:     {args.time_series}")
+    else:
+        logging.info(f"Start Time:      {args.start_time}")
+        logging.info(f"Interval (min):  {args.interval_minutes}")
+        logging.info(f"Num Policies:    {args.num_policies}")
     logging.info(f"Dry Run:         {'Yes' if args.dry_run else 'No'}")
 
     if policy_result:
@@ -718,14 +617,52 @@ def enumerate_backup_locations(name_filter=None, dry_run=False):
     ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
     cleaned_output = ansi_escape.sub('', stdout_text)
 
-    # Extract JSON from console output
-    parsed_data = extract_json_from_console(cleaned_output)
-
-    if parsed_data is None:
-        logging.error("Could not extract JSON from Ansible output")
+    task_pattern = (
+        r"(TASK \[Backup Location Enumerate call\][\s\S]*?)"
+        r"(?=TASK \[|PLAY RECAP|$)"
+    )
+    task_match = re.search(task_pattern, cleaned_output)
+    if not task_match:
+        logging.error("Could not find 'TASK [Backup Location Enumerate call]' block in the output.")
         return {}
 
-    return parsed_data
+    task_block = task_match.group(1)
+
+    start_pattern = r'"backup_locations"\s*:\s*\['
+    start_match = re.search(start_pattern, task_block)
+    if not start_match:
+        logging.error("No 'backup_locations' array found in 'TASK [Backup Location Enumerate call]' block.")
+        return {}
+
+    start_index = task_block.find('[', start_match.start())
+    if start_index == -1:
+        logging.error("Could not find '[' after 'backup_locations':")
+        return {}
+
+    bracket_depth = 0
+    i = start_index
+    while i < len(task_block):
+        if task_block[i] == '[':
+            bracket_depth += 1
+        elif task_block[i] == ']':
+            bracket_depth -= 1
+            if bracket_depth == 0:
+                break
+        i += 1
+
+    if bracket_depth != 0:
+        logging.error("Mismatched brackets in 'backup_locations' JSON array.")
+        return {}
+
+    array_snippet = task_block[start_index: i + 1]
+    wrapped_json = '{ "backup_locations": ' + array_snippet + ' }'
+
+    try:
+        parsed = json.loads(wrapped_json)
+        return parsed
+    except json.JSONDecodeError as exc:
+        logging.error(f"Failed to parse 'backup_locations' JSON: {exc}")
+        return {}
 
 
 def get_backup_location_by_name(location_name, dry_run=False):
@@ -805,20 +742,45 @@ def enumerate_schedule_policies(name_filter=None, dry_run=False):
     
     # Extract schedule policies from output
     stdout_text = result.stdout
-
-    # Remove ANSI escape codes
-    ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
-    cleaned_output = ansi_escape.sub('', stdout_text)
-
-    # Extract JSON from console output
-    parsed_data = extract_json_from_console(cleaned_output)
-
-    if parsed_data is None:
-        logging.error("Could not extract JSON from Ansible output")
+    
+    # Look for the schedule policies task output - match various possible task names
+    task_match = re.search(r"TASK \[(Enumerate schedule policies|Schedule Policy Enumerate call)].*?\n(.*?)\nTASK ", stdout_text, re.DOTALL)
+    if not task_match:
+        # Try looking for it at the end of the output (last task)
+        task_match = re.search(r"TASK \[(Enumerate schedule policies|Schedule Policy Enumerate call)].*?\n(.*?)$", stdout_text, re.DOTALL)
+        if not task_match:
+            logging.warning("Could not find schedule policies task output, trying alternative pattern")
+            # Try another pattern - look for schedule_policies in the output anywhere
+            json_match = re.search(r'"schedule_policies"\s*:\s*(\[.*?\])', stdout_text, re.DOTALL)
+            if json_match:
+                try:
+                    policies_json = json_match.group(1)
+                    policies = json.loads(policies_json)
+                    return policies
+                except json.JSONDecodeError as e:
+                    logging.error(f"Failed to parse schedule policies JSON: {e}")
+                    return []
+            logging.error("Could not extract schedule policies from output")
+            return []
+    
+    task_output = task_match.group(2)
+    
+    # Try to extract JSON
+    json_match = re.search(r'"schedule_policies"\s*:\s*(\[.*?\])', task_output, re.DOTALL)
+    if not json_match:
+        # Try to find the schedule_policies JSON in the entire output as a fallback
+        json_match = re.search(r'"schedule_policies"\s*:\s*(\[.*?\])', stdout_text, re.DOTALL)
+        if not json_match:
+            logging.error("Could not extract schedule policies list from task output")
+            return []
+    
+    try:
+        policies_json = json_match.group(1)
+        policies = json.loads(policies_json)
+        return policies
+    except json.JSONDecodeError as e:
+        logging.error(f"Failed to parse schedule policies JSON: {e}")
         return []
-
-    policies = parsed_data.get('schedule_policies', [])
-    return policies
 
 
 def check_policy_exists(policy_name, dry_run=False):
@@ -921,21 +883,28 @@ def create_schedule_policy(policy_name, policy_time, dry_run=False):
         logging.error(f"No output from Ansible playbook for policy {policy_name}.")
         return None, None
 
-    # Clean ANSI codes and extract JSON
-    ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
-    cleaned_output = ansi_escape.sub('', stdout_text)
+    # Locate the "Create schedule policy" task output
+    task_match = re.search(r"TASK \[Create schedule policy].*?\n(.*?)\nTASK ", stdout_text, re.DOTALL)
+    if not task_match:
+        logging.error(f"Could not find 'Create schedule policy' task output for policy {policy_name}.")
+        return None, None
+    task_output = task_match.group(1)
 
-    parsed_json = extract_json_from_console(cleaned_output)
-    if parsed_json:
+    # Extract JSON from the task output
+    json_match = re.search(r'(\{.*\})', task_output, re.DOTALL)
+    if not json_match:
+        logging.error(f"Could not extract JSON from 'Create schedule policy' task output for policy {policy_name}.")
+        return None, None
+    raw_json = json_match.group(1).strip()
+
+    try:
+        decoder = json.JSONDecoder()
+        parsed_json, idx = decoder.raw_decode(raw_json)
         logging.info(f"Created schedule policy successfully - {policy_name}")
-        # Try direct schedule_policy path first
         policy_uid = parsed_json.get("schedule_policy", {}).get("metadata", {}).get("uid")
-        # If not found, try results[0].schedule_policy path (for loop-based playbooks)
-        if not policy_uid and "results" in parsed_json and parsed_json["results"]:
-            policy_uid = parsed_json["results"][0].get("schedule_policy", {}).get("metadata", {}).get("uid")
         return policy_name, policy_uid
-    else:
-        logging.error(f"Could not extract JSON from Ansible output for policy {policy_name}.")
+    except json.JSONDecodeError as e:
+        logging.error(f"JSON parsing failed for policy {policy_name}: {str(e)}")
         return None, None
 
 
@@ -1147,40 +1116,37 @@ def inspect_cluster(cluster_name, cluster_uid, dry_run=False):
     logging.debug(f"Command completed with return code: {result.returncode}")
 
     if result.returncode != 0:
-        raise ValueError(f"Cluster inspection failed with return code {result.returncode}")
+        raise ValueError(f"Cluster inspection failed with return code {result.stdout}")
 
     stdout_text = result.stdout
     if not stdout_text:
         raise ValueError("No output from Ansible playbook")
 
-    # Remove ANSI escape codes
-    ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
-    cleaned_output = ansi_escape.sub('', stdout_text)
+    # Step 1: Locate the "Get cluster details" task output
+    task_match = re.search(r"TASK \[Get cluster details].*?\n(.*?)\nTASK ", stdout_text, re.DOTALL)
+    if not task_match:
+        raise ValueError("Could not find 'Get cluster details' task output")
 
-    # Extract JSON from console output
-    parsed_data = extract_json_from_console(cleaned_output)
+    task_output = task_match.group(1)
 
-    if parsed_data is None:
-        raise ValueError("Could not extract JSON from Ansible output")
+    # Step 2: Extract JSON between "cluster" and "clusters"
+    json_match = re.search(r'"cluster"\s*:\s*({.*?})\s*,\s*"clusters"', task_output, re.DOTALL)
+    if not json_match:
+        raise ValueError("Could not extract JSON between 'cluster' and 'clusters'")
 
-    # Handle loop output with 'results' array
-    if 'results' in parsed_data and parsed_data['results']:
-        first_result = parsed_data['results'][0]
-        cluster_data = first_result.get('cluster', {})
-    elif 'cluster' in parsed_data:
-        cluster_data = parsed_data['cluster']
-    else:
-        raise ValueError("No 'cluster' or 'results' key found in parsed output")
+    raw_json = json_match.group(1)
 
-    # Handle nested cluster structure (cluster.cluster)
-    if isinstance(cluster_data, dict) and 'cluster' in cluster_data:
-        cluster_data = cluster_data['cluster']
+    # Step 3: Parse JSON and save to file
+    try:
+        parsed_json = json.loads(raw_json)
+        output_file = f"cluster_data_{cluster_name}.json"
+        with open(output_file, "w") as json_file:
+            json.dump(parsed_json, json_file, indent=4)
+        logging.info(f"Extracted cluster data successfully.")
+        return output_file
 
-    output_file = f"cluster_data_{cluster_name}.json"
-    with open(output_file, "w") as json_file:
-        json.dump(cluster_data, json_file, indent=4)
-    logging.info(f"Extracted cluster data successfully.")
-    return output_file
+    except json.JSONDecodeError as e:
+        raise ValueError(f"JSON parsing failed: {str(e)}")
 
 
 def create_kubeconfig(cluster_file, dry_run=False):
@@ -1207,27 +1173,21 @@ def create_kubeconfig(cluster_file, dry_run=False):
         try:
             with open(cluster_file, 'r') as f:
                 data = json.load(f)
-                # Handle both nested and flat structures
-                if "cluster" in data:
-                    cluster_name = data.get("cluster", {}).get("metadata", {}).get("name", "dryrun")
-                else:
-                    cluster_name = data.get("metadata", {}).get("name", "dryrun")
+                cluster_name = data.get("cluster", {}).get("metadata", {}).get("name", "dryrun")
         except:
             pass
         return f"{cluster_name}_kubeconfig"
-
+        
     try:
         # Load the JSON data from the file
         with open(cluster_file, 'r') as f:
             data = json.load(f)
 
-        # Handle both nested (data.cluster.metadata) and flat (data.metadata) structures
-        if "cluster" in data:
-            cluster_name = data.get("cluster", {}).get("metadata", {}).get("name", "unknown")
-            kubeconfig_b64 = data.get("cluster", {}).get("clusterInfo", {}).get("kubeconfig", "")
-        else:
-            cluster_name = data.get("metadata", {}).get("name", "unknown")
-            kubeconfig_b64 = data.get("clusterInfo", {}).get("kubeconfig", "")
+        # Extract the cluster name from metadata; default to "unknown" if not present
+        cluster_name = data.get("cluster", {}).get("metadata", {}).get("name", "unknown")
+
+        # Extract the base64 encoded kubeconfig text from the clusterinfo section
+        kubeconfig_b64 = data.get("cluster", {}).get("clusterInfo", {}).get("kubeconfig", "")
 
         if not kubeconfig_b64:
             raise ValueError("No kubeconfig data found in the cluster file")
@@ -1274,7 +1234,10 @@ def get_inventory(ns_list, kubeconfig_file, label_selector=None, dry_run=False):
     try:
         # Always load the actual inventory
         config.load_kube_config(kubeconfig_file)
-        # Use the configuration from the loaded kubeconfig (which has embedded certs)
+        # Setup the cert
+        # configuration = client.Configuration.get_default_copy()
+        # configuration.ssl_ca_cert = "ca.crt"
+        # api_client = client.ApiClient(configuration)
         custom_api = client.CustomObjectsApi()
 
         group = "kubevirt.io"
@@ -1345,7 +1308,49 @@ def parse_time_series(time_series):
         # Create datetime object with today's date and the specified time
         time_obj = datetime.now().replace(hour=hours, minute=minutes, second=0, microsecond=0)
         times.append(time_obj)
-    
+
+    return times
+
+
+def generate_time_series_from_interval(start_time_str, interval_minutes, num_policies):
+    """
+    Generate a list of times based on start time, interval, and number of policies.
+
+    Args:
+        start_time_str (str): Start time in 24-hour format (e.g., "0100" for 1:00 AM)
+        interval_minutes (int): Interval in minutes between each policy schedule time
+        num_policies (int): Number of schedule policies to create
+
+    Returns:
+        list: List of datetime objects representing the generated times
+    """
+    times = []
+
+    if not start_time_str or not interval_minutes or not num_policies:
+        return times
+
+    # Validate start time format
+    start_time_str = start_time_str.strip()
+    if not re.match(r'^([01][0-9]|2[0-3])([0-5][0-9])$', start_time_str):
+        logging.error(f"Invalid start time format: {start_time_str}. Expected format is HHMM in 24-hour format (e.g., 0100, 2345)")
+        return times
+
+    # Extract hours and minutes from start time
+    start_hours = int(start_time_str[:2])
+    start_minutes = int(start_time_str[2:])
+
+    # Create the start datetime object
+    start_time = datetime.now().replace(hour=start_hours, minute=start_minutes, second=0, microsecond=0)
+
+    # Generate times for each policy
+    for i in range(num_policies):
+        policy_time = start_time + timedelta(minutes=i * interval_minutes)
+        # Handle day overflow - wrap around to stay within a 24-hour period
+        if policy_time.hour >= 24 or (policy_time.day != start_time.day):
+            # Wrap around to the next day's equivalent time
+            policy_time = policy_time.replace(day=start_time.day)
+        times.append(policy_time)
+
     return times
 
 
@@ -1374,10 +1379,10 @@ def create_policies_for_time_series(time_series, dry_run=False):
         policy_name = f"pxb-{time_str}"
         all_policy_names.append(policy_name)
         
-        exists, uid = check_policy_exists(policy_name, dry_run=dry_run)
-        if exists:
-            existing_policies.append(policy_name)
-            existing_policies_details.append((policy_name, uid))
+        # exists, uid = check_policy_exists(policy_name, dry_run=dry_run)
+        # if exists:
+        #     existing_policies.append(policy_name)
+        #     existing_policies_details.append((policy_name, uid))
     
     if existing_policies:
         error_msg = f"The following schedule policies already exist: {', '.join(existing_policies)}"
@@ -1496,13 +1501,16 @@ def main():
     parser.add_argument("--cluster-uid", required=True, help="UID of the cluster to use (required)")
     parser.add_argument("--backup-location", required=True, help="Name of the backup location to use (required)")
     parser.add_argument("--namespaces", nargs="+", help="List of namespaces to check (e.g., 'ns1' 'ns2')")
-    parser.add_argument("--time-series", required=True, help="Comma-separated list of times in 24-hour format (e.g., '0100,0245,0350')")
+    parser.add_argument("--time-series", required=False, help="Comma-separated list of times in 24-hour format (e.g., '0100,0245,0350')")
+    parser.add_argument("--start-time", required=False, help="Start time in 24-hour format (e.g., '0100' for 1:00 AM)")
+    parser.add_argument("--interval-minutes", type=int, required=False, help="Interval in minutes between each policy schedule time")
+    parser.add_argument("--num-policies", type=int, required=False, help="Number of schedule policies to create (defaults to total VM count if not specified)")
     parser.add_argument("--output", type=str, default="vm_schedule_result.json", help="Output file for backup results")
     parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose logging")
     parser.add_argument('--csiDriver_map',"-d", type=str, help='Map input in the form csiDriver1:VSC1,csiDriver2:VSC2')
     parser.add_argument("--label-selector", help="Kubernetes label selector string, e.g., 'env=prod,app!=myapp'")
-    parser.add_argument("--use-label-mode", action="store_true", default=False, help="Use single label selector per backup schedule instead of per-VM scheduling"
-)
+    parser.add_argument("--use-label-mode", action="store_true", default=False, help="Use single label selector per backup schedule instead of per-VM scheduling")
+    parser.add_argument("--dry-run", action="store_true", default=False, help="Run in dry-run mode without making any changes")
 
     args = parser.parse_args()
 
@@ -1513,24 +1521,36 @@ def main():
         logging.error("--use-label-mode was specified but no --label-selector was provided.")
         sys.exit("Error: --use-label-mode requires --label-selector to be set.")
 
+    # Validate that either --time-series OR (--start-time, --interval-minutes) are provided
+    # Note: --num-policies is optional; if not provided, it defaults to the total number of VMs
+    has_time_series = args.time_series is not None
+    has_interval_args = args.start_time is not None and args.interval_minutes is not None
+
+    if not has_time_series and not has_interval_args:
+        sys.exit("Error: You must provide either --time-series OR (--start-time and --interval-minutes)")
+
+    if has_time_series and (args.start_time is not None or args.interval_minutes is not None or args.num_policies is not None):
+        sys.exit("Error: You cannot provide both --time-series and interval-based arguments (--start-time, --interval-minutes, --num-policies). Choose one method.")
+
     mode = "label" if args.use_label_mode else "vm"
 
-    # removing dry run option
-    args.dry_run = False
     if args.dry_run:
         logging.info("Running in DRY RUN mode. No changes will be made.")
     print(f"Logs are getting captured at {LOG_FILE}")
 
     try:
-        # Parse time series
-        time_series_str = args.time_series
-        time_series = parse_time_series(time_series_str)
-        
-        if not time_series:
-            raise ValueError("No valid times provided in time-series. Expected format is HHMM in 24-hour format (e.g., 0100,2345)")
-            
-        logging.info(f"Using time series: {', '.join(t.strftime('%H:%M') for t in time_series)}")
-        
+        # If using --time-series, parse it now
+        # If using interval-based args, we'll generate the time series after getting VM inventory
+        time_series = None
+        if has_time_series:
+            # Parse time series from comma-separated string
+            time_series_str = args.time_series
+            time_series = parse_time_series(time_series_str)
+
+            if not time_series:
+                raise ValueError("No valid times provided in time-series. Expected format is HHMM in 24-hour format (e.g., 0100,2345)")
+            logging.info(f"Using time series: {', '.join(t.strftime('%H:%M') for t in time_series)}")
+
         # Get cluster info
         cluster_name = args.cluster_name
         cluster_uid = args.cluster_uid
@@ -1569,7 +1589,11 @@ def main():
                 try:
                     # Load the kubeconfig
                     config.load_kube_config(kubeconfig_file)
-                    # Use the configuration from the loaded kubeconfig (which has embedded certs)
+                    # Setup the cert
+                    # configuration = client.Configuration.get_default_copy()
+                    # configuration.ssl_ca_cert = "ca.crt"
+                    # api_client = client.ApiClient(configuration)
+                    # Create the API client
                     v1 = client.CoreV1Api()
                     # List all namespaces
                     namespaces = v1.list_namespace()
@@ -1584,14 +1608,31 @@ def main():
                 ns_list = ["default", "kube-system"]
                 
         vm_map = get_inventory(ns_list, kubeconfig_file, args.label_selector , dry_run=args.dry_run)
-        
+
         # Count total VMs
         total_vm_count = sum(len(vms) for vms in vm_map.values())
         logging.info(f"Found {total_vm_count} VMs across namespaces")
-        
+
         if total_vm_count == 0:
             raise ValueError(f"No VMs found in the specified namespaces. [{','.join(ns_list)}] Please verify the cluster has virtual machines.")
-        
+
+        # If using interval-based scheduling, generate time series now that we know the VM count
+        if time_series is None:
+            # Determine number of policies: use --num-policies if provided, otherwise use total VM count
+            num_policies = args.num_policies if args.num_policies is not None else total_vm_count
+            logging.info(f"Using {num_policies} policies (--num-policies={'specified' if args.num_policies else 'defaulted to VM count'})")
+
+            time_series = generate_time_series_from_interval(
+                args.start_time,
+                args.interval_minutes,
+                num_policies
+            )
+
+            if not time_series:
+                raise ValueError("Failed to generate time series from provided arguments. Check --start-time format (HHMM) and --interval-minutes values.")
+
+            logging.info(f"Using time series: {', '.join(t.strftime('%H:%M') for t in time_series)}")
+
         # Create policies for time series
         policy_result = create_policies_for_time_series(time_series, dry_run=args.dry_run)
         
