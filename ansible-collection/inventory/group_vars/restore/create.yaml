@@ -299,3 +299,35 @@ restores:
           - "v1/Secret"
           - "v1/PersistentVolumeClaim"
         resource_name_pattern: "app-*"
+
+  # Example restore 13: Restore with backup_object_type
+  # This example restores from a namespace backup (backup_object_type: All)
+  - name: "namespace-backup-restore"
+    backup_ref:
+      name: "one"
+    cluster_ref:
+      name: "one"
+    backup_object_type:
+      type: "All" 
+    namespace_mapping:
+      "default": "default"
+    storage_class_mapping:
+      "csi.vsphere.vmware.com": "csi-vsphere-vsc"
+      "pxd.portworx.com": "px-csi-snapclass"
+    replace_policy: "Retain"
+
+  # Example restore 14: VM backup restore with backup_object_type 
+  - name: "vm-backup-restore"
+    backup_ref:
+      name: "vm-backup-prod"
+    cluster_ref:
+      name: "vm-cluster"
+    backup_object_type:
+      type: "VirtualMachine" 
+    filter:
+      virtual_machine_filter:
+        vm_name_pattern: "*"
+    virtual_machine_restore_options:
+      skip_mac_masking: false
+      skip_vm_restart: false
+    replace_policy: "Retain"
