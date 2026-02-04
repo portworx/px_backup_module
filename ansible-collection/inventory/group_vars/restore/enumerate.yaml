@@ -15,9 +15,9 @@ status:                # Filter by backup status
 
 # Filter by backup object type
 # Can be "All" or "VirtualMachine"
-# backup_object_type: 
-#   type: "All"         
-backup_object_type: "All"
+backup_object_type: 
+  type: "All"         
+
 #
 # Filter can be used to avoid information overload,
 exclude_failed_resource: true
