@@ -352,6 +352,19 @@ options:
                 description: Skip VM restart during virtual machine restore
                 type: bool
                 default: false
+    backup_object_type:
+        description: Type of backup objects to restore
+        type: dict
+        required: false
+        suboptions:
+            type:
+                description:
+                    - Backup object type
+                    - "VirtualMachine for VM workloads"
+                    - "All for both VM & namespace"
+                type: str
+                required: true
+                choices: ['Invalid', 'All', 'VirtualMachine']
     ssl_config:
         description:
             - SSL configuration dictionary containing certificate settings
@@ -654,9 +667,6 @@ def build_restore_request(params: Dict[str, Any], module: AnsibleModule, client:
     if params.get('include_optional_resource_types'):
         request["include_optional_resource_types"] = params['include_optional_resource_types']
 
-    if params.get('backup_object_type'):
-        request["backup_object_type"] = params['backup_object_type']
-
     # Add new exclude_resources parameter
     if params.get('exclude_resources'):
         request["exclude_resources"] = params['exclude_resources']
@@ -729,7 +739,14 @@ def build_restore_request(params: Dict[str, Any], module: AnsibleModule, client:
             'All': 1,
             'VirtualMachine': 2
         }
-        request['backup_object_type'] = backup_object_type_map.get(params['backup_object_type'], 0)
+        # Extract the type value from the dict
+        backup_object_type = params['backup_object_type']
+        if isinstance(backup_object_type, dict) and backup_object_type.get('type'):
+            backup_object_type_str = backup_object_type['type']
+            type_value = backup_object_type_map.get(backup_object_type_str, 0)
+            request['backup_object_type'] = {"type": type_value}
+        else:
+            request['backup_object_type'] = {"type": 0}
 
     return request
 
