@@ -90,27 +90,21 @@ options:
                 description: UID of the backup
                 type: str
     rancher_project_mapping:
-        description: Rancher project mapping
+        description:
+            - Mapping of rancher projects from the backup to which restore should be done
+            - Format is source_project_id:target_project_id
+            - Can specify multiple project mappings
+            - 'Example: {"c-abc123:p-xyz789": "c-def456:p-uvw012", "c-abc123:p-xyz790": "c-def456:p-uvw013"}'
         type: dict
         required: false
-        suboptions:
-            key:
-                description: Source rancher project
-                type: str
-            value:
-                description: Destination rancher project
-                type: str
     rancher_project_name_mapping:
-        description: Rancher project name mapping
+        description:
+            - Mapping of source rancher project display names to target rancher project display names
+            - Format is source_project_name:target_project_name
+            - Can specify multiple project name mappings
+            - 'Example: {"Production Project": "DR Production Project", "Staging Project": "DR Staging Project"}'
         type: dict
         required: false
-        suboptions:
-            key:
-                description: Source rancher project name
-                type: str
-            value:
-                description: Destination rancher project name
-                type: str
     cluster_ref:
         description: Reference to cluster
         type: dict
@@ -266,13 +260,49 @@ options:
     namespace_mapping:
         description:
             - Mapping of source and destination namespaces during restore
+            - Should be used only when restore is done WITHOUT using filter
+            - Mutually exclusive with target_namespace_prefix
             - Set namespace_mapping equal if is_sfr is set to true
+            - 'Example: {"source-ns": "target-ns", "app-prod": "app-prod-restored"}'
         type: dict
         required: false
+    target_namespace_prefix:
+        description:
+            - Prefix to be added to all target namespaces during granular restore with filters
+            - Only used when restore is performed WITH filter.namespace_filter
+            - Will be ignored when restore is done without using filter
+            - 'For example, if prefix is "dr-" and source namespace is "app-prod", target will be "dr-app-prod"'
+            - Mutually exclusive with namespace_mapping
+        type: str
+        required: false
+        version_added: '2.11.0'
     storage_class_mapping:
-        description: Mapping of source and destination storage classes during restore
+        description:
+            - Mapping of source and destination storage classes during restore
+            - 'Example: {"fast-ssd": "standard-ssd", "slow-hdd": "standard-hdd"}'
         type: dict
         required: false
+    replace_policy:
+        description:
+            - Policy for handling existing resources during restore
+            - 'Invalid: No policy specified (default)'
+            - 'Retain: Keep existing resources, skip restore if resource exists'
+            - 'Delete: Delete existing resources before restore'
+        type: str
+        required: false
+        choices: ['Invalid', 'Retain', 'Delete']
+        default: 'Invalid'
+        version_added: '2.10.0'
+    include_optional_resource_types:
+        description:
+            - List of optional resource types to include in the restore
+            - By default, some resource types may be excluded
+            - Use this to explicitly include specific resource types
+            - 'Example: ["v1/Secret", "v1/ConfigMap"]'
+        type: list
+        elements: str
+        required: false
+        version_added: '2.11.0'
     cluster:
         description: Name or UID of the cluster
         type: str
@@ -660,9 +690,6 @@ def build_restore_request(params: Dict[str, Any], module: AnsibleModule, client:
     if params.get('target_namespace_prefix'):
         request["target_namespace_prefix"] = params['target_namespace_prefix']
 
-    if params.get('use_source_as_target_namespace'):
-        request["use_source_as_target_namespace"] = params['use_source_as_target_namespace']
-    
     # Add enhanced parameters for resource type selection
     if params.get('include_optional_resource_types'):
         request["include_optional_resource_types"] = params['include_optional_resource_types']
@@ -1008,20 +1035,12 @@ def run_module():
 
         rancher_project_name_mapping=dict(
             type='dict',
-            required=False,
-            options=dict(
-                key=dict(type='str', required=True),
-                value=dict(type='str', required=True)
-            )
+            required=False
         ),
 
         rancher_project_mapping=dict(
             type='dict',
-            required=False,
-            options=dict(
-                key=dict(type='str', required=True),
-                value=dict(type='str', required=True)
-            )
+            required=False
         ),
         
         # Cluster reference
@@ -1043,11 +1062,6 @@ def run_module():
         # Namespace target options (mutually exclusive)
         target_namespace_prefix=dict(
             type='str',
-            required=False
-        ),
-
-        use_source_as_target_namespace=dict(
-            type='bool',
             required=False
         ),
 
