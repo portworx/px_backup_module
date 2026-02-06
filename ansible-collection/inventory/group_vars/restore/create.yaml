@@ -1,23 +1,22 @@
 ---
 # Define restores list
 restores:
-  # Example restore 1: Application restore
+  # Example restore 1: Application restore with rancher project mapping
   - name: "restore-from-rancher-to-rancher-ansible"
     backup_ref:
       name: "rancher-backup"
     cluster_ref:
       name: "destination-rancher"
-    # namespace_mapping: 
-    #   "pvcsix": "pvcsix11178"
+    namespace_mapping:
+      "pvcsix": "pvcsix11178"
     replace_policy: "Retain"
+    # Correct format for rancher_project_mapping (free-form dict)
     rancher_project_mapping:
-      key: "c-m-b9x5wwqs:p-knzw9"
-      value: "c-m-b9x5wwqs:p-knzw9"
-    rancher_project_name_mapping:
-      key: ""
-      value: ""
-    # storage_class_mapping:
-    #   "px-db": "px-db"
+      "c-m-b9x5wwqs:p-knzw9": "c-m-b9x5wwqs:p-knzw9"
+    # rancher_project_name_mapping:
+    #   "Source Project Name": "Target Project Name"
+    storage_class_mapping:
+      "px-db": "px-db"
   #  Example restore 1a: Single File Restore Request 
   - name: "sfr-restore"
     backup_ref:
@@ -69,6 +68,7 @@ restores:
         resource_name_pattern: "config*"
 
 #   # Example restore 4: Restore with VM filtering (v2.11.0)
+  # NOTE: When using filter, use target_namespace_prefix instead of namespace_mapping
   - name: "vm-filtered-restore"
     backup_ref:
       name: "vm-backup"
@@ -77,11 +77,12 @@ restores:
     filter:
       virtual_machine_filter:
         vm_name_pattern: "production-vm-.*"
-    namespace_mapping: 
-      "vm-production": "vm-production"
-      "vm-staging": "vm-staging"
+    # Use target_namespace_prefix with filters (mutually exclusive with namespace_mapping)
+    target_namespace_prefix: "restored-"
+    # Result: vm-production → restored-vm-production, vm-staging → restored-vm-staging
 
   # Example restore 5: Namespace filtering only (v2.11.0+)
+  # NOTE: When using filter, use target_namespace_prefix instead of namespace_mapping
   - name: "comprehensive-filtered-restore"
     backup_ref:
       name: "full-backup"
@@ -96,7 +97,7 @@ restores:
         gvk: "v1/ConfigMap"
     filter:
       namespace_filter:
-        namespace_name_pattern: "app-.*" 
+        namespace_name_pattern: "app-.*"
         exclude_namespaces:
           - "app-temp"
           - "app-cache"
@@ -116,9 +117,9 @@ restores:
           - "apps/v1/StatefulSet"
           - "v1/Service"
         resource_name_pattern: "prod-.*"
-    namespace_mapping:
-      "app-prod": "restored-app-prod"
-      "app-staging": "restored-app-staging"
+    # Use target_namespace_prefix with filters (mutually exclusive with namespace_mapping)
+    target_namespace_prefix: "restored-"
+    # Result: app-prod → restored-app-prod, app-staging → restored-app-staging
     storage_class_mapping:
       "fast-ssd": "standard-ssd"
       "slow-hdd": "standard-hdd"
@@ -192,6 +193,7 @@ restores:
       skip_vm_restart: true
 
   # Example restore 9: Complete VM filtering with all parameters (v2.11.0+)
+  # NOTE: When using filter, use target_namespace_prefix instead of namespace_mapping
   - name: "vm-comprehensive-filtering"
     backup_ref:
       name: "vm-backup-full"
@@ -214,11 +216,12 @@ restores:
     virtual_machine_restore_options:
       skip_mac_masking: true
       skip_vm_restart: true
-    namespace_mapping:
-      "frontend": "restored-frontend"
-      "backend": "restored-backend"
+    # Use target_namespace_prefix with filters (mutually exclusive with namespace_mapping)
+    target_namespace_prefix: "restored-"
+    # Result: frontend → restored-frontend, backend → restored-backend
 
   # Example restore 10: Advanced namespace filtering with all resource options (v2.11.0+)
+  # NOTE: When using filter, use target_namespace_prefix instead of namespace_mapping
   - name: "advanced-namespace-resource-filtering"
     backup_ref:
       name: "complex-backup"
@@ -257,10 +260,9 @@ restores:
           - "v1/Service"
           - "v1/PersistentVolumeClaim"
         resource_name_pattern: "prod-*"
-    namespace_mapping:
-      "microservice-auth": "restored-auth"
-      "microservice-api": "restored-api"
-      "microservice-data": "restored-data"
+    # Use target_namespace_prefix with filters (mutually exclusive with namespace_mapping)
+    target_namespace_prefix: "restored-"
+    # Result: microservice-auth → restored-microservice-auth, etc.
     storage_class_mapping:
       "fast-ssd": "premium-ssd"
       "standard": "basic"
@@ -330,4 +332,58 @@ restores:
     virtual_machine_restore_options:
       skip_mac_masking: false
       skip_vm_restart: false
+    replace_policy: "Retain"
+
+  # Example 15: Granular restore with target_namespace_prefix
+  - name: "granular-restore-with-prefix"
+    backup_ref:
+      name: "one"
+      uid: "62a13ae2-004d-43e2-8e7b-83989889315b"
+    cluster_ref:
+      name: "one"
+      uid: "bc7d78e1-65e1-4d93-ad26-1dfdc5ccd3bf"
+    backup_object_type:
+      type: "All"
+    filter:
+      namespace_filter:
+        include_namespaces:
+          - "default"
+          - "kube-system"
+        include_resources:
+          - name: "nginx-deployment"
+            namespace: "default"
+            gvk: "apps/v1/Deployment"
+        gvks:
+          - "apps/v1/Deployment"
+          - "v1/Service"
+          - "v1/ConfigMap"
+    target_namespace_prefix: "dr-"
+    # Result: default → dr-default, kube-system → dr-kube-system
+    storage_class_mapping:
+      csi.vsphere.vmware.com: "csi-vsphere-vsc"
+      pxd.portworx.com: "px-csi-snapclass"
+    replace_policy: "Retain"
+
+  # Example 16: Multiple rancher project mappings
+  - name: "restore-with-rancher-projects"
+    backup_ref:
+      name: "one"
+      uid: "62a13ae2-004d-43e2-8e7b-83989889315b"
+    cluster_ref:
+      name: "one"
+      uid: "bc7d78e1-65e1-4d93-ad26-1dfdc5ccd3bf"
+    backup_object_type:
+      type: "All"
+    namespace_mapping:
+      default: "default-restored"
+      production: "production-restored"
+    rancher_project_mapping:
+      "c-abc123:p-xyz789": "c-def456:p-uvw012"
+      "c-abc123:p-xyz790": "c-def456:p-uvw013"
+    rancher_project_name_mapping:
+      "Production Project": "DR Production Project"
+      "Staging Project": "DR Staging Project"
+    storage_class_mapping:
+      csi.vsphere.vmware.com: "csi-vsphere-vsc"
+      pxd.portworx.com: "px-csi-snapclass"
     replace_policy: "Retain"
