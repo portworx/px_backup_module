@@ -29,10 +29,11 @@ This module has been updated with comprehensive restore capabilities:
 
 - **Complete Resource Management**: `include_resources`, `exclude_resources`, `include_optional_resource_types`
 - **Advanced Filtering**: Full namespace and VM filtering with pattern matching, include/exclude lists, and GVK specifications
-- **Namespace Management**: `namespace_mapping`, `target_namespace_prefix`, `use_source_as_target_namespace` (mutually exclusive)
+- **Namespace Management**: `namespace_mapping` (without filter), `target_namespace_prefix` (with filter) - mutually exclusive
 - **VM Restore Options**: `skip_mac_masking`, `skip_vm_restart` for virtual machine restores
-- **Infrastructure Mapping**: Enhanced Rancher project mapping with both ID and name mapping
+- **Infrastructure Mapping**: Enhanced Rancher project mapping with both ID and name mapping supporting multiple mappings
 - **Backup Object Types**: Support for `Invalid`, `All`, and `VirtualMachine` backup object types
+- **Replace Policy**: Control how existing resources are handled during restore
 
 **Backward Compatibility**: Please note that API changes in recent PX-Backup versions may cause incompatibilities - ensure your module version matches your PX-Backup installation version for optimal compatibility.
 
@@ -89,12 +90,11 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 | cluster_ref                    | dict    | no       | Target cluster reference                         |
 | cluster_ref.name               | string  | yes      | Target cluster name                              |
 | cluster_ref.uid                | string  | no       | Target cluster UID                               |
-| namespace_mapping              | dict    | no       | Source to target namespace mapping               |
-| target_namespace_prefix        | string  | no       | Prefix for all target namespaces                |
-| use_source_as_target_namespace | boolean | no       | Use source namespace as target                   |
+| namespace_mapping              | dict    | no       | Source to target namespace mapping (use WITHOUT filter) |
+| target_namespace_prefix        | string  | no       | Prefix for all target namespaces (use WITH filter) |
 | storage_class_mapping          | dict    | no       | Source to target storage class mapping          |
 
-**Note**: `namespace_mapping`, `target_namespace_prefix`, and `use_source_as_target_namespace` are mutually exclusive.
+**Note**: `namespace_mapping` and `target_namespace_prefix` are mutually exclusive. Use `namespace_mapping` when restoring WITHOUT filters, and `target_namespace_prefix` when restoring WITH filters.
 
 ### Resource Selection
 
@@ -122,12 +122,19 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 
 | Parameter                          | Type   | Required | Description                                 |
 | ------------------------------------ | -------- | ---------- | --------------------------------------------- |
-| rancher_project_mapping            | dict   | no       | Source to target project mapping            |
-| rancher_project_mapping.key        | string | yes      | Source to target project mapping key        |
-| rancher_project_mapping.value      | string | yes      | Source to target project mapping value      |
-| rancher_project_name_mapping       | dict   | no       | Source to target project name mapping       |
-| rancher_project_name_mapping.key   | string | yes      | Source to target project name mapping key   |
-| rancher_project_name_mapping.value | string | yes      | Source to target project name mapping value |
+| rancher_project_mapping            | dict   | no       | Source to target project ID mapping (supports multiple mappings) |
+| rancher_project_name_mapping       | dict   | no       | Source to target project name mapping (supports multiple mappings) |
+
+**Format Examples:**
+```yaml
+rancher_project_mapping:
+  "c-abc123:p-xyz789": "c-def456:p-uvw012"
+  "c-abc123:p-xyz790": "c-def456:p-uvw013"
+
+rancher_project_name_mapping:
+  "Production Project": "DR Production Project"
+  "Staging Project": "DR Staging Project"
+```
 
 ### Single File Restore (SFR) Parameters
 
@@ -467,10 +474,10 @@ Include or exclude specific resources from restore operations:
 
 ### Namespace Management Options
 
-Choose from three mutually exclusive namespace management strategies:
+Choose from two mutually exclusive namespace management strategies:
 
 ```yaml
-# Option 1: Direct namespace mapping
+# Option 1: Direct namespace mapping (use WITHOUT filter)
 - name: Create restore with namespace mapping
   restore:
     operation: CREATE
@@ -482,12 +489,13 @@ Choose from three mutually exclusive namespace management strategies:
       name: "cluster-backup"
     cluster_ref:
       name: "target-cluster"
+    # Use namespace_mapping when NOT using filter
     namespace_mapping:
       "source-ns": "target-ns"
       "prod": "production"
 
-# Option 2: Namespace prefix
-- name: Create restore with namespace prefix
+# Option 2: Namespace prefix (use WITH filter)
+- name: Create restore with namespace prefix and filter
   restore:
     operation: CREATE
     api_url: "{{ px_backup_api_url }}"
@@ -498,21 +506,14 @@ Choose from three mutually exclusive namespace management strategies:
       name: "cluster-backup"
     cluster_ref:
       name: "target-cluster"
+    # Use target_namespace_prefix when using filter
+    filter:
+      namespace_filter:
+        include_namespaces:
+          - "app-prod"
+          - "app-staging"
     target_namespace_prefix: "restored-"
-
-# Option 3: Use source as target
-- name: Create restore using source namespaces
-  restore:
-    operation: CREATE
-    api_url: "{{ px_backup_api_url }}"
-    token: "{{ px_backup_token }}"
-    name: "source-target-restore"
-    org_id: "default"
-    backup_ref:
-      name: "cluster-backup"
-    cluster_ref:
-      name: "target-cluster"
-    use_source_as_target_namespace: true
+    # Result: app-prod → restored-app-prod, app-staging → restored-app-staging
 ```
 
 ### Advanced Filtering
@@ -607,16 +608,16 @@ Combine all available options for maximum control:
       name: "target-cluster"
       uid: "cluster-uid-456"
     replace_policy: "Retain"
-    target_namespace_prefix: "restored-"
     storage_class_mapping:
       "fast-ssd": "premium-ssd"
       "standard": "gp2"
+    # Correct format for rancher project mappings (free-form dict)
     rancher_project_mapping:
-      key: "source-project-id"
-      value: "target-project-id"
+      "c-abc123:p-xyz789": "c-def456:p-uvw012"
+      "c-abc123:p-xyz790": "c-def456:p-uvw013"
     rancher_project_name_mapping:
-      key: "source-project"
-      value: "target-project"
+      "Production Project": "DR Production Project"
+      "Staging Project": "DR Staging Project"
     backup_object_type:
       type: "All"
     include_optional_resource_types:
@@ -626,6 +627,7 @@ Combine all available options for maximum control:
       - name: "temp-secret"
         namespace: "default"
         gvk: "v1/Secret"
+    # Use target_namespace_prefix when using filter
     filter:
       namespace_filter:
         namespace_name_pattern: "prod-*"
@@ -634,6 +636,8 @@ Combine all available options for maximum control:
       virtual_machine_filter:
         vm_name_pattern: "prod-vm-*"
         os_name: ["ubuntu"]
+    target_namespace_prefix: "restored-"
+    # Result: prod-web → restored-prod-web, prod-api → restored-prod-api
     virtual_machine_restore_options:
       skip_mac_masking: true
       skip_vm_restart: false
