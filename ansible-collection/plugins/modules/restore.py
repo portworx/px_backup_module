@@ -660,6 +660,63 @@ def inspect_backup(module: AnsibleModule, client: PXBackupClient, backup: Any) -
                 error_msg = f"API returned status code {e.response.status_code}: {error_msg}"
         module.fail_json(msg=f"Failed to inspect backup: {error_msg}")
 
+def parse_gvk(gvk_string: str) -> Dict[str, str]:
+    """
+    Parse GVK string into group, version, and kind components.
+
+    Formats supported:
+    - "version/kind" for core resources (e.g., "v1/ConfigMap")
+    - "group/version/kind" for non-core resources (e.g., "apps/v1/Deployment")
+
+    Returns:
+        Dict with 'group', 'version', and 'kind' keys
+    """
+    s = (gvk_string or "").strip()
+    if not s:
+        return {"group": "", "version": "", "kind": ""}
+
+    # Split, trim, and drop empty segments (handles extra slashes + whitespace)
+    parts = [p.strip() for p in s.split("/") if p.strip()]
+    if len(parts) < 2 or len(parts) > 3 :
+        # Invalid format - return entire string as kind
+        return {"group": "", "version": "", "kind": s}
+
+    return {
+        "group": "/".join(parts[:-2]),  # "" for core resources like "v1/Pod"
+        "version": parts[-2],
+        "kind": parts[-1],
+    }
+
+def convert_resource_list(resources: list) -> list:
+    """
+    Convert resource list from Ansible format (with 'gvk' field) to API format
+    (with separate 'group', 'version', 'kind' fields).
+
+    Args:
+        resources: List of resource dicts with 'name', 'namespace', and 'gvk' fields
+
+    Returns:
+        List of resource dicts with 'name', 'namespace', 'group', 'version', 'kind' fields
+    """
+    if not resources:
+        return []
+
+    converted = []
+    for resource in resources:
+        converted_resource = {
+            "name": resource.get('name', ''),
+            "namespace": resource.get('namespace', '')
+        }
+
+        # Parse GVK if present
+        if 'gvk' in resource:
+            gvk_parts = parse_gvk(resource['gvk'])
+            converted_resource.update(gvk_parts)
+
+        converted.append(converted_resource)
+
+    return converted
+
 def build_restore_request(params: Dict[str, Any], module: AnsibleModule, client: PXBackupClient) -> Dict[str, Any]:
     """
     Build restore request object
@@ -676,11 +733,15 @@ def build_restore_request(params: Dict[str, Any], module: AnsibleModule, client:
         "metadata": metadata
     }
 
+    # Convert include_resources and exclude_resources from Ansible format to API format
+    include_resources = convert_resource_list(params.get('include_resources', []))
+    exclude_resources = convert_resource_list(params.get('exclude_resources', []))
+
     # For other operations, include additional fields
     request.update({
         "backup_ref": params.get('backup_ref', {}),
         "cluster_ref": params.get('cluster_ref', {}),
-        "include_resources": params.get('include_resources', []),
+        "include_resources": include_resources,
         "storage_class_mapping": params.get('storage_class_mapping', {}),
         "rancher_project_mapping": params.get('rancher_project_mapping', {}),
         "rancher_project_name_mapping": params.get('rancher_project_name_mapping', {})
@@ -694,9 +755,9 @@ def build_restore_request(params: Dict[str, Any], module: AnsibleModule, client:
     if params.get('include_optional_resource_types'):
         request["include_optional_resource_types"] = params['include_optional_resource_types']
 
-    # Add new exclude_resources parameter
-    if params.get('exclude_resources'):
-        request["exclude_resources"] = params['exclude_resources']
+    # Add exclude_resources parameter (already converted above)
+    if exclude_resources:
+        request["exclude_resources"] = exclude_resources
 
     # Add filter parameter with enhanced VM filtering
     filter_obj = {}
@@ -727,7 +788,22 @@ def build_restore_request(params: Dict[str, Any], module: AnsibleModule, client:
 
     # Add legacy filter parameter for backward compatibility
     if params.get('filter'):
-        filter_obj.update(params['filter'])
+        filter_param = params['filter'].copy()
+
+        # Convert resource lists in namespace_filter if present
+        if 'namespace_filter' in filter_param:
+            ns_filter = filter_param['namespace_filter'].copy()
+
+            # Convert include_resources and exclude_resources in namespace_filter
+            if 'include_resources' in ns_filter:
+                ns_filter['include_resources'] = convert_resource_list(ns_filter['include_resources'])
+
+            if 'exclude_resources' in ns_filter:
+                ns_filter['exclude_resources'] = convert_resource_list(ns_filter['exclude_resources'])
+
+            filter_param['namespace_filter'] = ns_filter
+
+        filter_obj.update(filter_param)
 
     if filter_obj:
         request["filter"] = filter_obj
