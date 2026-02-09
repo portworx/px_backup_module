@@ -5,7 +5,6 @@
 
   vars_files:
     - "{{ inventory_dir }}/group_vars/common/all.yaml"
-    - "{{ inventory_dir }}/group_vars/schedule_policy/enumerate.yaml"
 
   pre_tasks:
     - name: Validate required variables
@@ -18,6 +17,7 @@
   tasks:
     - name: Login and fetch Px-Backup token
       include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+
     - name: Enumerate schedule policies
       block:
         - name: Get list of schedule policies
@@ -26,9 +26,6 @@
             api_url: "{{ px_backup_api_url }}"
             token: "{{ px_backup_token }}"
             org_id: "{{ org_id }}"
-            # Optional filters
-            labels: "{{ labels | default(omit) }}"
-            max_objects: "{{ max_objects | default(omit) }}"
             # SSL Certificate Parameters
             ssl_config: "{{ ssl_config.px_backup | default({}) }}"
           register: schedule_policy_result

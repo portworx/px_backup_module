@@ -1,6 +1,2 @@
 ---
-# Variables specific to enumeration operations
-labels: {}  # Optional labels for filtering
-
-# Optional filters
-max_results: 100
+# enumerate_options are not used all roles are returned.

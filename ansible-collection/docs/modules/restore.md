@@ -161,16 +161,23 @@ rancher_project_name_mapping:
 | partition_info       | string  | no          | Partition info if volume is partitioned       |
 ### Enumeration Options
 
+For INSPECT_ALL operations, use the unified `enumerate_options` structure for pagination, filtering, and sorting. See [Enumerate Options Configuration](../common/enumerate_options.md) for complete documentation.
 
-| Parameter                  | Type    | Required | Default | Description                         |
-| ---------------------------- | --------- | ---------- | --------- | ------------------------------------- |
-| max_objects                | int     | no       |         | Maximum objects to return           |
-| cluster_uid_filter         | string  | no       |         | Filter by cluster UID              |
-| owners                     | list    | no       |         | Filter by owners                    |
-| status                     | list    | no       |         | Filter by status                    |
-| name_filter                | string  | no       |         | Filter by restore name              |
-| cluster_name_filter        | string  | no       |         | Filter by cluster name              |
-| include_detailed_resources | boolean | no       | false   | Include detailed resource info      |
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| enumerate_options | dictionary | no | Options for controlling enumeration behavior |
+| enumerate_options.max_objects | integer | no | Maximum number of objects to return |
+| enumerate_options.object_index | integer | no | Starting index for pagination |
+| enumerate_options.name_filter | string | no | Filter by restore name |
+| enumerate_options.cluster_name_filter | string | no | Filter by cluster name |
+| enumerate_options.cluster_uid_filter | string | no | Filter by cluster UID |
+| enumerate_options.owners | list | no | Filter by owners |
+| enumerate_options.status | list | no | Filter by status |
+| enumerate_options.include_detailed_resources | boolean | no | Include detailed resource info |
+| enumerate_options.time_range | dictionary | no | Filter by time range |
+| enumerate_options.sort_option | dictionary | no | Sorting configuration |
+
+> **Note**: Legacy top-level parameters (e.g., `max_objects` at module level) are still supported for backward compatibility.
 
 ## Examples
 

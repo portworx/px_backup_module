@@ -1,11 +1,23 @@
 ---
-# Variables specific to enumeration operations
-include_secrets: false
-labels: {}  # Optional labels for filtering
+# Backup location enumerate parameters (flat structure)
 
-# Optional filters
-cloud_credential_filter: "{{ cloud_cred_name | default(omit) }}"
-max_results: 100
-cloud_credential_ref:
-  name: "{{ cloud_cred_name | default(omit) }}"
-  uid: "{{ cloud_cred_uid | default(omit) }}"
+# Backup location specific parameters
+include_secrets: false
+
+# Pagination parameters
+max_objects: 100
+object_index: 0
+
+# Filter parameters
+name_filter: ""
+labels: {}
+
+# Time range filter
+time_range:
+  start_time: ""
+  end_time: ""
+
+# Sort option
+sort_option:
+  sortBy: "CreationTimestamp"
+  sortOrder: "Descending"

@@ -29,8 +29,21 @@
             exclude_objects: "{{ exclude_objects | default(omit) }}"
             include_filter: "{{ include_filter | default(omit) }}"
             exclude_filter: "{{ exclude_filter | default(omit) }}"
-            # Enumerate options
-            enumerate_options: "{{ enumerate_options | default(omit) }}"
+            # Pagination and filtering (flat params)
+            max_objects: "{{ max_objects | default(omit) }}"
+            object_index: "{{ object_index | default(omit) }}"
+            name_filter: "{{ name_filter | default(omit) }}"
+            labels: "{{ labels | default(omit) }}"
+            cluster_name_filter: "{{ cluster_name_filter | default(omit) }}"
+            cluster_uid_filter: "{{ cluster_uid_filter | default(omit) }}"
+            include_detailed_resources: "{{ include_detailed_resources | default(omit) }}"
+            backup_object_type: "{{ backup_object_type | default(omit) }}"
+            owners: "{{ owners | default(omit) }}"
+            status: "{{ status | default(omit) }}"
+            schedule_policy_ref: "{{ schedule_policy_ref | default(omit) }}"
+            backup_schedule_ref: "{{ backup_schedule_ref | default(omit) }}"
+            time_range: "{{ time_range | default(omit) }}"
+            sort_option: "{{ sort_option | default(omit) }}"
             # SSL Certificate Parameters
             ssl_config: "{{ ssl_config.px_backup | default({}) }}"
           register: backup_schedules_result

@@ -1,3 +1,23 @@
 ---
-# Variables specific to enumeration operations
+# Cloud credential enumerate parameters (flat structure)
+
+# Cloud credential specific parameters
 include_secrets: false
+
+# Pagination parameters
+max_objects: 100
+object_index: 0
+
+# Filter parameters
+name_filter: ""
+labels: {}
+
+# Time range filter
+time_range:
+  start_time: ""
+  end_time: ""
+
+# Sort option
+sort_option:
+  sortBy: "CreationTimestamp"
+  sortOrder: "Descending"

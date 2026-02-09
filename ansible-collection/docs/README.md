@@ -113,6 +113,16 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 - Troubleshooting guide
 - Security best practices
 
+### Enumerate Options
+
+All modules that support listing resources (INSPECT_ALL operations) use a unified `enumerate_options` structure for pagination, filtering, and sorting. See [Enumerate Options Configuration](common/enumerate_options.md) for:
+
+- Pagination with `max_objects` and `object_index`
+- Time-based filtering with `time_range`
+- Sorting with `sort_option`
+- Label and name filtering
+- Response metadata (total_count, complete)
+
 ## API Integration
 
 This collection integrates with PX-Backup API v2.11.0. For detailed API documentation, visit:

@@ -19,6 +19,9 @@ from dataclasses import dataclass
 
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.purepx.px_backup.plugins.module_utils.px_backup.api import PXBackupClient
+from ansible_collections.purepx.px_backup.plugins.module_utils.px_backup.enumerate import (
+    add_pagination_metadata
+)
 import requests
 
 DOCUMENTATION = r'''
@@ -277,13 +280,47 @@ def update_ownership(module, client):
         module.fail_json(msg=f"Failed to update Cloud Credential ownership: {str(e)}")
 
 def enumerate_cloud_credentials(module, client):
-    """List all Cloud Credentials"""
+    """List all Cloud Credentials with pagination and filtering support."""
     params = {
         'include_secrets': module.params.get('include_secrets', False)
     }
+
+    # Add pagination and filter parameters
+    if module.params.get('max_objects') is not None:
+        params['enumerate_options.max_objects'] = module.params['max_objects']
+    if module.params.get('object_index') is not None:
+        params['enumerate_options.object_index'] = module.params['object_index']
+    if module.params.get('name_filter'):
+        params['enumerate_options.name_filter'] = module.params['name_filter']
+    if module.params.get('cluster_name_filter'):
+        params['enumerate_options.cluster_name_filter'] = module.params['cluster_name_filter']
+    if module.params.get('cluster_uid_filter'):
+        params['enumerate_options.cluster_uid_filter'] = module.params['cluster_uid_filter']
+    if module.params.get('include_detailed_resources') is not None:
+        params['enumerate_options.include_detailed_resources'] = module.params['include_detailed_resources']
+    if module.params.get('owners'):
+        params['enumerate_options.owners'] = module.params['owners']
+    if module.params.get('labels'):
+        params['enumerate_options.labels'] = module.params['labels']
+
+    # Add sorting options if provided
+    if module.params.get('sort_option'):
+        sort_option = module.params['sort_option']
+        params['enumerate_options.sort_option.sortBy.type'] = sort_option.get('sortBy', 'CreationTimestamp')
+        params['enumerate_options.sort_option.sortOrder.type'] = sort_option.get('sortOrder', 'Descending')
+
+    # Add time_range filter
+    if module.params.get('time_range'):
+        time_range = module.params['time_range']
+        if time_range.get('start_time'):
+            params['enumerate_options.time_range.start_time'] = time_range['start_time']
+        if time_range.get('end_time'):
+            params['enumerate_options.time_range.end_time'] = time_range['end_time']
+
     try:
         response = client.make_request('GET', f"v1/cloudcredential/{module.params['org_id']}", params=params)
-        return response.get('cloud_credentials', [])
+        # Return full response to include pagination metadata
+        return response
     except Exception as e:
         module.fail_json(msg=f"Failed to enumerate Cloud Credential: {str(e)}")
 
@@ -453,6 +490,43 @@ def run_module():
                     )
                 )
             )
+        ),
+
+        # Pagination parameters (INSPECT_ALL)
+        max_objects=dict(type='int', required=False),
+        object_index=dict(type='int', required=False),
+        name_filter=dict(type='str', required=False),
+        cluster_name_filter=dict(type='str', required=False),
+        cluster_uid_filter=dict(type='str', required=False),
+        include_detailed_resources=dict(type='bool', required=False, default=False),
+        owners=dict(type='list', elements='str', required=False),
+
+        # Sort option for enumerate
+        sort_option=dict(
+            type='dict',
+            required=False,
+            options=dict(
+                sortBy=dict(
+                    type='str',
+                    choices=['Invalid', 'CreationTimestamp', 'Name', 'ClusterName', 'Size', 'RestoreBackupName', 'LastUpdateTimestamp'],
+                    default='Invalid'
+                ),
+                sortOrder=dict(
+                    type='str',
+                    choices=['Invalid', 'Ascending', 'Descending'],
+                    default='Invalid'
+                )
+            )
+        ),
+
+        # Time range filter for enumerate
+        time_range=dict(
+            type='dict',
+            required=False,
+            options=dict(
+                start_time=dict(type='str', required=False),
+                end_time=dict(type='str', required=False)
+            )
         )
     )
 
@@ -460,7 +534,9 @@ def run_module():
         changed=False,
         cloud_credential={},
         cloud_credentials=[],
-        message=''
+        message='',
+        total_count=None,
+        complete=None
     )
 
     module = AnsibleModule(
@@ -528,8 +604,10 @@ def run_module():
             result['message'] = "Cloud Credential Ownership updated successfully"
             
         elif operation == 'INSPECT_ALL':
-            cloud_credentials = enumerate_cloud_credentials(module, client)
+            response = enumerate_cloud_credentials(module, client)
+            cloud_credentials = response.get('cloud_credentials', [])
             result['cloud_credentials'] = cloud_credentials
+            add_pagination_metadata(result, response)
             result['message'] = f"Found {len(cloud_credentials)} Cloud Credentials"
             
         elif operation == 'INSPECT_ONE':

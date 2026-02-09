@@ -225,19 +225,30 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 
 ### Enumeration and Filtering Parameters
 
+All enumeration and filtering options are available through the unified `enumerate_options` structure. See [Enumerate Options Configuration](../common/enumerate_options.md) for complete documentation including:
 
-| Parameter                  | Type       | Required | Default | Description                                       |
-| ---------------------------- | ------------ | ---------- | --------- | --------------------------------------------------- |
-| max_objects                | integer    | no       |         | Maximum number of objects to return               |
-| name_filter                | string     | no       |         | Filter backups by name                            |
-| cluster_name_filter        | string     | no       |         | Filter backups by cluster name                    |
-| cluster_uid_filter         | string     | no       |         | Filter backups by cluster UID                     |
-| include_detailed_resources | boolean    | no       | false   | Include detailed resource information             |
-| owners                     | list       | no       |         | Filter backups by owners (list of owner UIDs)     |
-| status                     | list       | no       |         | Filter backups by status (list of status strings) |
-| schedule_policy_ref        | list       | no       |         | List of schedule policy references to filter by   |
-| backup_schedule_ref        | list       | no       |         | List of backup schedule references to filter by   |
-| sort_option                | dictionary | no       |         | Sorting configuration for backup enumeration      |
+- Pagination with `max_objects` and `object_index`
+- Time-based filtering with `time_range`
+- Sorting with `sort_option`
+- Label and name filtering
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| enumerate_options | dictionary | no | | Unified enumerate options (see common documentation) |
+| enumerate_options.max_objects | integer | no | | Maximum number of objects to return |
+| enumerate_options.object_index | integer | no | | Starting index for pagination |
+| enumerate_options.name_filter | string | no | | Filter backups by name |
+| enumerate_options.cluster_name_filter | string | no | | Filter backups by cluster name |
+| enumerate_options.cluster_uid_filter | string | no | | Filter backups by cluster UID |
+| enumerate_options.include_detailed_resources | boolean | no | false | Include detailed resource information |
+| enumerate_options.owners | list | no | | Filter backups by owners (list of owner UIDs) |
+| enumerate_options.status | list | no | | Filter backups by status (list of status strings) |
+| enumerate_options.schedule_policy_ref | list | no | | List of schedule policy references to filter by |
+| enumerate_options.backup_schedule_ref | list | no | | List of backup schedule references to filter by |
+| enumerate_options.time_range | dictionary | no | | Time range filter (start_time, end_time) |
+| enumerate_options.sort_option | dictionary | no | | Sorting configuration for backup enumeration |
+
+> **Note**: Legacy top-level parameters (e.g., `max_objects` at module level) are still supported for backward compatibility.
 
 ### New Filtration Parameters (v2.11.0+)
 

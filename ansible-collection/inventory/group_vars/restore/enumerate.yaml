@@ -1,23 +1,28 @@
 ---
-# Optional filter parameters
-cluster_name_filter: "px-source"  # Filter backups by cluster name
-name_filter: ""         # Filter backups by backup name
-# labels: {}             # Filter by labels
-  # environment: prod    # Example label filter
-max_objects: 5       # Maximum number of backups to return
-include_detailed_resources: true  # Include full resource lists in response
-
-# Filters for specific backup attributes
-# owners: []             # Filter by backup owners
-status:                # Filter by backup status
-  - "Success"
-  - "Failed"
-
-# Filter by backup object type
-# Can be "All" or "VirtualMachine"
-backup_object_type: 
-  type: "All"         
-
-#
-# Filter can be used to avoid information overload,
+# Restore specific parameter
 exclude_failed_resource: true
+
+# Pagination parameters
+max_objects: 10
+object_index: 0
+
+# Filter parameters
+name_filter: ""
+labels: {}
+cluster_name_filter: ""
+cluster_uid_filter: ""
+include_detailed_resources: false
+owners: []
+backup_object_type:
+  type: "All"
+status: []
+
+# Time range filter
+time_range:
+  start_time: ""
+  end_time: ""
+
+# Sort option
+sort_option:
+  sortBy: "CreationTimestamp"
+  sortOrder: "Descending"

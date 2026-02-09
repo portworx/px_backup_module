@@ -25,6 +25,9 @@ os.environ['PYTHONUNBUFFERED'] = '1'
 
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.purepx.px_backup.plugins.module_utils.px_backup.api import PXBackupClient
+from ansible_collections.purepx.px_backup.plugins.module_utils.px_backup.enumerate import (
+    add_pagination_metadata
+)
 import requests
 import sys
 
@@ -530,29 +533,33 @@ def validate_sfr_params(params: Dict[str, Any]) -> None:
                 raise ValidationError(f"restore_files[{i}].source_path is required")
 
 
-def enumerate_restores(module: AnsibleModule, client: PXBackupClient) -> List[Dict[str, Any]]:
-    """List all restores"""
+def enumerate_restores(module: AnsibleModule, client: PXBackupClient) -> Dict[str, Any]:
+    """List all restores with pagination and filtering support."""
     # First, let's log the input parameters for debugging
     logger.debug(f"Enumerate parameters module: {module.params}")
 
-    # Build query parameters
-    params = {
-        'enumerate_options.cluster_name_filter': module.params.get('cluster_name_filter'),
-        'enumerate_options.cluster_uid_filter': module.params.get('cluster_uid_filter')
-    }
+    # Build query parameters from flat top-level parameters
+    params = {}
 
-    # Add other parameters if they exist
-    if module.params.get('max_objects'):
+    # Pagination parameters
+    if module.params.get('max_objects') is not None:
         params['enumerate_options.max_objects'] = module.params['max_objects']
+    if module.params.get('object_index') is not None:
+        params['enumerate_options.object_index'] = module.params['object_index']
 
+    # Filter parameters
+    if module.params.get('cluster_name_filter'):
+        params['enumerate_options.cluster_name_filter'] = module.params.get('cluster_name_filter')
+    if module.params.get('cluster_uid_filter'):
+        params['enumerate_options.cluster_uid_filter'] = module.params.get('cluster_uid_filter')
     if module.params.get('include_detailed_resources') is not None:
         params['enumerate_options.include_detailed_resources'] = module.params['include_detailed_resources']
-
     if module.params.get('name_filter'):
         params['enumerate_options.name_filter'] = module.params['name_filter']
-
     if module.params.get('owners'):
         params['enumerate_options.owners'] = module.params['owners']
+    if module.params.get('labels'):
+        params['enumerate_options.labels'] = module.params['labels']
 
     # Add backup_object_type if provided
     if module.params.get('backup_object_type'):
@@ -566,13 +573,20 @@ def enumerate_restores(module: AnsibleModule, client: PXBackupClient) -> List[Di
     # Add sorting options if provided
     if module.params.get('sort_option'):
         sort_option = module.params['sort_option']
-        params['enumerate_options.sort_option.sortBy.type'] = sort_option.get('sort_by', 'CreationTimestamp')
-        params['enumerate_options.sort_option.sortOrder.type'] = sort_option.get('sort_order', 'Descending')
+        params['enumerate_options.sort_option.sortBy.type'] = sort_option.get('sortBy', 'CreationTimestamp')
+        params['enumerate_options.sort_option.sortOrder.type'] = sort_option.get('sortOrder', 'Descending')
 
-    # Add new filtration features
+    # Add time_range filter
+    if module.params.get('time_range'):
+        time_range = module.params['time_range']
+        if time_range.get('start_time'):
+            params['enumerate_options.time_range.start_time'] = time_range['start_time']
+        if time_range.get('end_time'):
+            params['enumerate_options.time_range.end_time'] = time_range['end_time']
+
+    # Add restore-specific filtration features
     if module.params.get('vm_volume_name'):
         params['enumerate_options.vm_volume_name'] = module.params['vm_volume_name']
-
     if module.params.get('exclude_failed_resource') is not None:
         params['enumerate_options.exclude_failed_resource'] = module.params['exclude_failed_resource']
 
@@ -592,7 +606,7 @@ def enumerate_restores(module: AnsibleModule, client: PXBackupClient) -> List[Di
 
     # Remove None values
     params = {k: v for k, v in params.items() if v is not None}
-    
+
     logger.debug(f"Enumerate parameters logger: {module.params}")
 
     try:
@@ -605,7 +619,8 @@ def enumerate_restores(module: AnsibleModule, client: PXBackupClient) -> List[Di
         # Log the response for debugging
         logger.debug(f"Received response: {response}")
 
-        return response.get('restores', [])
+        # Return full response to include pagination metadata
+        return response
     except Exception as e:
         error_msg = str(e)
         if isinstance(e, requests.exceptions.RequestException) and hasattr(e, 'response'):
@@ -1045,11 +1060,17 @@ def perform_operation(module: AnsibleModule, client: PXBackupClient, operation: 
             )
 
         elif operation == 'INSPECT_ALL':
-            restores = enumerate_restores(module, client)
+            response = enumerate_restores(module, client)
+            restores = response.get('restores', [])
+
+            # Build result data with pagination metadata
+            result_data = {'restores': restores}
+            add_pagination_metadata(result_data, response)
+
             return OperationResult(
                 success=True,
                 changed=False,
-                data={'restores': restores},
+                data=result_data,
                 message=f"Found {len(restores)} restores"
             )
 
@@ -1284,6 +1305,7 @@ def run_module():
 
         # Enumerate options
         max_objects=dict(type='int', required=False),
+        object_index=dict(type='int', required=False),
         name_filter=dict(type='str', required=False),
         cluster_name_filter=dict(type='str', required=False),
         include_detailed_resources=dict(
@@ -1291,20 +1313,6 @@ def run_module():
         cluster_uid_filter=dict(type='str', required=False),
         owners=dict(type='list', elements='str', required=False),
         status=dict(type='list', elements='str', required=False),
-
-        # Sorting options
-        sort_option=dict(type='dict', required=False, options=dict(
-            sort_by=dict(
-                type='str',
-                choices=['CreationTimestamp', 'Name', 'ClusterName', 'Size', 'RestoreBackupName', 'LastUpdateTimestamp'],
-                default='CreationTimestamp'
-            ),
-            sort_order=dict(
-                type='str',
-                choices=['Ascending', 'Descending'],
-                default='Descending'
-            )
-        )),
 
         # Virtual machine restore options
         virtual_machine_restore_options=dict(
@@ -1352,6 +1360,34 @@ def run_module():
                 client_cert=dict(type='path'),
                 client_key=dict(type='path', no_log=False)
             )
+        ),
+
+        # Sort option for enumerate
+        sort_option=dict(
+            type='dict',
+            required=False,
+            options=dict(
+                sortBy=dict(
+                    type='str',
+                    choices=['Invalid', 'CreationTimestamp', 'Name', 'ClusterName', 'Size', 'RestoreBackupName', 'LastUpdateTimestamp'],
+                    default='Invalid'
+                ),
+                sortOrder=dict(
+                    type='str',
+                    choices=['Invalid', 'Ascending', 'Descending'],
+                    default='Invalid'
+                )
+            )
+        ),
+
+        # Time range filter for enumerate
+        time_range=dict(
+            type='dict',
+            required=False,
+            options=dict(
+                start_time=dict(type='str', required=False),
+                end_time=dict(type='str', required=False)
+            )
         )
     )
 
@@ -1359,7 +1395,9 @@ def run_module():
         changed=False,
         result={},
         results=[],
-        message=''
+        message='',
+        total_count=None,
+        complete=None
     )
 
     # Define required parameters for each operation

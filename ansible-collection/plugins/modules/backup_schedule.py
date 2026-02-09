@@ -5,7 +5,11 @@ __metaclass__ = type
 
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.purepx.px_backup.plugins.module_utils.px_backup.api import PXBackupClient
+from ansible_collections.purepx.px_backup.plugins.module_utils.px_backup.enumerate import (
+    add_pagination_metadata
+)
 import requests
+from typing import Dict, Any
 
 # Constants for enum mappings
 BACKUP_OBJECT_TYPE_MAP = {
@@ -515,174 +519,152 @@ def update_backup_schedule(module, client):
     except Exception as e:
         module.fail_json(msg=f"Failed to update Backup Schedule: {str(e)}")
 
-def enumerate_backup_schedules(module, client, operation):
-    """List all backup schedules with support for both GET and POST methods"""
+def enumerate_backup_schedules(module, client, operation) -> Dict[str, Any]:
+    """List all backup schedules with support for both GET and POST methods."""
     backup_location_ref = module.params.get('backup_location_ref') or {}
     cluster_ref = module.params.get('cluster_ref') or {}
-    enumerate_options = module.params.get('enumerate_options') or {}
-    
+
     if operation == 'INSPECT_ALL_POST_REQUEST':
         try:
-            # Build the request body for POST
+            # Build the request body
             request_body = {}
-            
-            # Add enumerate_options if provided
+
+            # Build enumerate_options from flat parameters
+            enumerate_options = {}
+            if module.params.get('max_objects') is not None:
+                enumerate_options["max_objects"] = str(module.params['max_objects'])
+            if module.params.get('object_index') is not None:
+                enumerate_options["object_index"] = str(module.params['object_index'])
+            if module.params.get('name_filter'):
+                enumerate_options["name_filter"] = module.params['name_filter']
+            if module.params.get('cluster_name_filter'):
+                enumerate_options["cluster_name_filter"] = module.params['cluster_name_filter']
+            if module.params.get('cluster_uid_filter'):
+                enumerate_options["cluster_uid_filter"] = module.params['cluster_uid_filter']
+            if module.params.get('include_detailed_resources') is not None:
+                enumerate_options["include_detailed_resources"] = module.params['include_detailed_resources']
+            if module.params.get('labels'):
+                enumerate_options["labels"] = module.params['labels']
+            if module.params.get('owners'):
+                enumerate_options["owners"] = module.params['owners']
+            if module.params.get('status'):
+                enumerate_options["status"] = module.params['status']
+            if module.params.get('sort_option'):
+                sort_option = module.params['sort_option']
+                enumerate_options["sort_option"] = {
+                    "sortBy": {"type": sort_option.get('sortBy', 'CreationTimestamp')},
+                    "sortOrder": {"type": sort_option.get('sortOrder', 'Descending')}
+                }
+            if module.params.get('time_range'):
+                time_range = module.params['time_range']
+                tr = {}
+                if time_range.get('start_time'):
+                    tr['start_time'] = time_range['start_time']
+                if time_range.get('end_time'):
+                    tr['end_time'] = time_range['end_time']
+                if tr:
+                    enumerate_options["time_range"] = tr
+
             if enumerate_options:
-                request_body["enumerate_options"] = {}
-                
-                # Add all enumerate options fields
-                if enumerate_options.get('labels'):
-                    request_body["enumerate_options"]["labels"] = enumerate_options.get('labels')
-                if enumerate_options.get('max_objects'):
-                    request_body["enumerate_options"]["max_objects"] = enumerate_options.get('max_objects')
-                if enumerate_options.get('name_filter'):
-                    request_body["enumerate_options"]["name_filter"] = enumerate_options.get('name_filter')
-                if enumerate_options.get('cluster_name_filter'):
-                    request_body["enumerate_options"]["cluster_name_filter"] = enumerate_options.get('cluster_name_filter')
-                if enumerate_options.get('cluster_uid_filter'):
-                    request_body["enumerate_options"]["cluster_uid_filter"] = enumerate_options.get('cluster_uid_filter')
-                if enumerate_options.get('include_detailed_resources') is not None:
-                    request_body["enumerate_options"]["include_detailed_resources"] = enumerate_options.get('include_detailed_resources')
-                if enumerate_options.get('backup_object_type'):
-                    request_body["enumerate_options"]["backup_object_type"] = enumerate_options.get('backup_object_type')
-                if enumerate_options.get('owners'):
-                    request_body["enumerate_options"]["owners"] = enumerate_options.get('owners')
-                if enumerate_options.get('status'):
-                    request_body["enumerate_options"]["status"] = enumerate_options.get('status')
-                if enumerate_options.get('time_range'):
-                    request_body["enumerate_options"]["time_range"] = enumerate_options.get('time_range')
-                if enumerate_options.get('schedule_policy_ref'):
-                    request_body["enumerate_options"]["schedule_policy_ref"] = enumerate_options.get('schedule_policy_ref')
-                if enumerate_options.get('backup_schedule_ref'):
-                    request_body["enumerate_options"]["backup_schedule_ref"] = enumerate_options.get('backup_schedule_ref')
-                if enumerate_options.get('sort_option'):
-                    request_body["enumerate_options"]["sort_option"] = enumerate_options.get('sort_option')
-                if enumerate_options.get('object_index'):
-                    request_body["enumerate_options"]["object_index"] = enumerate_options.get('object_index')
-                # Add new filtration features
-                if enumerate_options.get('vm_volume_name'):
-                    request_body["enumerate_options"]["vm_volume_name"] = enumerate_options.get('vm_volume_name')
-                if enumerate_options.get('exclude_failed_resource') is not None:
-                    request_body["enumerate_options"]["exclude_failed_resource"] = enumerate_options.get('exclude_failed_resource')
-                # Add resource_info filter
-                if enumerate_options.get('resource_info'):
-                    resource_info = enumerate_options['resource_info']
-                    request_body["enumerate_options"]["resource_info"] = {
-                        k: v for k, v in resource_info.items() if v is not None
-                    }
+                request_body["enumerate_options"] = enumerate_options
 
             # Add references if provided
             if backup_location_ref:
                 request_body["backup_location_ref"] = backup_location_ref
-            
+
             if cluster_ref:
                 request_body["cluster_ref"] = cluster_ref
-            
+
             # Add 2.9.0 fields if provided
             volume_resource_only_policy_ref = module.params.get('volume_resource_only_policy_ref') or {}
             if volume_resource_only_policy_ref.get('name'):
-                params['volume_resource_only_policy_ref.name'] = volume_resource_only_policy_ref.get('name')
+                request_body["volume_resource_only_policy_ref"] = volume_resource_only_policy_ref
 
-            if volume_resource_only_policy_ref.get('uid'):
-                params['volume_resource_only_policy_ref.uid'] = volume_resource_only_policy_ref.get('uid')
-                
             if module.params.get('policy_ref'):
                 request_body["policy_ref"] = module.params.get('policy_ref')
-                
+
             if module.params.get('include_objects'):
                 request_body["include_objects"] = module.params.get('include_objects')
-                
+
             if module.params.get('exclude_objects'):
                 request_body["exclude_objects"] = module.params.get('exclude_objects')
-                
+
             if module.params.get('include_filter'):
                 request_body["include_filter"] = module.params.get('include_filter')
-                
+
             if module.params.get('exclude_filter'):
                 request_body["exclude_filter"] = module.params.get('exclude_filter')
-            
+
             # Make POST request
             response = client.make_request(
                 'POST',
                 f"v1/backupschedule/{module.params['org_id']}/enumerate",
                 data=request_body
             )
-            
-            return response.get('backup_schedules', [])
-            
+
+            # Return full response to include pagination metadata
+            return response
+
         except Exception as e:
             handle_request_exception(e, module, "enumerate backup schedules")
     else:
         # Use GET with query parameters for simpler queries
         params = {}
 
+        # Build enumerate_options from flat parameters
+        if module.params.get('max_objects') is not None:
+            params['enumerate_options.max_objects'] = module.params['max_objects']
+        if module.params.get('object_index') is not None:
+            params['enumerate_options.object_index'] = module.params['object_index']
+        if module.params.get('name_filter'):
+            params['enumerate_options.name_filter'] = module.params['name_filter']
+        if module.params.get('cluster_name_filter'):
+            params['enumerate_options.cluster_name_filter'] = module.params['cluster_name_filter']
+        if module.params.get('cluster_uid_filter'):
+            params['enumerate_options.cluster_uid_filter'] = module.params['cluster_uid_filter']
+        if module.params.get('include_detailed_resources') is not None:
+            params['enumerate_options.include_detailed_resources'] = module.params['include_detailed_resources']
+        if module.params.get('labels'):
+            params['enumerate_options.labels'] = module.params['labels']
+        if module.params.get('owners'):
+            params['enumerate_options.owners'] = module.params['owners']
+        if module.params.get('status'):
+            params['enumerate_options.status'] = module.params['status']
+        if module.params.get('sort_option'):
+            sort_option = module.params['sort_option']
+            params['enumerate_options.sort_option.sortBy.type'] = sort_option.get('sortBy', 'CreationTimestamp')
+            params['enumerate_options.sort_option.sortOrder.type'] = sort_option.get('sortOrder', 'Descending')
+        if module.params.get('time_range'):
+            time_range = module.params['time_range']
+            if time_range.get('start_time'):
+                params['enumerate_options.time_range.start_time'] = time_range['start_time']
+            if time_range.get('end_time'):
+                params['enumerate_options.time_range.end_time'] = time_range['end_time']
+
+        # Add references
         if backup_location_ref.get('name'):
             params['backup_location_ref.name'] = backup_location_ref.get('name')
-            
         if backup_location_ref.get('uid'):
             params['backup_location_ref.uid'] = backup_location_ref.get('uid')
 
         if cluster_ref.get('name'):
             params['cluster_ref.name'] = cluster_ref.get('name')
-
         if cluster_ref.get('uid'):
             params['cluster_ref.uid'] = cluster_ref.get('uid')
 
         volume_resource_only_policy_ref = module.params.get('volume_resource_only_policy_ref') or {}
         if volume_resource_only_policy_ref.get('name'):
             params['volume_resource_only_policy_ref.name'] = volume_resource_only_policy_ref.get('name')
-
         if volume_resource_only_policy_ref.get('uid'):
             params['volume_resource_only_policy_ref.uid'] = volume_resource_only_policy_ref.get('uid')
 
-        if enumerate_options:
-            # Handle time_range
-            time_range = enumerate_options.get("time_range", {})
-            if time_range:
-                params['enumerate_options.time_range.start_time'] = time_range.get('start_time')
-                params['enumerate_options.time_range.end_time'] = time_range.get('end_time')
-
-            # Handle other enumerate options
-            if enumerate_options.get('backup_object_type'):
-                params['enumerate_options.backup_object_type'] = enumerate_options.get('backup_object_type')
-            if enumerate_options.get('max_objects'):
-                params['enumerate_options.max_objects'] = enumerate_options.get('max_objects')
-            if enumerate_options.get('name_filter'):
-                params['enumerate_options.name_filter'] = enumerate_options.get('name_filter')
-            if enumerate_options.get('cluster_name_filter'):
-                params['enumerate_options.cluster_name_filter'] = enumerate_options.get('cluster_name_filter')
-            if enumerate_options.get('object_index'):
-                params['enumerate_options.object_index'] = enumerate_options.get('object_index')
-            if enumerate_options.get('include_detailed_resources') is not None:
-                params['enumerate_options.include_detailed_resources'] = enumerate_options.get('include_detailed_resources')
-            if enumerate_options.get('cluster_uid_filter'):
-                params['enumerate_options.cluster_uid_filter'] = enumerate_options.get('cluster_uid_filter')
-            if enumerate_options.get('owners'):
-                params['enumerate_options.owners'] = enumerate_options.get('owners')
-            if enumerate_options.get('status'):
-                params['enumerate_options.status'] = enumerate_options.get('status')
-            # Add new filtration features
-            if enumerate_options.get('vm_volume_name'):
-                params['enumerate_options.vm_volume_name'] = enumerate_options.get('vm_volume_name')
-            if enumerate_options.get('exclude_failed_resource') is not None:
-                params['enumerate_options.exclude_failed_resource'] = enumerate_options.get('exclude_failed_resource')
-            # Add resource_info filter
-            if enumerate_options.get('resource_info'):
-                resource_info = enumerate_options['resource_info']
-                if resource_info.get('name'):
-                    params['enumerate_options.resource_info.name'] = resource_info['name']
-                if resource_info.get('namespace'):
-                    params['enumerate_options.resource_info.namespace'] = resource_info['namespace']
-                if resource_info.get('group'):
-                    params['enumerate_options.resource_info.group'] = resource_info['group']
-                if resource_info.get('kind'):
-                    params['enumerate_options.resource_info.kind'] = resource_info['kind']
-                if resource_info.get('version'):
-                    params['enumerate_options.resource_info.version'] = resource_info['version']
+        # Remove None values
+        params = {k: v for k, v in params.items() if v is not None}
 
         try:
             response = client.make_request('GET', f"v1/backupschedule/{module.params['org_id']}", params=params)
-            return response.get('backup_schedules', [])
+            # Return full response to include pagination metadata
+            return response
         except Exception as e:
             handle_request_exception(e, module, "enumerate backup schedules")
 
@@ -1038,39 +1020,44 @@ def run_module():
                 type=dict(type='str', choices=['Invalid', 'Read', 'Write', 'Admin'])
             ))
         )),
-        enumerate_options=dict(type='dict', required=False, options=dict(
-            labels=dict(type='dict'),
-            owners=dict(type='list', elements='str'),
-            max_objects=dict(type='str'),
-            name_filter=dict(type='str'),
-            cluster_name_filter=dict(type='str'),
-            object_index=dict(type='str'),
-            include_detailed_resources=dict(type='bool'),
-            cluster_uid_filter=dict(type='str'),
-            backup_object_type=dict(type='str'),
-            status=dict(type='list', elements='str'),
-            time_range=dict(type='dict', options=dict(
-                start_time=dict(type='str'),
-                end_time=dict(type='str')
-            )),
-            schedule_policy_ref=dict(type='list', elements='dict', options=dict(
-                name=dict(type='str'),
-                uid=dict(type='str')
-            )),
-            backup_schedule_ref=dict(type='list', elements='dict', options=dict(
-                name=dict(type='str'),
-                uid=dict(type='str')
-            )),
-            sort_option=dict(type='dict', options=dict(
-                sortBy=dict(type='dict', options=dict(
-                    type=dict(type='str', choices=['Invalid', 'CreationTimestamp', 'Name', 'ClusterName', 'Size', 'RestoreBackupName'])
-                )),
-                sortOrder=dict(type='dict', options=dict(
-                    type=dict(type='str', choices=['Invalid', 'Ascending', 'Descending'])
-                ))
-            ))
-        )),
-        
+        # Pagination parameters (INSPECT_ALL)
+        max_objects=dict(type='int', required=False),
+        object_index=dict(type='int', required=False),
+        name_filter=dict(type='str', required=False),
+        cluster_name_filter=dict(type='str', required=False),
+        cluster_uid_filter=dict(type='str', required=False),
+        include_detailed_resources=dict(type='bool', required=False, default=False),
+        owners=dict(type='list', elements='str', required=False),
+        status=dict(type='list', elements='str', required=False),
+
+        # Sort option for enumerate
+        sort_option=dict(
+            type='dict',
+            required=False,
+            options=dict(
+                sortBy=dict(
+                    type='str',
+                    choices=['Invalid', 'CreationTimestamp', 'Name', 'ClusterName', 'Size', 'RestoreBackupName', 'LastUpdateTimestamp'],
+                    default='Invalid'
+                ),
+                sortOrder=dict(
+                    type='str',
+                    choices=['Invalid', 'Ascending', 'Descending'],
+                    default='Invalid'
+                )
+            )
+        ),
+
+        # Time range filter for enumerate
+        time_range=dict(
+            type='dict',
+            required=False,
+            options=dict(
+                start_time=dict(type='str', required=False),
+                end_time=dict(type='str', required=False)
+            )
+        ),
+
         # New in 2.9.0 - Volume Resource Only Policy support
         volume_resource_only_policy_ref=dict(
             type='dict',
@@ -1128,38 +1115,15 @@ def run_module():
                 all_clusters=dict(type='bool')
             )
         ),
-
-        # New filtration features
-        vm_volume_name=dict(
-            type='str',
-            required=False,
-            description='Filter VM that matches the resource_info and has volume vm_volume_name attached to it'
-        ),
-        exclude_failed_resource=dict(
-            type='bool',
-            required=False,
-            default=False,
-            description='Filter to exclude failed resources while enumerating objects'
-        ),
-        resource_info=dict(
-            type='dict',
-            required=False,
-            options=dict(
-                name=dict(type='str', required=False),
-                namespace=dict(type='str', required=False),
-                group=dict(type='str', required=False),
-                kind=dict(type='str', required=False),
-                version=dict(type='str', required=False)
-            ),
-            description='Filter to use resource name and namespace. Any backup schedule that contains the resource will be returned'
-        ),
     )
 
     result = dict(
         changed=False,
         backup_schedule={},
         backup_schedules=[],
-        message=''
+        message='',
+        total_count=None,
+        complete=None
     )
 
     module = AnsibleModule(
@@ -1213,10 +1177,15 @@ def run_module():
             result['changed'] = changed
 
         elif module.params['operation'] == 'INSPECT_ALL' or module.params['operation'] == 'INSPECT_ALL_POST_REQUEST':
-            backup_schedules = enumerate_backup_schedules(module, client, module.params['operation'])
+            response = enumerate_backup_schedules(module, client, module.params['operation'])
+            backup_schedules = response.get('backup_schedules', [])
+
             result['backup_schedules'] = backup_schedules
             result['message'] = f"Found {len(backup_schedules)} backup schedules"
             result['changed'] = False
+
+            # Add pagination metadata
+            add_pagination_metadata(result, response)
 
         elif module.params['operation'] == 'INSPECT_ONE':
             backup_schedule = inspect_backup_schedules(module, client)

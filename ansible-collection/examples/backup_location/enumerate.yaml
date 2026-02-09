@@ -29,6 +29,15 @@
         api_url: "{{ px_backup_api_url }}"
         token: "{{ px_backup_token }}"
         org_id: "{{ org_id | default('default') }}"
+        # Optional filters
+        include_secrets: "{{ include_secrets | default(false) }}"
+        labels: "{{ labels | default(omit) }}"
+        cloud_credential_ref: "{{ cloud_credential_ref | default(omit) }}"
+        max_objects: "{{ max_objects | default(omit) }}"
+        object_index: "{{ object_index | default(omit) }}"
+        name_filter: "{{ name_filter | default(omit) }}"
+        time_range: "{{ time_range | default(omit) }}"
+        sort_option: "{{ sort_option | default(omit) }}"
         # SSL Certificate Parameters
         ssl_config: "{{ ssl_config.px_backup | default({}) }}"
       register: backup_location_result

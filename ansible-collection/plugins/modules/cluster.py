@@ -24,6 +24,7 @@ from dataclasses import dataclass
 
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.purepx.px_backup.plugins.module_utils.px_backup.api import PXBackupClient
+# Note: enumerate utility imports removed - cluster has limited server-side support
 import requests
 import base64
 
@@ -501,43 +502,49 @@ def unshare_cluster(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict
     except Exception as e:
         module.fail_json(msg=f"Failed to unshare cluster: {str(e)}")
 
-def enumerate_clusters(module: AnsibleModule, client: PXBackupClient) -> List[Dict[str, Any]]:
-    """List all clusters"""
+def enumerate_clusters(module: AnsibleModule, client: PXBackupClient) -> Dict[str, Any]:
+    """List all clusters.
+
+    Note: Server-side support for enumerate_options is LIMITED for cluster endpoint.
+    Only sort_option (Name, CreationTimestamp) is supported.
+    Pagination (max_objects, object_index), time_range, name_filter, owners, status
+    are NOT implemented on the server and will be ignored.
+    Labels filtering is client-side only via top-level 'labels' parameter.
+    """
     try:
         params = {
-            'labels': module.params.get('labels', {}),
             'include_secrets': module.params.get('include_secrets', False),
             'only_backup_share': module.params.get('only_backup_share', False),
-            'cloud_credential_ref': module.params.get('cloud_credential_ref', {}),
         }
 
-        # Add new filtration features
-        if module.params.get('vm_volume_name'):
-            params['enumerate_options.vm_volume_name'] = module.params['vm_volume_name']
+        # Labels - passed as top-level param (client-side filtering only)
+        labels = module.params.get('labels')
+        if labels:
+            params['labels'] = labels
 
-        if module.params.get('exclude_failed_resource') is not None:
-            params['enumerate_options.exclude_failed_resource'] = module.params['exclude_failed_resource']
+        # cloud_credential_ref - flatten to query params if provided
+        cloud_cred_ref = module.params.get('cloud_credential_ref')
+        if cloud_cred_ref:
+            if cloud_cred_ref.get('name'):
+                params['cloud_credential_ref.name'] = cloud_cred_ref['name']
+            if cloud_cred_ref.get('uid'):
+                params['cloud_credential_ref.uid'] = cloud_cred_ref['uid']
 
-        # Add resource_info filter
-        if module.params.get('resource_info'):
-            resource_info = module.params['resource_info']
-            if resource_info.get('name'):
-                params['enumerate_options.resource_info.name'] = resource_info['name']
-            if resource_info.get('namespace'):
-                params['enumerate_options.resource_info.namespace'] = resource_info['namespace']
-            if resource_info.get('group'):
-                params['enumerate_options.resource_info.group'] = resource_info['group']
-            if resource_info.get('kind'):
-                params['enumerate_options.resource_info.kind'] = resource_info['kind']
-            if resource_info.get('version'):
-                params['enumerate_options.resource_info.version'] = resource_info['version']
+        # Only sort_option is supported for cluster endpoint (server limitation)
+        if module.params.get('sort_option'):
+            sort_option = module.params['sort_option']
+            # Only Name and CreationTimestamp are supported sort fields
+            if sort_option.get('sortBy') and sort_option['sortBy'] in ('Name', 'CreationTimestamp'):
+                params['enumerate_options.sort_option.sortBy.type'] = sort_option['sortBy']
+            if sort_option.get('sortOrder') and sort_option['sortOrder'] != 'Invalid':
+                params['enumerate_options.sort_option.sortOrder.type'] = sort_option['sortOrder']
 
         response = client.make_request(
             method='GET',
             endpoint=f"v1/cluster/{module.params['org_id']}",
             params=params
         )
-        return response.get('clusters', [])
+        return response
 
     except Exception as e:
         module.fail_json(msg=f"Failed to enumerate clusters: {str(e)}")
@@ -716,7 +723,9 @@ def perform_operation(module: AnsibleModule, client: PXBackupClient, operation: 
             )
         
         elif operation == 'INSPECT_ALL':
-            clusters = enumerate_clusters(module, client)
+            response = enumerate_clusters(module, client)
+            clusters = response.get('clusters', [])
+
             return OperationResult(
                 success=True,
                 changed=False,
@@ -919,6 +928,7 @@ def run_module():
             )
         ),
         include_secrets=dict(type='bool', default=False),
+        only_backup_share=dict(type='bool', default=False),
         # New filtration features
         vm_volume_name=dict(
             type='str',
@@ -979,6 +989,30 @@ def run_module():
                             choices=['Read', 'Write', 'Admin']
                         )
                     )
+                )
+            )
+        ),
+
+        # Pagination parameters - NOTE: Server support is LIMITED for cluster endpoint
+        # Only sort_option (Name, CreationTimestamp) is supported server-side
+        max_objects=dict(type='int', required=False),
+        object_index=dict(type='int', required=False),
+        name_filter=dict(type='str', required=False),
+
+        # Sort option for enumerate (only Name and CreationTimestamp supported)
+        sort_option=dict(
+            type='dict',
+            required=False,
+            options=dict(
+                sortBy=dict(
+                    type='str',
+                    choices=['Invalid', 'CreationTimestamp', 'Name', 'ClusterName', 'Size', 'RestoreBackupName', 'LastUpdateTimestamp'],
+                    default='Invalid'
+                ),
+                sortOrder=dict(
+                    type='str',
+                    choices=['Invalid', 'Ascending', 'Descending'],
+                    default='Invalid'
                 )
             )
         )

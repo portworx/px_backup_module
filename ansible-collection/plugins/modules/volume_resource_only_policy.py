@@ -23,6 +23,11 @@ from dataclasses import dataclass
 
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.purepx.px_backup.plugins.module_utils.px_backup.api import PXBackupClient
+from ansible_collections.purepx.px_backup.plugins.module_utils.px_backup.enumerate import (
+    get_vro_enumerate_options_spec,
+    build_vro_enumerate_request_body,
+    add_pagination_metadata
+)
 import requests
 
 # Constants for enum mappings
@@ -575,10 +580,9 @@ def update_ownership(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dic
     except Exception as e:
         module.fail_json(msg=f"Failed to update volume resource only policy ownership: {str(e)}")
 
-def enumerate_volume_resource_only_policies(module: AnsibleModule, client: PXBackupClient) -> List[Dict[str, Any]]:
-    """List all volume resource only policies"""
+def enumerate_volume_resource_only_policies(module: AnsibleModule, client: PXBackupClient) -> Dict[str, Any]:
+    """List all volume resource only policies with pagination support."""
 
-    # Determine if we should use the new POST endpoint based on enhanced options
     enumerate_options = module.params.get('enumerate_options', {})
     request_body = {
         "org_id": module.params['org_id']
@@ -588,43 +592,11 @@ def enumerate_volume_resource_only_policies(module: AnsibleModule, client: PXBac
     if module.params.get('labels'):
         request_body["labels"] = module.params['labels']
 
-    # Build enumerate_options for the request
+    # Build enumerate_options using common VRO handler
     if enumerate_options:
-        request_enumerate_options = {}
+        request_enumerate_options = build_vro_enumerate_request_body(enumerate_options)
 
-        # Handle generic enumerate options
-        if enumerate_options.get('generic_enumerate_options'):
-            generic_opts = enumerate_options['generic_enumerate_options']
-            generic_enumerate_options = {}
-
-            # Add simple fields
-            for field in ['labels', 'max_objects', 'name_filter', 'object_index']:
-                if field in generic_opts and generic_opts[field] is not None:
-                    generic_enumerate_options[field] = generic_opts[field]
-
-            # Handle sort_option (nested within generic_enumerate_options)
-            if generic_opts.get('sort_option'):
-                sort_option = generic_opts['sort_option']
-                generic_enumerate_options["sort_option"] = {
-                    "sortBy": {"type": sort_option.get('sortBy', 'Invalid')},
-                    "sortOrder": {"type": sort_option.get('sortOrder', 'Invalid')}
-                }
-
-            # Handle time_range (nested within generic_enumerate_options)
-            if generic_opts.get('time_range'):
-                time_range = generic_opts['time_range']
-                time_range_obj = {}
-                if time_range.get('start_time'):
-                    time_range_obj['start_time'] = time_range['start_time']
-                if time_range.get('end_time'):
-                    time_range_obj['end_time'] = time_range['end_time']
-                if time_range_obj:
-                    generic_enumerate_options['time_range'] = time_range_obj
-
-            if generic_enumerate_options:
-                request_enumerate_options['generic_enumerate_options'] = generic_enumerate_options
-
-        # Handle volume types filtering (at top level of enumerate_options)
+        # Add VRO-specific fields not in common handler
         if enumerate_options.get('volume_types'):
             request_enumerate_options["volume_types"] = enumerate_options['volume_types']
 
@@ -637,7 +609,8 @@ def enumerate_volume_resource_only_policies(module: AnsibleModule, client: PXBac
             f"v1/volumeresourceonlypolicy/{module.params['org_id']}/enumerate",
             data=request_body
         )
-        return response.get('volume_resource_only_policies', [])
+        # Return full response to include pagination metadata
+        return response
     except Exception as e:
         module.fail_json(msg=f"Failed to enumerate volume resource only policies (POST): {str(e)}")
 
@@ -736,11 +709,17 @@ def perform_operation(module: AnsibleModule, client: PXBackupClient, operation: 
             )
         
         elif operation == 'INSPECT_ALL':
-            policies = enumerate_volume_resource_only_policies(module, client)
+            response = enumerate_volume_resource_only_policies(module, client)
+            policies = response.get('volume_resource_only_policies', [])
+
+            # Build result data with pagination metadata
+            result_data = {'volume_resource_only_policies': policies}
+            add_pagination_metadata(result_data, response)
+
             return OperationResult(
                 success=True,
                 changed=False,
-                data={'volume_resource_only_policies': policies},
+                data=result_data,
                 message=f"Found {len(policies)} volume resource only policies"
             )
 
@@ -824,48 +803,7 @@ def run_module():
         enumerate_options=dict(
             type='dict',
             required=False,
-            options=dict(
-                generic_enumerate_options=dict(
-                    type='dict',
-                    required=False,
-                    options=dict(
-                        labels=dict(type='dict', required=False),
-                        max_objects=dict(type='int', required=False),
-                        name_filter=dict(type='str', required=False),
-                        object_index=dict(type='int', required=False),
-                        sort_option=dict(
-                            type='dict',
-                            required=False,
-                            options=dict(
-                                sortBy=dict(
-                                    type='str',
-                                    choices=['Invalid', 'CreationTimestamp', 'Name', 'ClusterName', 'Size', 'RestoreBackupName', 'LastUpdateTimestamp'],
-                                    default='Invalid'
-                                ),
-                                sortOrder=dict(
-                                    type='str',
-                                    choices=['Invalid', 'Ascending', 'Descending'],
-                                    default='Invalid'
-                                )
-                            )
-                        ),
-                        time_range=dict(
-                            type='dict',
-                            required=False,
-                            options=dict(
-                                start_time=dict(type='str', required=False),
-                                end_time=dict(type='str', required=False)
-                            )
-                        )
-                    )
-                ),
-                volume_types=dict(
-                    type='list',
-                    elements='str',
-                    required=False,
-                    choices=['Invalid', 'Portworx', 'Csi', 'Nfs']
-                )
-            )
+            options=get_vro_enumerate_options_spec()
         ),
         ownership=dict(
             type='dict',
@@ -911,7 +849,9 @@ def run_module():
         changed=False,
         volume_resource_only_policy={},
         volume_resource_only_policies=[],
-        message=''
+        message='',
+        total_count=None,
+        complete=None
     )
 
     # Define required parameters for each operation

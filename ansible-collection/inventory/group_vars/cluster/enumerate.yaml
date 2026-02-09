@@ -1,9 +1,9 @@
 ---
-# Variables specific to enumeration operations
+# Cluster specific parameters
 include_secrets: false
 only_backup_share: false
-labels: {}  # Optional labels for filtering
 
-# Optional filters
-cloud_credential_filter: "{{ cloud_cred_name | default(omit) }}"
-max_results: 100
+# Sort option
+sort_option:
+  sortBy: "CreationTimestamp"
+  sortOrder: "Descending"

@@ -23,11 +23,14 @@ from dataclasses import dataclass
 
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.purepx.px_backup.plugins.module_utils.px_backup.api import PXBackupClient
+from ansible_collections.purepx.px_backup.plugins.module_utils.px_backup.enumerate import (
+    add_pagination_metadata
+)
 import requests
 
 # Constants for enum mappings
+# Based on API testing - only 'All' and 'VirtualMachine' are accepted for enumerate
 BACKUP_OBJECT_TYPE_MAP = {
-    'Invalid': 0,
     'All': 1,
     'VirtualMachine': 2
 }
@@ -1116,43 +1119,68 @@ def update_backup_share(module: AnsibleModule, client: PXBackupClient) -> Tuple[
                 error_msg = f"{error_msg}: {getattr(e.response, 'text', 'No response text')}"
         module.fail_json(msg=f"Failed to update backup share: {error_msg}")
 
-def enumerate_backups(module: AnsibleModule, client: PXBackupClient) -> List[Dict[str, Any]]:
-    """List all backups with support for both GET and POST methods based on query complexity"""
+def enumerate_backups(module: AnsibleModule, client: PXBackupClient) -> Dict[str, Any]:
+    """List all backups with pagination and filtering support."""
     try:
-        # Build enumerate_options for POST request
-        enumerate_options = {
-            "max_objects": str(module.params.get('max_objects')),
-            "name_filter": module.params.get('name_filter'),
-            "cluster_name_filter": module.params.get('cluster_name_filter'),
-            "cluster_uid_filter": module.params.get('cluster_uid_filter'),
-            "include_detailed_resources": module.params.get('include_detailed_resources', False),
-            "labels": module.params.get('labels', {}),
-            "owners": module.params.get('owners', []),
-            "status": module.params.get('status', [])
-        }
-            
-        # Add backup_object_type if provided
+        enumerate_options = {}
+
+        # Pagination parameters
+        if module.params.get('max_objects') is not None:
+            enumerate_options["max_objects"] = str(module.params.get('max_objects'))
+        if module.params.get('object_index') is not None:
+            enumerate_options["object_index"] = str(module.params.get('object_index'))
+
+        # Filter parameters
+        if module.params.get('name_filter'):
+            enumerate_options["name_filter"] = module.params.get('name_filter')
+        if module.params.get('cluster_name_filter'):
+            enumerate_options["cluster_name_filter"] = module.params.get('cluster_name_filter')
+        if module.params.get('cluster_uid_filter'):
+            enumerate_options["cluster_uid_filter"] = module.params.get('cluster_uid_filter')
+        if module.params.get('include_detailed_resources'):
+            enumerate_options["include_detailed_resources"] = module.params.get('include_detailed_resources')
+        if module.params.get('labels'):
+            enumerate_options["labels"] = module.params.get('labels', {})
+        if module.params.get('owners'):
+            enumerate_options["owners"] = module.params.get('owners', [])
+        if module.params.get('status'):
+            enumerate_options["status"] = module.params.get('status', [])
+
+        # Add backup_object_type if provided - API expects string value for enumerate
         if module.params.get('backup_object_type'):
-            enumerate_options['backup_object_type'] = module.params['backup_object_type'].get('type')
-                
-        # Add new 2.9.0 fields
+            backup_obj_type = module.params['backup_object_type']
+            if isinstance(backup_obj_type, dict) and 'type' in backup_obj_type:
+                # EnumerateOptions expects backup_object_type as a string (e.g., "NS", "All", "VirtualMachine")
+                enumerate_options['backup_object_type'] = backup_obj_type['type']
+
+        # Add schedule refs
         if module.params.get('schedule_policy_ref'):
             enumerate_options["schedule_policy_ref"] = module.params['schedule_policy_ref']
-
         if module.params.get('backup_schedule_ref'):
             enumerate_options["backup_schedule_ref"] = module.params['backup_schedule_ref']
 
+        # Handle sort_option
         if module.params.get('sort_option'):
             sort_option = module.params['sort_option']
             enumerate_options["sort_option"] = {
-                "sortBy": {"type": sort_option.get('sort_by', 'CreationTimestamp')},
-                "sortOrder": {"type": sort_option.get('sort_order', 'Descending')}
+                "sortBy": {"type": sort_option.get('sortBy', 'CreationTimestamp')},
+                "sortOrder": {"type": sort_option.get('sortOrder', 'Descending')}
             }
 
-        # Add new filtration features
+        # Handle time_range
+        if module.params.get('time_range'):
+            time_range = module.params['time_range']
+            tr = {}
+            if time_range.get('start_time'):
+                tr['start_time'] = time_range['start_time']
+            if time_range.get('end_time'):
+                tr['end_time'] = time_range['end_time']
+            if tr:
+                enumerate_options["time_range"] = tr
+
+        # Add backup-specific filtration features
         if module.params.get('vm_volume_name'):
             enumerate_options["vm_volume_name"] = module.params['vm_volume_name']
-
         if module.params.get('exclude_failed_resource') is not None:
             enumerate_options["exclude_failed_resource"] = module.params['exclude_failed_resource']
 
@@ -1173,7 +1201,8 @@ def enumerate_backups(module: AnsibleModule, client: PXBackupClient) -> List[Dic
             data={"enumerate_options": enumerate_options}
         )
 
-        return response.get('backups', [])
+        # Return full response to include pagination metadata
+        return response
     except Exception as e:
         error_msg = str(e)
         if isinstance(e, requests.exceptions.RequestException) and hasattr(e, 'response'):
@@ -1468,11 +1497,17 @@ def perform_operation(module: AnsibleModule, client: PXBackupClient, operation: 
             )
 
         elif operation == 'INSPECT_ALL':
-            backups = enumerate_backups(module, client)
+            response = enumerate_backups(module, client)
+            backups = response.get('backups', [])
+
+            # Build result data with pagination metadata
+            result_data = {'backups': backups}
+            add_pagination_metadata(result_data, response)
+
             return OperationResult(
                 success=True,
                 changed=False,
-                data={'backups': backups},
+                data=result_data,
                 message=f"Found {len(backups)} backups"
             )
 
@@ -1654,7 +1689,7 @@ def run_module():
                 type=dict(
                     type='str',
                     required=True,
-                    choices=['Invalid', 'All', 'VirtualMachine']
+                    choices=['All', 'VirtualMachine']
                 )
             )
         ),
@@ -1672,22 +1707,6 @@ def run_module():
             options=dict(
                 name=dict(type='str'),
                 uid=dict(type='str')
-            )
-        ),
-        sort_option=dict(
-            type='dict',
-            required=False,
-            options=dict(
-                sort_by=dict(
-                    type='str',
-                    choices=['CreationTimestamp', 'Name', 'ClusterName', 'Size', 'RestoreBackupName', 'LastUpdateTimestamp'],
-                    default='CreationTimestamp'
-                ),
-                sort_order=dict(
-                    type='str',
-                    choices=['Ascending', 'Descending'],
-                    default='Descending'
-                )
             )
         ),
         schedule_policy_ref=dict(
@@ -1833,6 +1852,34 @@ def run_module():
                 client_cert=dict(type='path'),
                 client_key=dict(type='path', no_log=False)
             )
+        ),
+
+        # Sort option for enumerate
+        sort_option=dict(
+            type='dict',
+            required=False,
+            options=dict(
+                sortBy=dict(
+                    type='str',
+                    choices=['Invalid', 'CreationTimestamp', 'Name', 'ClusterName', 'Size', 'RestoreBackupName', 'LastUpdateTimestamp'],
+                    default='Invalid'
+                ),
+                sortOrder=dict(
+                    type='str',
+                    choices=['Invalid', 'Ascending', 'Descending'],
+                    default='Invalid'
+                )
+            )
+        ),
+
+        # Time range filter for enumerate
+        time_range=dict(
+            type='dict',
+            required=False,
+            options=dict(
+                start_time=dict(type='str', required=False),
+                end_time=dict(type='str', required=False)
+            )
         )
     )
 
@@ -1840,7 +1887,9 @@ def run_module():
         changed=False,
         backup={},
         backups=[],
-        message=''
+        message='',
+        total_count=None,
+        complete=None
     )
 
     # Define required parameters for each operation

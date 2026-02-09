@@ -1,6 +1,3 @@
 ---
-# Variables specific to enumeration operations
-labels: {}  # Optional labels for filtering
-
-# Optional filters
-max_results: 100
+# schedule_policy enumerate does not support any enumerate_options.
+# Only org_id is used - all schedule policies are returned.

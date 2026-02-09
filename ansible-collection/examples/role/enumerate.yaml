@@ -6,7 +6,6 @@
 
   vars_files:
     - "{{ inventory_dir }}/group_vars/common/all.yaml"
-    - "{{ inventory_dir }}/group_vars/role/enumerate.yaml"
 
   pre_tasks:
     - name: Validate required variables
@@ -19,6 +18,8 @@
   tasks:
     - name: Login and fetch Px-Backup token
       include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+
+    # All roles are returned - no pagination, sorting, or filtering available.
     - name: Enumerate roles
       block:
         - name: Get list of roles
@@ -27,16 +28,13 @@
             api_url: "{{ px_backup_api_url }}"
             token: "{{ px_backup_token }}"
             org_id: "{{ org_id }}"
-            # Optional filters
-            labels: "{{ labels | default(omit) }}"
-            max_objects: "{{ max_objects | default(omit) }}"
             # SSL Certificate Parameters
             ssl_config: "{{ ssl_config.px_backup | default({}) }}"
           register: role_result
 
         - name: Display role list summary
           debug:
-            msg: 
+            msg:
               - "Total roles found: {{ role_result.roles | length }}"
 
       rescue:
@@ -48,7 +46,6 @@
         - name: Fail with error message
           fail:
             msg: "Failed to enumerate roles. See above for details."
-
 
     # Output configuration: Display the output or save to file
     - name: Handle output

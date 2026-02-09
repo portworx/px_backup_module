@@ -129,6 +129,39 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 | cluster_share.groups                | list    | no       |         | List of groups to share with |
 | cluster_share.share_cluster_backups | boolean | no       | false   | List of users to share with  |
 
+### Enumeration Options
+
+For INSPECT_ALL operations, use the unified `enumerate_options` structure for pagination, filtering, and sorting. See [Enumerate Options Configuration](../common/enumerate_options.md) for complete documentation.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| enumerate_options | dictionary | no | Options for controlling enumeration behavior |
+| enumerate_options.max_objects | integer | no | Maximum number of objects to return |
+| enumerate_options.object_index | integer | no | Starting index for pagination |
+| enumerate_options.name_filter | string | no | Filter by name |
+| enumerate_options.labels | dictionary | no | Filter by labels |
+| enumerate_options.time_range | dictionary | no | Filter by time range |
+| enumerate_options.sort_option | dictionary | no | Sorting configuration |
+| only_backup_share | boolean | no | Filter to include only clusters with backup sharing enabled |
+
+> **Note**: The cluster API does not return pagination metadata (`total_count`, `complete`). To check if more results exist, compare the returned array length with `max_objects`.
+
+#### Example: List with Pagination
+
+```yaml
+- name: List clusters with pagination
+  cluster:
+    operation: INSPECT_ALL
+    api_url: "{{ px_backup_api_url }}"
+    token: "{{ px_backup_token }}"
+    org_id: "default"
+    enumerate_options:
+      max_objects: 10
+      sort_option:
+        sortBy: "Name"
+        sortOrder: "Ascending"
+```
+
 ## Error Handling
 
 The module implements comprehensive error handling:

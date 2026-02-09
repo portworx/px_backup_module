@@ -24,6 +24,7 @@ from dataclasses import dataclass
 
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.purepx.px_backup.plugins.module_utils.px_backup.api import PXBackupClient
+# Note: enumerate utility imports removed - role has NO server-side support
 import requests
 
 DOCUMENTATION = r'''
@@ -565,35 +566,18 @@ def permission_role(module, client):
         module.fail_json(msg=f"Failed to fetch permissions: {str(e)}")
 
 def enumerate_roles(module, client):
-    """List all roles"""
-    params = {
-        'labels': module.params.get('labels', {})
-    }
+    """List all roles.
 
-    # Add new filtration features
-    if module.params.get('vm_volume_name'):
-        params['enumerate_options.vm_volume_name'] = module.params['vm_volume_name']
-
-    if module.params.get('exclude_failed_resource') is not None:
-        params['enumerate_options.exclude_failed_resource'] = module.params['exclude_failed_resource']
-
-    # Add resource_info filter
-    if module.params.get('resource_info'):
-        resource_info = module.params['resource_info']
-        if resource_info.get('name'):
-            params['enumerate_options.resource_info.name'] = resource_info['name']
-        if resource_info.get('namespace'):
-            params['enumerate_options.resource_info.namespace'] = resource_info['namespace']
-        if resource_info.get('group'):
-            params['enumerate_options.resource_info.group'] = resource_info['group']
-        if resource_info.get('kind'):
-            params['enumerate_options.resource_info.kind'] = resource_info['kind']
-        if resource_info.get('version'):
-            params['enumerate_options.resource_info.version'] = resource_info['version']
+    Note: Server-side support for enumerate_options is NOT implemented for role endpoint.
+    The server ignores ALL enumerate_options fields (pagination, sorting, filtering).
+    Only org_id is used by the server.
+    """
+    # Server only uses org_id - no enumerate_options are supported
+    params = {}
 
     try:
         response = client.make_request('GET', f"v1/role/{module.params['org_id']}", params=params)
-        return response.get('roles', [])
+        return response
     except Exception as e:
         module.fail_json(msg=f"Failed to enumerate roles: {str(e)}")
 
@@ -736,7 +720,9 @@ def perform_operation(module: AnsibleModule, client: PXBackupClient, operation: 
             )
         
         elif operation == 'INSPECT_ALL':
-            roles = enumerate_roles(module, client)
+            response = enumerate_roles(module, client)
+            roles = response.get('roles', [])
+
             return OperationResult(
                 success=True,
                 changed=False,
@@ -906,6 +892,12 @@ def run_module():
                 client_key=dict(type='path', no_log=False)
             )
         ),
+
+        # NOTE: Role endpoint does NOT support enumerate_options server-side
+        # These are defined for API consistency but are ignored by the server
+        max_objects=dict(type='int', required=False),
+        object_index=dict(type='int', required=False),
+        name_filter=dict(type='str', required=False)
     )
 
     result = dict(

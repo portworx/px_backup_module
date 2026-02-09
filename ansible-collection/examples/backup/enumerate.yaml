@@ -40,6 +40,8 @@
             sort_option: "{{ sort_option | default(omit) }}"
             schedule_policy_ref: "{{ schedule_policy_ref | default(omit) }}"
             backup_schedule_ref: "{{ backup_schedule_ref | default(omit) }}"
+            time_range: "{{ time_range | default(omit) }}"
+            object_index: "{{ object_index | default(omit) }}"
             # SSL Certificate Parameters
             ssl_config: "{{ ssl_config.px_backup | default({}) }}"
           register: backup_result

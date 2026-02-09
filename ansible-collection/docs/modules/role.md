@@ -103,7 +103,37 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 | rules.services | list(string) | yes      |         | Services that the role has access to  |
 | rules.apis     | list(string) | yes      |         | API actions that the role can perform |
 
+### Enumeration Options
 
+For INSPECT_ALL operations, use the unified `enumerate_options` structure for pagination, filtering, and sorting. See [Enumerate Options Configuration](../common/enumerate_options.md) for complete documentation.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| enumerate_options | dictionary | no | Options for controlling enumeration behavior |
+| enumerate_options.max_objects | integer | no | Maximum number of objects to return |
+| enumerate_options.object_index | integer | no | Starting index for pagination |
+| enumerate_options.name_filter | string | no | Filter by name |
+| enumerate_options.labels | dictionary | no | Filter by labels |
+| enumerate_options.time_range | dictionary | no | Filter by time range |
+| enumerate_options.sort_option | dictionary | no | Sorting configuration |
+
+> **Note**: The role API does not return pagination metadata (`total_count`, `complete`). To check if more results exist, compare the returned array length with `max_objects`.
+
+#### Example: List with Pagination
+
+```yaml
+- name: List roles with pagination
+  role:
+    operation: INSPECT_ALL
+    api_url: "{{ px_backup_api_url }}"
+    token: "{{ px_backup_token }}"
+    org_id: "default"
+    enumerate_options:
+      max_objects: 10
+      sort_option:
+        sortBy: "Name"
+        sortOrder: "Ascending"
+```
 
 ## Examples
 
