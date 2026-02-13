@@ -427,6 +427,15 @@ options:
         elements: str
         required: false
 
+    exclude_synced_backups:
+        description:
+            - Exclude synced backups from enumeration results
+            - When set to true, only local backups will be returned
+            - When set to false or omitted, all backups including synced ones will be returned
+        type: bool
+        required: false
+        default: false
+
     force_resync:
         description: Force resync of failed sync process for GET_BACKUP_RESOURCE_DETAILS operation
         type: bool
@@ -1156,6 +1165,9 @@ def enumerate_backups(module: AnsibleModule, client: PXBackupClient) -> List[Dic
         if module.params.get('exclude_failed_resource') is not None:
             enumerate_options["exclude_failed_resource"] = module.params['exclude_failed_resource']
 
+        if module.params.get('exclude_synced_backups') is not None:
+            enumerate_options["exclude_synced_backups"] = module.params['exclude_synced_backups']
+
         # Add resource_info filter
         if module.params.get('resource_info'):
             resource_info = module.params['resource_info']
@@ -1808,6 +1820,12 @@ def run_module():
             required=False,
             default=False,
             description='Filter to exclude failed resources while enumerating objects'
+        ),
+        exclude_synced_backups=dict(
+            type='bool',
+            required=False,
+            default=False,
+            description='Exclude synced backups from enumeration results. When true, only local backups are returned'
         ),
         resource_info=dict(
             type='dict',
