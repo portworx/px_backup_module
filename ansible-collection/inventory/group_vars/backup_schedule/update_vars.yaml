@@ -2,33 +2,64 @@
 # Backup schedules to update
 
 backup_schedules_update:
-  # List of backup schedules to update
   - name: "test-g"
+    # uid: "optional-uid"  # Optional: specify UID for precise targeting
     suspend: false
+    reclaim_policy: "Delete"  # Options: Invalid, Delete, Retain
+    cluster: "cluster-name"  # Cluster name (string)
     cluster_ref:
       name: "self-cluster"
-    pre_exec_rule_ref:
-      name: "pre-rule"
-    post_exec_rule_ref:
-      name: "post-rule"
+    namespaces:
+      - "namespace-1"
+      - "namespace-2"
+    # NOTE: label_selectors and advanced_resource_label_selector are MUTUALLY EXCLUSIVE
+    # Use only ONE of them, not both.
+    # IMPORTANT: These can ONLY be updated if they were set during creation!
+    # label_selectors:
+    #   app: "myapp"
+    #   tier: "backend"
+    # OR use advanced_resource_label_selector (supports operators like in, notin, exists):
+    # advanced_resource_label_selector: "app.kubernetes.io/name=myapp"
+    # ns_label_selectors: "kubernetes.io/metadata.name in (default, kube-system)"
+    # include_resources:
+    #   - name: "my-pvc"
+    #     namespace: "app-namespace"
+    backup_object_type:
+      type: "All"  # Options: All, VirtualMachine, Namespace
     schedule_policy_ref:
       name: "15min-retain3-incr2"
     backup_location_ref:
       name: "minio"
-    labels:
-      key: value
-    remark: "Adding remark via Ansible"
-  # OR Bulk update schedules
-  - backup_object_type:
-      type: "All"  # Can be "All" or "VM" or "NS"
+    pre_exec_rule_ref:
+      name: "pre-rule"
+    post_exec_rule_ref:
+      name: "post-rule"
+    volume_snapshot_class_mapping:
+      csi.storage.k8s.io: "csi-snapclass"
+    skip_vm_auto_exec_rules: false  # NOTE: Only valid when backup_object_type is "VirtualMachine"
+    parallel_backup: true
     policy_ref:
       - name: "policy-1"
       - name: "policy-2"
-    cluster_scope:
-      all_clusters: true
-    include_filter: "*"
+    volume_resource_only_policy_ref:
+      name: "vro-policy"
+    remark: "Adding remark via Ansible"
     exclude_objects:
       - name: "sched-bkp-2"
+        uid: "uid-123"
+    include_objects:
+      - name: "sched-bkp-1"
+        uid: "uid-456"
+    include_filter: "prod-*"  # Regex pattern to match schedule names
+    exclude_filter: "test-*"  # Regex pattern to exclude schedule names
+    cluster_scope:
+      all_clusters: true
+      # OR specify clusters:
+      # cluster_ref:
+      #   - name: "cluster-1"
+      #   - name: "cluster-2"
+    labels:
+      updated_by: ansible
 
 # Global update configuration
 backup_configs: true
