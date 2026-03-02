@@ -262,6 +262,53 @@ options:
                         type: str
                         required: false
                         choices: ['Read', 'Write', 'Admin']
+    provider_info:
+        description:
+            - Cloud provider specific information for the cluster
+            - Contains details about the cluster's origin (e.g., Gardener Shoot cluster info)
+        required: false
+        type: dict
+        version_added: '2.11.0'
+        suboptions:
+            gardener_shoot_info:
+                description:
+                    - Information specific to Gardener Shoot clusters
+                    - Populated when cluster is discovered via ClusterDiscoveryConfig
+                type: dict
+                required: false
+                suboptions:
+                    project_name:
+                        description: Gardener project name containing the Shoot cluster
+                        type: str
+                    shoot_name:
+                        description: Name of the Shoot cluster in Gardener
+                        type: str
+                    seed_name:
+                        description: Name of the Seed cluster hosting this Shoot
+                        type: str
+                    labels:
+                        description: Labels from the Shoot cluster metadata
+                        type: dict
+                    cloud_provider_type:
+                        description: Cloud provider type (e.g., aws, gcp, azure)
+                        type: str
+                    cluster_discovery_config_refs:
+                        description: References to ClusterDiscoveryConfigs that discovered this cluster
+                        type: list
+                        elements: dict
+                        suboptions:
+                            name:
+                                description: Name of the ClusterDiscoveryConfig
+                                type: str
+                            uid:
+                                description: UID of the ClusterDiscoveryConfig
+                                type: str
+                    expiration_timestamp:
+                        description: Expiration time of the kubeconfig (RFC3339 format)
+                        type: str
+                    refresh_at:
+                        description: Time when the kubeconfig should be refreshed (RFC3339 format)
+                        type: str
 
 requirements:
     - python >= 3.9
@@ -636,7 +683,34 @@ def build_cluster_request(params: Dict[str, Any]) -> Dict[str, Any]:
 
     if params.get('ownership'):
         request['metadata']['ownership'] = params['ownership']
-    
+
+    # Add provider_info if provided (e.g., GardenerShootInfo for Gardener-discovered clusters)
+    if params.get('provider_info'):
+        provider_info = {}
+        if params['provider_info'].get('gardener_shoot_info'):
+            gardener_info = params['provider_info']['gardener_shoot_info']
+            gardener_shoot_info = {}
+
+            # Add simple string fields
+            for field in ['project_name', 'shoot_name', 'seed_name', 'cloud_provider_type',
+                          'expiration_timestamp', 'refresh_at']:
+                if gardener_info.get(field):
+                    gardener_shoot_info[field] = gardener_info[field]
+
+            # Add labels dict
+            if gardener_info.get('labels'):
+                gardener_shoot_info['labels'] = gardener_info['labels']
+
+            # Add cluster_discovery_config_refs
+            if gardener_info.get('cluster_discovery_config_refs'):
+                gardener_shoot_info['cluster_discovery_config_refs'] = gardener_info['cluster_discovery_config_refs']
+
+            if gardener_shoot_info:
+                provider_info['gardener_shoot_info'] = gardener_shoot_info
+
+        if provider_info:
+            cluster_info['provider_info'] = provider_info
+
     # Add cluster info to request if not empty
     if cluster_info:
         request['clusterinfo'] = cluster_info
@@ -978,6 +1052,33 @@ def run_module():
                             type='str',
                             choices=['Read', 'Write', 'Admin']
                         )
+                    )
+                )
+            )
+        ),
+        provider_info=dict(
+            type='dict',
+            required=False,
+            options=dict(
+                gardener_shoot_info=dict(
+                    type='dict',
+                    required=False,
+                    options=dict(
+                        project_name=dict(type='str'),
+                        shoot_name=dict(type='str'),
+                        seed_name=dict(type='str'),
+                        labels=dict(type='dict'),
+                        cloud_provider_type=dict(type='str'),
+                        cluster_discovery_config_refs=dict(
+                            type='list',
+                            elements='dict',
+                            options=dict(
+                                name=dict(type='str'),
+                                uid=dict(type='str')
+                            )
+                        ),
+                        expiration_timestamp=dict(type='str'),
+                        refresh_at=dict(type='str')
                     )
                 )
             )

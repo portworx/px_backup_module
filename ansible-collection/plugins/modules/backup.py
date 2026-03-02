@@ -759,6 +759,21 @@ backup:
                 "volumes_completion_time": "2024-11-19T10:00:00Z",
                 "resources_completion_time": "2024-11-19T10:05:00Z",
                 "total_completion_time": "2024-11-19T10:05:30Z"
+            },
+            "failed_resource_count": 0,
+            "failed_vol_count": 0,
+            "resources_sync_status_info": {
+                "status": "Completed",
+                "reason": "Resources synced successfully"
+            },
+            "namespace_sync_status_info": {
+                "status": "Completed",
+                "reason": "Namespaces synced successfully"
+            },
+            "resource_representation": {
+                "namespace_resources": {
+                    "namespaces": []
+                }
             }
         }
     }
