@@ -114,6 +114,35 @@ options:
         required: false
         type: bool
         default: false
+    federated:
+        description:
+            - Enable Federated Identity (Workload Identity/OIDC) authentication
+            - When true, authentication uses workload identity instead of cloud credentials
+            - When true, cloud_credential_ref should be empty
+            - Cloud-specific config (azure_account_name, azure_subscription_id) should be in s3_config
+        required: false
+        type: bool
+        default: false
+    cluster_refs:
+        description:
+            - List of clusters associated with this BackupLocation
+            - Each item should have 'name' and optionally 'uid'
+        required: false
+        type: list
+        elements: dict
+        suboptions:
+            name:
+                description: Name of the cluster
+                type: str
+            uid:
+                description: UID of the cluster
+                type: str
+    cluster_status:
+        description:
+            - Per-cluster validation status map (key is cluster_uid)
+            - Read-only field returned from API, typically not set by user
+        required: false
+        type: dict
     s3_config:
         description: Configuration for S3 backup locations
         required: false
@@ -148,6 +177,18 @@ options:
                         type: str
             azure_resource_group_name:
                 description: Azure resource group name
+                type: str
+            azure_account_name:
+                description:
+                    - Azure storage account name
+                    - Required for Federated Identity when using Azure
+                    - When using federated identity, provide account name here instead of in cloud credential
+                type: str
+            azure_subscription_id:
+                description:
+                    - Azure subscription ID
+                    - Required for Federated Identity when using Azure
+                    - When using federated identity, provide subscription ID here instead of in cloud credential
                 type: str
     nfs_config:
         description: Configuration for NFS backup locations
@@ -286,6 +327,27 @@ EXAMPLES = r'''
     name: "prod-s3-backup"
     org_id: "default"
     uid: "backup-location-uid"
+
+# Create an Azure backup location with Federated Identity (Workload Identity)
+- name: Create Azure backup location with federated identity
+  backup_location:
+    operation: CREATE
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    name: "prod-azure-federated"
+    org_id: "default"
+    location_type: "S3"
+    path: "my-azure-container"
+    federated: true
+    s3_config:
+      azure_account_name: "mystorageaccount"
+      azure_subscription_id: "12345678-1234-1234-1234-123456789012"
+      azure_environment:
+        type: "AZURE_GLOBAL"
+    cluster_refs:
+      - name: "cluster-1"
+        uid: "cluster-1-uid"
+      - name: "cluster-2"
 '''
 
 RETURN = r'''
@@ -543,18 +605,33 @@ def build_backup_location_request(params: Dict[str, Any]) -> Dict[str, Any]:
             "path": params.get('path'),
             "encryption_key": params.get('encryption_key', ''),
             "validate_cloud_credential": params.get('validate_cloud_credential', True),
-            "object_lock_enabled": params.get('object_lock_enabled', False)
+            "object_lock_enabled": params.get('object_lock_enabled', False),
+            "federated": params.get('federated', False)
         }
     }
 
     # Add optional configurations safely
     if params.get('labels'):
         request['metadata']['labels'] = params['labels']
-        
+
     if params.get('ownership'):
         request['metadata']['ownership'] = params['ownership']
 
-    # Handle cloud credential reference
+    # Handle cluster_refs for federated backup locations
+    if params.get('cluster_refs'):
+        cluster_refs = []
+        for ref in params['cluster_refs']:
+            cluster_ref = {}
+            if ref.get('name'):
+                cluster_ref['name'] = ref['name']
+            if ref.get('uid'):
+                cluster_ref['uid'] = ref['uid']
+            if cluster_ref:
+                cluster_refs.append(cluster_ref)
+        if cluster_refs:
+            request['backup_location']['cluster_refs'] = cluster_refs
+
+    # Handle cloud credential reference (not required for federated identity)
     if params.get('cloud_credential_ref'):
         cloud_cred_ref = {}
         if params['cloud_credential_ref'].get('cloud_credential_name'):
@@ -567,13 +644,13 @@ def build_backup_location_request(params: Dict[str, Any]) -> Dict[str, Any]:
 
     # Add location-specific configuration based on type
     location_type = params.get('location_type')
-    
+
     if location_type == 'S3' and params.get('s3_config'):
         s3_config = {}
         s3_fields = [
-            'endpoint', 'region', 'disable_ssl', 'disable_path_style', 
+            'endpoint', 'region', 'disable_ssl', 'disable_path_style',
             'storage_class', 'sse_type', 'azure_environment',
-            'azure_resource_group_name'
+            'azure_resource_group_name', 'azure_account_name', 'azure_subscription_id'
         ]
         for key in s3_fields:
             if params['s3_config'].get(key) is not None:
@@ -748,6 +825,17 @@ def run_module():
         encryption_key=dict(type='str', required=False, no_log=True),
         validate_cloud_credential=dict(type='bool', required=False, default=True),
         object_lock_enabled=dict(type='bool', required=False, default=False),
+        federated=dict(type='bool', required=False, default=False),
+        cluster_refs=dict(
+            type='list',
+            required=False,
+            elements='dict',
+            options=dict(
+                name=dict(type='str'),
+                uid=dict(type='str')
+            )
+        ),
+        cluster_status=dict(type='dict', required=False),
         cloud_credential_ref=dict(
             type='dict',
             required=False,
@@ -774,7 +862,9 @@ def run_module():
                         type=dict(type='str', choices=['Invalid', 'AZURE_GLOBAL', 'AZURE_CHINA'])
                     )
                 ),
-                azure_resource_group_name=dict(type='str')
+                azure_resource_group_name=dict(type='str'),
+                azure_account_name=dict(type='str', no_log=True),
+                azure_subscription_id=dict(type='str', no_log=True)
             )
         ),
         
