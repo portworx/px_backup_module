@@ -162,15 +162,33 @@ rancher_project_name_mapping:
 ### Enumeration Options
 
 
-| Parameter                  | Type    | Required | Default | Description                         |
-| ---------------------------- | --------- | ---------- | --------- | ------------------------------------- |
-| max_objects                | int     | no       |         | Maximum objects to return           |
-| cluster_uid_filter         | string  | no       |         | Filter by cluster UID              |
-| owners                     | list    | no       |         | Filter by owners                    |
-| status                     | list    | no       |         | Filter by status                    |
-| name_filter                | string  | no       |         | Filter by restore name              |
-| cluster_name_filter        | string  | no       |         | Filter by cluster name              |
-| include_detailed_resources | boolean | no       | false   | Include detailed resource info      |
+| Parameter                  | Type       | Required | Default | Description                              |
+| ---------------------------- | ------------ | ---------- | --------- | ------------------------------------------ |
+| max_objects                | int        | no       |         | Maximum objects to return                |
+| cluster_uid_filter         | string     | no       |         | Filter by cluster UID                    |
+| owners                     | list       | no       |         | Filter by owners                         |
+| status                     | list       | no       |         | Filter by status                         |
+| name_filter                | string     | no       |         | Filter by restore name                   |
+| cluster_name_filter        | string     | no       |         | Filter by cluster name                   |
+| include_detailed_resources | boolean    | no       | false   | Include detailed resource info           |
+| labels                     | dictionary | no       |         | Filter restores by labels                |
+| object_index               | integer    | no       | 0       | Starting index for pagination            |
+| time_range                 | dictionary | no       |         | Filter by creation time range            |
+| sort_option                | dictionary | no       |         | Sorting configuration                    |
+
+#### sort_option Format
+
+| Parameter  | Type   | Required | Choices                           | Default             | Description      |
+| ---------- | ------ | -------- | --------------------------------- | ------------------- | ---------------- |
+| sort_by    | string | no       | 'CreationTimestamp', 'Name'       | 'CreationTimestamp' | Field to sort by |
+| sort_order | string | no       | 'Ascending', 'Descending'         | 'Descending'        | Sort order       |
+
+#### time_range Format
+
+| Parameter  | Type   | Required | Description                                    |
+| ---------- | ------ | -------- | ---------------------------------------------- |
+| start_time | string | no       | Start time in ISO 8601 format                  |
+| end_time   | string | no       | End time in ISO 8601 format                    |
 
 ## Examples
 

@@ -245,6 +245,56 @@ options:
         description: Include sensitive information in response
         type: bool
         default: false
+    enumerate_options:
+        description:
+            - Options for controlling enumeration behavior when listing backup locations
+            - Used with INSPECT_ALL operation to filter and paginate results
+        type: dict
+        required: false
+        version_added: "2.11.0"
+        suboptions:
+            max_objects:
+                description:
+                    - Maximum number of backup locations to return in the response
+                    - Useful for pagination and limiting large result sets
+                type: int
+                required: false
+            name_filter:
+                description: Filter backup locations by name using substring matching
+                type: str
+                required: false
+            object_index:
+                description:
+                    - Starting index for pagination when retrieving backup locations
+                    - Used with max_objects for pagination through large result sets
+                type: int
+                required: false
+            sort_option:
+                description: Sorting configuration for backup location enumeration
+                type: dict
+                required: false
+                suboptions:
+                    sort_by:
+                        description: Field to sort by
+                        type: str
+                        choices: ['Invalid', 'CreationTimestamp', 'Name', 'LastUpdateTimestamp']
+                        default: 'Invalid'
+                    sort_order:
+                        description: Sort order
+                        type: str
+                        choices: ['Invalid', 'Ascending', 'Descending']
+                        default: 'Invalid'
+            time_range:
+                description: Time range for filtering backup locations by creation/update time
+                type: dict
+                required: false
+                suboptions:
+                    start_time:
+                        description: Start time in RFC3339 format
+                        type: str
+                    end_time:
+                        description: End time in RFC3339 format
+                        type: str
 
 requirements:
     - python >= 3.9
@@ -465,7 +515,7 @@ def enumerate_backup_locations(module, client):
         'include_secrets': module.params.get('include_secrets', False),
         'include_validation_state': True
     }
-    
+
     if module.params.get('cloud_credential_ref'):
         cloud_cred_ref = {}
         if module.params['cloud_credential_ref'].get('cloud_credential_name'):
@@ -475,7 +525,35 @@ def enumerate_backup_locations(module, client):
 
         if cloud_cred_ref:
             params['cloud_credential_ref'] = cloud_cred_ref
-    
+
+    # Add enumerate_options (CommonEnumerateOptions)
+    enumerate_options = module.params.get('enumerate_options') or {}
+
+    if enumerate_options.get('max_objects') is not None:
+        params['enumerate_options.max_objects'] = enumerate_options['max_objects']
+
+    if enumerate_options.get('name_filter'):
+        params['enumerate_options.name_filter'] = enumerate_options['name_filter']
+
+    if enumerate_options.get('object_index') is not None:
+        params['enumerate_options.object_index'] = enumerate_options['object_index']
+
+    # Handle sort_option
+    if enumerate_options.get('sort_option'):
+        sort_option = enumerate_options['sort_option']
+        if sort_option.get('sort_by'):
+            params['enumerate_options.sort_option.sortBy.type'] = sort_option['sort_by']
+        if sort_option.get('sort_order'):
+            params['enumerate_options.sort_option.sortOrder.type'] = sort_option['sort_order']
+
+    # Handle time_range
+    if enumerate_options.get('time_range'):
+        time_range = enumerate_options['time_range']
+        if time_range.get('start_time'):
+            params['enumerate_options.time_range.start_time'] = time_range['start_time']
+        if time_range.get('end_time'):
+            params['enumerate_options.time_range.end_time'] = time_range['end_time']
+
     try:
         response = client.make_request('GET', f"v1/backuplocation/{module.params['org_id']}", params=params)
         return response.get('backup_locations', [])
@@ -829,7 +907,40 @@ def run_module():
         
         labels=dict(type='dict', required=False),
         ownership=dict(type='dict', required=False),
-        include_secrets=dict(type='bool', default=False)
+        include_secrets=dict(type='bool', default=False),
+        enumerate_options=dict(
+            type='dict',
+            required=False,
+            options=dict(
+                max_objects=dict(type='int', required=False),
+                name_filter=dict(type='str', required=False),
+                object_index=dict(type='int', required=False),
+                sort_option=dict(
+                    type='dict',
+                    required=False,
+                    options=dict(
+                        sort_by=dict(
+                            type='str',
+                            choices=['Invalid', 'CreationTimestamp', 'Name', 'LastUpdateTimestamp'],
+                            default='Invalid'
+                        ),
+                        sort_order=dict(
+                            type='str',
+                            choices=['Invalid', 'Ascending', 'Descending'],
+                            default='Invalid'
+                        )
+                    )
+                ),
+                time_range=dict(
+                    type='dict',
+                    required=False,
+                    options=dict(
+                        start_time=dict(type='str', required=False),
+                        end_time=dict(type='str', required=False)
+                    )
+                )
+            )
+        )
     )
 
     result = dict(

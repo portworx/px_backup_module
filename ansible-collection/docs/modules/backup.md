@@ -238,6 +238,15 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 | schedule_policy_ref        | list       | no       |         | List of schedule policy references to filter by   |
 | backup_schedule_ref        | list       | no       |         | List of backup schedule references to filter by   |
 | sort_option                | dictionary | no       |         | Sorting configuration for backup enumeration      |
+| object_index               | integer    | no       | 0       | Starting index for pagination                     |
+| time_range                 | dictionary | no       |         | Filter by creation time range                     |
+
+#### time_range Format
+
+| Parameter  | Type   | Required | Description                                    |
+| ---------- | ------ | -------- | ---------------------------------------------- |
+| start_time | string | no       | Start time in ISO 8601 format                  |
+| end_time   | string | no       | End time in ISO 8601 format                    |
 
 ### New Filtration Parameters (v2.11.0+)
 

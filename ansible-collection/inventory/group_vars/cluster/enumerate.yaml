@@ -7,3 +7,9 @@ labels: {}  # Optional labels for filtering
 # Optional filters
 cloud_credential_filter: "{{ cloud_cred_name | default(omit) }}"
 max_results: 100
+
+
+# Sorting options
+# sort_option:
+#   sort_by: "Name"                  # Options: 'CreationTimestamp', 'Name'
+#   sort_order: "Ascending"          # Options: 'Ascending', 'Descending'

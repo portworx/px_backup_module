@@ -427,6 +427,19 @@ options:
         elements: str
         required: false
 
+    time_range:
+        description: Time range for filtering backups by creation/update time
+        type: dict
+        required: false
+        version_added: "2.11.0"
+        suboptions:
+            start_time:
+                description: Start time in RFC3339 format (e.g., 2024-01-01T00:00:00Z)
+                type: str
+            end_time:
+                description: End time in RFC3339 format (e.g., 2024-12-31T23:59:59Z)
+                type: str
+
     force_resync:
         description: Force resync of failed sync process for GET_BACKUP_RESOURCE_DETAILS operation
         type: bool
@@ -1149,12 +1162,20 @@ def enumerate_backups(module: AnsibleModule, client: PXBackupClient) -> List[Dic
                 "sortOrder": {"type": sort_option.get('sort_order', 'Descending')}
             }
 
-        # Add new filtration features
-        if module.params.get('vm_volume_name'):
-            enumerate_options["vm_volume_name"] = module.params['vm_volume_name']
+        # Add time_range filter (2.11.0)
+        if module.params.get('time_range'):
+            time_range = module.params['time_range']
+            time_range_obj = {}
+            if time_range.get('start_time'):
+                time_range_obj['start_time'] = time_range['start_time']
+            if time_range.get('end_time'):
+                time_range_obj['end_time'] = time_range['end_time']
+            if time_range_obj:
+                enumerate_options["time_range"] = time_range_obj
 
-        if module.params.get('exclude_failed_resource') is not None:
-            enumerate_options["exclude_failed_resource"] = module.params['exclude_failed_resource']
+        # Add object_index for pagination (2.11.0)
+        if module.params.get('object_index') is not None:
+            enumerate_options["object_index"] = str(module.params['object_index'])
 
         # Add resource_info filter
         if module.params.get('resource_info'):
@@ -1751,6 +1772,14 @@ def run_module():
         cluster_uid_filter=dict(type='str', required=False),
         owners=dict(type='list', elements='str', required=False),
         status=dict(type='list', elements='str', required=False),
+        time_range=dict(
+            type='dict',
+            required=False,
+            options=dict(
+                start_time=dict(type='str', required=False),
+                end_time=dict(type='str', required=False)
+            )
+        ),
 
         # Enhanced GetBackupResourceDetails options
         force_resync=dict(type='bool', required=False, default=False),

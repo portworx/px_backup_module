@@ -27,9 +27,8 @@
             api_url: "{{ px_backup_api_url }}"
             token: "{{ px_backup_token }}"
             org_id: "{{ org_id }}"
-            # Optional filters
-            labels: "{{ labels | default(omit) }}"
-            max_objects: "{{ max_objects | default(omit) }}"
+            # Note: EnumerateOptions (labels, max_objects, pagination, sorting) are NOT
+            # supported by the server for role enumeration. Only org_id is used for filtering.
             # SSL Certificate Parameters
             ssl_config: "{{ ssl_config.px_backup | default({}) }}"
           register: role_result

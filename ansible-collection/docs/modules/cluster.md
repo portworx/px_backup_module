@@ -129,6 +129,49 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 | cluster_share.groups                | list    | no       |         | List of groups to share with |
 | cluster_share.share_cluster_backups | boolean | no       | false   | List of users to share with  |
 
+### Enumeration Options (INSPECT_ALL)
+
+The following parameters control enumeration behavior when using the `INSPECT_ALL` operation:
+
+| Parameter    | Type       | Required | Default | Description                              |
+| ------------ | ---------- | -------- | ------- | ---------------------------------------- |
+| labels       | dictionary | no       |         | Filter clusters by labels                |
+| sort_option  | dictionary | no       |         | Sorting configuration                    |
+
+**Note:** The cluster enumeration API does **not support pagination** (`max_objects` and `object_index` are ignored by the server). Only sorting by `Name` or `CreationTimestamp` is supported.
+
+#### sort_option Format
+
+| Parameter  | Type   | Required | Choices                           | Default             | Description      |
+| ---------- | ------ | -------- | --------------------------------- | ------------------- | ---------------- |
+| sort_by    | string | no       | 'CreationTimestamp', 'Name'       | 'CreationTimestamp' | Field to sort by |
+| sort_order | string | no       | 'Ascending', 'Descending'         | 'Descending'        | Sort order       |
+
+### Enumeration Examples
+
+```yaml
+# List all clusters with sorting
+- name: List clusters sorted by name (ascending)
+  cluster:
+    operation: INSPECT_ALL
+    api_url: "{{ px_backup_api_url }}"
+    token: "{{ px_backup_token }}"
+    org_id: "default"
+    sort_option:
+      sort_by: "Name"
+      sort_order: "Ascending"
+
+# Filter by labels
+- name: List clusters with specific labels
+  cluster:
+    operation: INSPECT_ALL
+    api_url: "{{ px_backup_api_url }}"
+    token: "{{ px_backup_token }}"
+    org_id: "default"
+    labels:
+      environment: "production"
+```
+
 ## Error Handling
 
 The module implements comprehensive error handling:
