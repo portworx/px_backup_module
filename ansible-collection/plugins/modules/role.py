@@ -34,7 +34,7 @@ short_description: Manage roles in PX-Backup
 
 version_added: "2.10.0"
 
-description: 
+description:
     - Manage roles in PX-Backup using different operations
     - Supports CRUD operations, and ownership management
     - Provides both single role and bulk inspection capabilities
@@ -565,34 +565,11 @@ def permission_role(module, client):
         module.fail_json(msg=f"Failed to fetch permissions: {str(e)}")
 
 def enumerate_roles(module, client):
-    """List all roles"""
-    params = {
-        'labels': module.params.get('labels', {})
-    }
-
-    # Add new filtration features
-    if module.params.get('vm_volume_name'):
-        params['enumerate_options.vm_volume_name'] = module.params['vm_volume_name']
-
-    if module.params.get('exclude_failed_resource') is not None:
-        params['enumerate_options.exclude_failed_resource'] = module.params['exclude_failed_resource']
-
-    # Add resource_info filter
-    if module.params.get('resource_info'):
-        resource_info = module.params['resource_info']
-        if resource_info.get('name'):
-            params['enumerate_options.resource_info.name'] = resource_info['name']
-        if resource_info.get('namespace'):
-            params['enumerate_options.resource_info.namespace'] = resource_info['namespace']
-        if resource_info.get('group'):
-            params['enumerate_options.resource_info.group'] = resource_info['group']
-        if resource_info.get('kind'):
-            params['enumerate_options.resource_info.kind'] = resource_info['kind']
-        if resource_info.get('version'):
-            params['enumerate_options.resource_info.version'] = resource_info['version']
-
+    """List all roles
+    Only org_id is used for scoping the results.
+    """
     try:
-        response = client.make_request('GET', f"v1/role/{module.params['org_id']}", params=params)
+        response = client.make_request('GET', f"v1/role/{module.params['org_id']}")
         return response.get('roles', [])
     except Exception as e:
         module.fail_json(msg=f"Failed to enumerate roles: {str(e)}")

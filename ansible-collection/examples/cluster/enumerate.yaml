@@ -22,6 +22,10 @@
         api_url: "{{ px_backup_api_url }}"
         token: "{{ px_backup_token }}"
         org_id: "{{ org_id | default('default') }}"
+        # Label filtering (client-side)
+        labels: "{{ labels | default(omit) }}"
+        # Sorting (2.11.0+) - only Name and CreationTimestamp supported
+        sort_option: "{{ sort_option | default(omit) }}"
         # SSL Certificate Parameters
         ssl_config: "{{ ssl_config.px_backup | default({}) }}"
       register: cluster_result

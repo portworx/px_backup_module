@@ -117,6 +117,71 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 | ownership.collaborators[].access | string | yes      | Read/Write/Admin | Collaborator access level |
 | ownership.public.type            | string | no       | Read/Write/Admin | Public access level       |
 
+### Enumeration Options (INSPECT_ALL)
+
+The following parameters control enumeration behavior when using the `INSPECT_ALL` operation. These are passed within an `enumerate_options` dictionary:
+
+| Parameter    | Type       | Required | Default | Description                                              |
+| ------------ | ---------- | -------- | ------- | -------------------------------------------------------- |
+| labels       | dictionary | no       |         | Filter cloud credentials by labels                       |
+| max_objects  | integer    | no       |         | Maximum number of cloud credentials to return            |
+| name_filter  | string     | no       |         | Filter cloud credentials by name (substring match)       |
+| object_index | integer    | no       | 0       | Starting index for pagination                            |
+| sort_option  | dictionary | no       |         | Sorting configuration                                    |
+| time_range   | dictionary | no       |         | Filter by creation time range                            |
+
+#### sort_option Format
+
+| Parameter  | Type   | Required | Choices                           | Default             | Description      |
+| ---------- | ------ | -------- | --------------------------------- | ------------------- | ---------------- |
+| sort_by    | string | no       | 'CreationTimestamp', 'Name'       | 'CreationTimestamp' | Field to sort by |
+| sort_order | string | no       | 'Ascending', 'Descending'         | 'Descending'        | Sort order       |
+
+#### time_range Format
+
+| Parameter  | Type   | Required | Description                                    |
+| ---------- | ------ | -------- | ---------------------------------------------- |
+| start_time | string | no       | Start time in ISO 8601 format                  |
+| end_time   | string | no       | End time in ISO 8601 format                    |
+
+### Enumeration Examples
+
+```yaml
+# List all cloud credentials with sorting
+- name: List cloud credentials sorted by name
+  cloud_credential:
+    operation: INSPECT_ALL
+    api_url: "{{ px_backup_api_url }}"
+    token: "{{ px_backup_token }}"
+    org_id: "default"
+    enumerate_options:
+      sort_option:
+        sort_by: "Name"
+        sort_order: "Ascending"
+
+# Paginated enumeration
+- name: Get first 5 cloud credentials
+  cloud_credential:
+    operation: INSPECT_ALL
+    api_url: "{{ px_backup_api_url }}"
+    token: "{{ px_backup_token }}"
+    org_id: "default"
+    enumerate_options:
+      max_objects: 5
+      object_index: 0
+
+# Filter by labels
+- name: Find cloud credentials with specific labels
+  cloud_credential:
+    operation: INSPECT_ALL
+    api_url: "{{ px_backup_api_url }}"
+    token: "{{ px_backup_token }}"
+    org_id: "default"
+    enumerate_options:
+      labels:
+        environment: "production"
+```
+
 ## Error Handling
 
 The module implements comprehensive error handling:

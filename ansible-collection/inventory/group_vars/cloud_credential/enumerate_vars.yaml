@@ -1,3 +1,26 @@
 ---
 # Variables specific to enumeration operations
 include_secrets: false
+
+# Label filter - filter cloud credentials by labels
+# labels:
+#   environment: "production"
+#   team: "platform"
+
+# Pagination options
+# max_objects: 10                    # Maximum number of cloud credentials to return
+# object_index: 0                    # Starting index for pagination
+
+# Name filter - performs substring matching
+# name_filter: "aws"                 # Filter cloud credentials containing "aws" in name
+
+# Sorting options
+# sort_option:
+#   sort_by: "Name"                  # Options: 'CreationTimestamp', 'Name'
+#   sort_order: "Ascending"          # Options: 'Ascending', 'Descending'
+
+# Time range filter - filter by creation time
+# time_range:
+#   start_time: "2024-01-01T00:00:00Z"  # ISO 8601 format
+#   end_time: "2024-12-31T23:59:59Z"    # ISO 8601 format
+

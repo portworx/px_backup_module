@@ -142,6 +142,69 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 | id        | string | yes      |                                     | Group or collaborator identifier |
 | access    | string | yes      | 'Invalid', 'Read', 'Write', 'Admin' | Access level                     |
 
+### Enumeration Options (INSPECT_ALL)
+
+The following parameters control enumeration behavior when using the `INSPECT_ALL` operation:
+
+| Parameter    | Type       | Required | Default | Description                                              |
+| ------------ | ---------- | -------- | ------- | -------------------------------------------------------- |
+| max_objects  | integer    | no       |         | Maximum number of backup locations to return             |
+| name_filter  | string     | no       |         | Filter backup locations by name (substring match)        |
+| object_index | integer    | no       | 0       | Starting index for pagination                            |
+| sort_option  | dictionary | no       |         | Sorting configuration                                    |
+| time_range   | dictionary | no       |         | Filter by creation time range                            |
+
+#### sort_option Format
+
+| Parameter  | Type   | Required | Choices                           | Default             | Description      |
+| ---------- | ------ | -------- | --------------------------------- | ------------------- | ---------------- |
+| sort_by    | string | no       | 'CreationTimestamp', 'Name'       | 'CreationTimestamp' | Field to sort by |
+| sort_order | string | no       | 'Ascending', 'Descending'         | 'Descending'        | Sort order       |
+
+#### time_range Format
+
+| Parameter  | Type   | Required | Description                                    |
+| ---------- | ------ | -------- | ---------------------------------------------- |
+| start_time | string | no       | Start time in ISO 8601 format                  |
+| end_time   | string | no       | End time in ISO 8601 format                    |
+
+### Enumeration Examples
+
+```yaml
+# List all backup locations with sorting
+- name: List backup locations sorted by name
+  backup_location:
+    operation: INSPECT_ALL
+    api_url: "{{ px_backup_api_url }}"
+    token: "{{ px_backup_token }}"
+    org_id: "default"
+    enumerate_options:
+      sort_option:
+        sort_by: "Name"
+        sort_order: "Ascending"
+
+# Paginated enumeration
+- name: Get first 10 backup locations
+  backup_location:
+    operation: INSPECT_ALL
+    api_url: "{{ px_backup_api_url }}"
+    token: "{{ px_backup_token }}"
+    org_id: "default"
+    enumerate_options:
+      max_objects: 10
+      object_index: 0
+
+# Filter by name
+- name: Find backup locations containing 's3' in name
+  backup_location:
+    operation: INSPECT_ALL
+    api_url: "{{ px_backup_api_url }}"
+    token: "{{ px_backup_token }}"
+    org_id: "default"
+    enumerate_options:
+      name_filter: "s3"
+```
+
 ## Error Handling
 
 The module implements comprehensive error handling:

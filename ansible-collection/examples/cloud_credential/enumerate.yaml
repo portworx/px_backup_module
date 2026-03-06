@@ -23,6 +23,19 @@
         api_url: "{{ px_backup_api_url }}"
         token: "{{ px_backup_token }}"
         org_id: "{{ org_id | default('default') }}"
+        # CommonEnumerateOptions (2.11.0+)
+        enumerate_options:
+          # Label filtering
+          labels: "{{ labels | default(omit) }}"
+          # Pagination
+          max_objects: "{{ max_objects | default(omit) }}"
+          object_index: "{{ object_index | default(omit) }}"
+          # Name filtering
+          name_filter: "{{ name_filter | default(omit) }}"
+          # Time-based filtering
+          time_range: "{{ time_range | default(omit) }}"
+          # Sorting 
+          sort_option: "{{ sort_option | default(omit) }}"
         # SSL Certificate Parameters
         ssl_config: "{{ ssl_config.px_backup | default({}) }}"
       register: cloudcred_result

@@ -368,6 +368,30 @@ options:
                 type: str
                 choices: ['Ascending', 'Descending']
                 default: 'Descending'
+    labels:
+        description: Label selectors for filtering restores
+        type: dict
+        required: false
+        version_added: '2.11.0'
+    object_index:
+        description:
+            - Starting index for pagination when retrieving restores
+            - Used with max_objects for pagination through large result sets
+        type: int
+        required: false
+        version_added: '2.11.0'
+    time_range:
+        description: Time range for filtering restores by creation/update time
+        type: dict
+        required: false
+        version_added: '2.11.0'
+        suboptions:
+            start_time:
+                description: Start time in RFC3339 format (e.g., 2024-01-01T00:00:00Z)
+                type: str
+            end_time:
+                description: End time in RFC3339 format (e.g., 2024-12-31T23:59:59Z)
+                type: str
     virtual_machine_restore_options:
         description: Virtual machine specific restore options
         type: dict
@@ -569,26 +593,21 @@ def enumerate_restores(module: AnsibleModule, client: PXBackupClient) -> List[Di
         params['enumerate_options.sort_option.sortBy.type'] = sort_option.get('sort_by', 'CreationTimestamp')
         params['enumerate_options.sort_option.sortOrder.type'] = sort_option.get('sort_order', 'Descending')
 
-    # Add new filtration features
-    if module.params.get('vm_volume_name'):
-        params['enumerate_options.vm_volume_name'] = module.params['vm_volume_name']
+    # Add labels filter (2.11.0)
+    if module.params.get('labels'):
+        params['enumerate_options.labels'] = module.params['labels']
 
-    if module.params.get('exclude_failed_resource') is not None:
-        params['enumerate_options.exclude_failed_resource'] = module.params['exclude_failed_resource']
+    # Add time_range filter (2.11.0)
+    if module.params.get('time_range'):
+        time_range = module.params['time_range']
+        if time_range.get('start_time'):
+            params['enumerate_options.time_range.start_time'] = time_range['start_time']
+        if time_range.get('end_time'):
+            params['enumerate_options.time_range.end_time'] = time_range['end_time']
 
-    # Add resource_info filter
-    if module.params.get('resource_info'):
-        resource_info = module.params['resource_info']
-        if resource_info.get('name'):
-            params['enumerate_options.resource_info.name'] = resource_info['name']
-        if resource_info.get('namespace'):
-            params['enumerate_options.resource_info.namespace'] = resource_info['namespace']
-        if resource_info.get('group'):
-            params['enumerate_options.resource_info.group'] = resource_info['group']
-        if resource_info.get('kind'):
-            params['enumerate_options.resource_info.kind'] = resource_info['kind']
-        if resource_info.get('version'):
-            params['enumerate_options.resource_info.version'] = resource_info['version']
+    # Add object_index for pagination (2.11.0)
+    if module.params.get('object_index') is not None:
+        params['enumerate_options.object_index'] = module.params['object_index']
 
     # Remove None values
     params = {k: v for k, v in params.items() if v is not None}
@@ -1283,6 +1302,7 @@ def run_module():
         ),
 
         # Enumerate options
+        labels=dict(type='dict', required=False),
         max_objects=dict(type='int', required=False),
         name_filter=dict(type='str', required=False),
         cluster_name_filter=dict(type='str', required=False),
@@ -1291,6 +1311,15 @@ def run_module():
         cluster_uid_filter=dict(type='str', required=False),
         owners=dict(type='list', elements='str', required=False),
         status=dict(type='list', elements='str', required=False),
+        object_index=dict(type='int', required=False),
+        time_range=dict(
+            type='dict',
+            required=False,
+            options=dict(
+                start_time=dict(type='str', required=False),
+                end_time=dict(type='str', required=False)
+            )
+        ),
 
         # Sorting options
         sort_option=dict(type='dict', required=False, options=dict(

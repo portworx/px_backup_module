@@ -14,7 +14,7 @@ status:                # Filter by backup status
   - "Success"
   - "Failed"
 
-backup_object_type: 
+backup_object_type:
   type: "VirtualMachine"   # Filter by backup object type, Can be "All" or "VirtualMachine"
 
 schedule_policy_ref:
@@ -27,9 +27,18 @@ backup_schedule_ref:
   - name: "vm-sched-bkp-1"                # Name of the backup schedule
     uid: "backup-schedule-uid"                 # UID of the backup schedule
 
+# Sorting options
 sort_option:
-  sort_by: "Name"  
-  sort_order: "Ascending"    
-#
-# Filter can be used to avoid information overload,
+  sort_by: "Name"                    # Options: 'CreationTimestamp', 'Name', 'ClusterName', 'Size', 'RestoreBackupName', 'LastUpdateTimestamp'
+  sort_order: "Ascending"            # Options: 'Ascending', 'Descending'
+
+# Pagination options
+object_index: 0                      # Starting index for pagination (use with max_objects)
+
+# Time range filter - filter backups by creation time
+# time_range:
+#   start_time: "2024-01-01T00:00:00Z"  # ISO 8601 format
+#   end_time: "2024-12-31T23:59:59Z"    # ISO 8601 format
+
+# Filter can be used to avoid information overload
 exclude_failed_resource: true
