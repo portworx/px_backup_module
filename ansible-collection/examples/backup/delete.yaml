@@ -41,6 +41,7 @@
             name: "{{ item.name }}"
             uid: "{{ item.uid | default(omit) }}"
             cluster_ref: "{{ item.cluster_ref | default(omit) }}"
+            force: "{{ item.force | default(omit) }}"
             # SSL Certificate Parameters
             ssl_config: "{{ ssl_config.px_backup | default({}) }}"
           register: delete_result
