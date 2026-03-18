@@ -97,6 +97,7 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 | parallel_backup                  | boolean    | no       | false    | Option to enable parallel schedule backups                                  |
 | keep_cr_status                   | boolean    | no       | false    | Option to enable to keep the CR status of the resources in the backup       |
 | advanced_resource_label_selector | string     | no       |          | Advanced label selector for resources (string format with operator support) |
+| force                            | boolean    | no       | false    | Force metadata-only deletion when no valid cluster is available (federated mode only) |
 | volume_resource_only_policy_ref  | dictionary | no       |          | Reference to Volume Resource Only policy                                    |
 | cloud_credential_ref             | dictionary | no       |          | Reference to cloud credentials for backup                                   |
 
@@ -546,6 +547,24 @@ backup:
     cluster_ref:
       name: "prod-cluster"
       uid: "cluster-uid"
+```
+
+### Force Delete Backup (Metadata-Only)
+
+> **WARNING**: Force delete only removes the backup record from MongoDB.
+> Backup data remains in object storage and requires manual cleanup.
+> This option is only valid in federated mode.
+
+```yaml
+- name: Force delete orphaned backup metadata
+  backup:
+    operation: DELETE
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    name: "orphaned-backup"
+    org_id: "default"
+    uid: "backup-uid"
+    force: true
 ```
 
 ## Error Handling
