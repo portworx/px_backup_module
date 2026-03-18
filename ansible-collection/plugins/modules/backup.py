@@ -427,6 +427,20 @@ options:
         elements: str
         required: false
 
+    force:
+        description:
+            - Force deletion of backup metadata even when no valid cluster is available.
+            - "WARNING: This only removes the record from MongoDB and skips physical cleanup
+              of the backup data in object storage. The backup data will remain in object storage
+              and require manual cleanup."
+            - To ensure full data deletion, prefer registering a temporary cluster with the same backup location.
+            - Use this flag only for orphaned metadata where the actual backup data is no longer needed.
+            - This option is only valid in federated mode and will return an error in non-federated mode.
+            - Only applicable for DELETE operation.
+        type: bool
+        required: false
+        default: false
+
     force_resync:
         description: Force resync of failed sync process for GET_BACKUP_RESOURCE_DETAILS operation
         type: bool
@@ -651,6 +665,17 @@ EXAMPLES = r'''
     resource_status_filter: ["Success"]
     max_objects: 100
     force_resync: false
+
+# Delete backup with force flag (metadata-only deletion)
+- name: Force delete backup metadata
+  backup:
+    operation: DELETE
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    name: "orphaned-backup"
+    org_id: "default"
+    uid: "backup-uid"
+    force: true
 
 # Retry failed backup
 - name: Retry failed VM backup
@@ -1261,6 +1286,9 @@ def delete_backup(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict[s
             if module.params['cluster_ref'].get('uid'):
                 params['cluster_ref.uid'] = module.params['cluster_ref']['uid']
 
+        # Add force flag for metadata-only deletion
+        if module.params.get('force'):
+            params['force'] = 'true'
 
         response = client.make_request(
             'DELETE',
@@ -1766,6 +1794,9 @@ def run_module():
         cluster_uid_filter=dict(type='str', required=False),
         owners=dict(type='list', elements='str', required=False),
         status=dict(type='list', elements='str', required=False),
+
+        # Delete options
+        force=dict(type='bool', required=False, default=False),
 
         # Enhanced GetBackupResourceDetails options
         force_resync=dict(type='bool', required=False, default=False),
