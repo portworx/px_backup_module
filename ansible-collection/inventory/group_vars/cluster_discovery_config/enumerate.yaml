@@ -1,0 +1,10 @@
+---
+# Variables specific to enumeration operations
+
+# Filter by discovery config type (optional)
+# Allowed values: "Shoot", "All"
+# Omit or leave empty to return all types
+discovery_config_type: "{{ config_type_filter | default(omit) }}"
+
+# Include sensitive fields like gardener kubeconfigs in the response
+include_secrets: false

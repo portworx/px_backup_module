@@ -1,0 +1,10 @@
+---
+# Cluster discovery configurations to trigger credential refresh for
+# Refresh re-fetches kubeconfigs from Gardener for all discovered clusters
+cluster_discovery_configs_refresh:
+  # Refresh credentials by name
+  - name: "gardener-shoot-discovery"
+
+  # Refresh credentials with uid for exact match
+  - name: "gardener-shoot-manual"
+    uid: "fd1a2790-708e-47a3-bd86-d9b7c2a063b5"

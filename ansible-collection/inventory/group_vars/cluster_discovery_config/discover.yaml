@@ -1,0 +1,5 @@
+---
+# Cluster discovery configurations to trigger manual discovery for
+cluster_discovery_configs_discover:
+  # Trigger discovery by name
+  - name: "gardener-shoot-discovery"

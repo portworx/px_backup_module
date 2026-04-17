@@ -1,0 +1,57 @@
+---
+- name: Update PX-Backup Cluster Discovery Configurations
+  hosts: localhost
+  gather_facts: true
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/cluster_discovery_config/update.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - cluster_discovery_configs_update is defined
+        fail_msg: "Required variables must be defined"
+
+  tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+    - name: Update cluster discovery configs
+      block:
+        - name: Update cluster discovery config
+          cluster_discovery_config:
+            operation: UPDATE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            name: "{{ item.name }}"
+            org_id: "{{ org_id | default('default') }}"
+            uid: "{{ item.uid | default(omit) }}"
+            settings: "{{ item.settings | default(omit) }}"
+            labels: "{{ item.labels | default(omit) }}"
+            gardener_kubeconfig: "{{ item.gardener_kubeconfig | default(omit) }}"
+            confirm_update: "{{ item.confirm_update | default(true) }}"
+            ssl_config: "{{ ssl_config.px_backup | default({}) }}"
+          loop: "{{ cluster_discovery_configs_update }}"
+          register: update_result
+          loop_control:
+            label: "{{ item.name }}"
+
+      rescue:
+        - name: Display error details
+          debug:
+            msg: "Failed to update cluster discovery config: {{ update_result.results | selectattr('failed', 'true') | map(attribute='msg') | list }}"
+          when: update_result is defined and update_result.results is defined
+
+        - name: Fail with error message
+          fail:
+            msg: "Failed to update cluster discovery configs. See above for details."
+
+    # Output configuration
+    - name: Handle output
+      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
+      vars:
+        output_data: "{{ update_result }}"
+        output_filename_prefix: "cluster_discovery_config_update"
+      when: output_config.enabled | default(false)

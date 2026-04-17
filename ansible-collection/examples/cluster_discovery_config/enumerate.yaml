@@ -1,0 +1,37 @@
+---
+- name: List all PX-Backup Cluster Discovery Configurations
+  hosts: localhost
+  gather_facts: true
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/cluster_discovery_config/enumerate.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+        fail_msg: "Required variable px_backup_api_url must be defined"
+
+  tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+    - name: Enumerate cluster discovery configs
+      cluster_discovery_config:
+        operation: INSPECT_ALL
+        api_url: "{{ px_backup_api_url }}"
+        token: "{{ px_backup_token }}"
+        org_id: "{{ org_id | default('default') }}"
+        config_type: "{{ discovery_config_type | default(omit) }}"
+        include_secrets: "{{ include_secrets | default(false) }}"
+        ssl_config: "{{ ssl_config.px_backup | default({}) }}"
+      register: enumerate_result
+
+    # Output configuration
+    - name: Handle output
+      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
+      vars:
+        output_data: "{{ enumerate_result }}"
+        output_filename_prefix: "cluster_discovery_config_enumerate"
+      when: output_config.enabled | default(false)

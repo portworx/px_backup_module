@@ -1,0 +1,56 @@
+---
+- name: Create PX-Backup Cluster Discovery Configurations
+  hosts: localhost
+  gather_facts: true
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/cluster_discovery_config/create.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - cluster_discovery_configs is defined
+        fail_msg: "Required variables must be defined"
+
+  tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+    - name: Create cluster discovery configs
+      block:
+        - name: Create cluster discovery config
+          cluster_discovery_config:
+            operation: CREATE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            name: "{{ item.name }}"
+            org_id: "{{ org_id | default('default') }}"
+            config_type: "{{ item.config_type }}"
+            shoot_config: "{{ item.shoot_config | default(omit) }}"
+            settings: "{{ item.settings | default(omit) }}"
+            labels: "{{ item.labels | default(omit) }}"
+            ssl_config: "{{ ssl_config.px_backup | default({}) }}"
+          loop: "{{ cluster_discovery_configs }}"
+          register: create_result
+          loop_control:
+            label: "{{ item.name }}"
+
+      rescue:
+        - name: Display error details
+          debug:
+            msg: "Failed to create cluster discovery config: {{ create_result.results | selectattr('failed', 'true') | map(attribute='msg') | list }}"
+          when: create_result is defined and create_result.results is defined
+
+        - name: Fail with error message
+          fail:
+            msg: "Failed to create cluster discovery configs. See above for details."
+
+    # Output configuration
+    - name: Handle output
+      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
+      vars:
+        output_data: "{{ create_result }}"
+        output_filename_prefix: "cluster_discovery_config_create"
+      when: output_config.enabled | default(false)
