@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-PX-Backup ClusterDiscoveryConfig Management Module
+PX-Backup Cluster Discovery Configuration Management Module
 
 This Ansible module manages cluster discovery configurations in PX-Backup,
 providing operations for:
@@ -155,9 +155,8 @@ options:
         default: false
     gardener_kubeconfig:
         description:
-            - Updated Gardener kubeconfig for UPDATE operations
-            - Must be base64-encoded
-            - In UPDATE, this is a top-level field (not inside shoot_config)
+            - Base64-encoded Gardener API server kubeconfig to rotate or replace existing credentials
+            - Only used with the UPDATE operation to update the kubeconfig of an existing discovery configuration
         required: false
         type: str
     ssl_config:

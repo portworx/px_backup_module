@@ -18,6 +18,9 @@
   tasks:
     - name: Login and fetch Px-Backup token
       include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+    # Note: REFRESH_CLUSTERS is an async operation.
+    # A successful response means the refresh was triggered, not that it completed.
+    # Use INSPECT_ONE to poll the config's refresh_status field for completion.
     - name: Trigger credential refresh
       block:
         - name: Refresh clusters

@@ -18,6 +18,9 @@
   tasks:
     - name: Login and fetch Px-Backup token
       include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+    # Note: DISCOVER_CLUSTERS is an async operation.
+    # A successful response means discovery was triggered, not that it completed.
+    # Use INSPECT_ONE to poll the config's status field for completion.
     - name: Trigger cluster discovery
       block:
         - name: Discover clusters
