@@ -1,0 +1,36 @@
+---
+# Gardener kubeconfig (must be base64-encoded)
+gardener_kubeconfig: "<base64-encoded-gardener-kubeconfig>"
+
+# Cluster discovery configurations to create
+cluster_discovery_configs:
+  # Shoot discovery - auto-discover enabled with label selector and labels
+  - name: "gardener-shoot-discovery"
+    config_type: "Shoot"
+    shoot_config:
+      gardener_kubeconfig: "{{ gardener_kubeconfig }}"
+      project_name: "<project-name>"
+      label_selector: "px-backup_allotment=<label-value>"
+    settings:
+      auto_discover: true
+      auto_discover_frequency:
+        days: 1
+        hours: 0
+        minutes: 0
+    labels:
+      team: "platform"
+      environment: "staging"
+
+  # Shoot discovery - auto-discover disabled (manual-only, trigger via DISCOVER_CLUSTERS)
+  - name: "gardener-shoot-manual"
+    config_type: "Shoot"
+    shoot_config:
+      gardener_kubeconfig: "{{ gardener_kubeconfig }}"
+      project_name: "<project-name>"
+      label_selector: "px-backup_allotment=<label-value>"
+    settings:
+      auto_discover: false
+      auto_discover_frequency:
+        days: 1
+        hours: 0
+        minutes: 0

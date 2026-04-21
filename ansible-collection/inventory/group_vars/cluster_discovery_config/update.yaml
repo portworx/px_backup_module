@@ -1,0 +1,30 @@
+---
+# Rotated Gardener kubeconfig (base64-encoded) - override via -e or vault
+new_gardener_kubeconfig: "<base64-encoded-new-gardener-kubeconfig>"
+
+# Cluster discovery configurations to update
+cluster_discovery_configs_update:
+  # Toggle auto-discover off
+  - name: "gardener-shoot-discovery"
+    settings:
+      auto_discover: false
+    confirm_update: true
+
+  # Update Gardener kubeconfig (rotate credentials)
+  - name: "gardener-shoot-discovery"
+    gardener_kubeconfig: "{{ new_gardener_kubeconfig }}"
+    confirm_update: true
+
+  # Update everything at once: kubeconfig, auto_discover, frequency, and labels
+  - name: "gardener-shoot-discovery"
+    gardener_kubeconfig: "{{ new_gardener_kubeconfig }}"
+    settings:
+      auto_discover: true
+      auto_discover_frequency:
+        days: 1
+        hours: 0
+        minutes: 0
+    labels:
+      team: "sre"
+      rotated: "true"
+    confirm_update: true

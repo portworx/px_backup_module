@@ -1,0 +1,13 @@
+---
+# Cluster discovery configurations to inspect
+cluster_discovery_configs_inspect:
+  # Basic inspect - no secrets
+  - name: "gardener-shoot-discovery"
+    include_secrets: false
+
+  # Inspect with secrets (reveals gardener kubeconfig in response)
+  - name: "gardener-shoot-discovery"
+    include_secrets: true
+
+# Global inspect configuration
+default_include_secrets: false

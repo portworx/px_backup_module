@@ -5,5 +5,23 @@ only_backup_share: false
 labels: {}  # Optional labels for filtering
 
 # Optional filters
-cloud_credential_filter: "{{ cloud_cred_name | default(omit) }}"
+#cloud_credential_filter: "{{ cloud_cred_name | default(omit) }}"
 max_results: 100
+
+# Cluster discovery config based filters (optional)
+# Filter clusters by Gardener project name(s)
+#project_names:
+#   - "<project-name-1>"
+#   - "<project-name-2>"
+
+# Filter clusters discovered by specific ClusterDiscoveryConfig(s)
+#cluster_discovery_config_refs:
+#  - name: "gardener-shoot-discovery"
+#  - name: "gardener-shoot-manual"
+#    uid: "bd57f119-02be-40d1-b39e-7707ccc4ce19"
+
+# Filter by Gardener Shoot labels (Kubernetes label selector syntax)
+#shoot_label_selector: "px-backup_allotment=ramya"
+
+# Filter by managed state
+#managed: true
