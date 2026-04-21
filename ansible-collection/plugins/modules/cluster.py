@@ -315,7 +315,7 @@ options:
             - Filters clusters based on Gardener Shoot and ClusterDiscoveryConfig attributes
         required: false
         type: dict
-        version_added: '2.11.0'
+        version_added: '3.0.0'
         suboptions:
             project_names:
                 description:
