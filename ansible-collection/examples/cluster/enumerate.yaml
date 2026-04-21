@@ -5,6 +5,7 @@
 
   vars_files:
     - "{{ inventory_dir}}/group_vars/common/all.yaml"
+    - "{{ inventory_dir}}/group_vars/cluster/enumerate.yaml"
 
   pre_tasks:
     - name: Validate required variables
@@ -22,6 +23,12 @@
         api_url: "{{ px_backup_api_url }}"
         token: "{{ px_backup_token }}"
         org_id: "{{ org_id | default('default') }}"
+        # Optional: Cluster discovery config based filters
+        cluster_enumerate_options:
+          project_names: "{{ project_names | default(omit) }}"
+          cluster_discovery_config_refs: "{{ cluster_discovery_config_refs | default(omit) }}"
+          shoot_label_selector: "{{ shoot_label_selector | default(omit) }}"
+          managed: "{{ managed | default(omit) }}"
         # SSL Certificate Parameters
         ssl_config: "{{ ssl_config.px_backup | default({}) }}"
       register: cluster_result

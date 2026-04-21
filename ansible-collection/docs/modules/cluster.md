@@ -129,6 +129,19 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 | cluster_share.groups                | list    | no       |         | List of groups to share with |
 | cluster_share.share_cluster_backups | boolean | no       | false   | List of users to share with  |
 
+#### Enumerate Filter Parameters (INSPECT_ALL)
+
+
+| Parameter                                                      | Type    | Required | Description                                                         |
+| ---------------------------------------------------------------- | --------- | ---------- | --------------------------------------------------------------------- |
+| cluster_enumerate_options                                      | dict    | no       | Advanced filter options for cluster enumeration                     |
+| cluster_enumerate_options.project_names                        | list    | no       | Filter by Gardener project name(s)                                  |
+| cluster_enumerate_options.cluster_discovery_config_refs        | list    | no       | Filter by ClusterDiscoveryConfig reference(s)                       |
+| cluster_enumerate_options.cluster_discovery_config_refs[].name | string  | no       | Name of the ClusterDiscoveryConfig                                  |
+| cluster_enumerate_options.cluster_discovery_config_refs[].uid  | string  | no       | UID of the ClusterDiscoveryConfig                                   |
+| cluster_enumerate_options.shoot_label_selector                 | string  | no       | Filter by Gardener Shoot labels (Kubernetes label selector syntax)  |
+| cluster_enumerate_options.managed                              | boolean | no       | Filter by managed state (true = discovered by CDC)                  |
+
 ## Error Handling
 
 The module implements comprehensive error handling:

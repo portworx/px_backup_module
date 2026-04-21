@@ -309,6 +309,43 @@ options:
                     refresh_at:
                         description: Time when the kubeconfig should be refreshed (RFC3339 format)
                         type: str
+    cluster_enumerate_options:
+        description:
+            - Advanced filter options for cluster enumeration (INSPECT_ALL only)
+            - Filters clusters based on Gardener Shoot and ClusterDiscoveryConfig attributes
+        required: false
+        type: dict
+        version_added: '3.0.0'
+        suboptions:
+            project_names:
+                description:
+                    - Filter by Gardener project name(s)
+                    - Returns clusters whose GardenerShootInfo.project_name matches any of the specified names
+                type: list
+                elements: str
+            cluster_discovery_config_refs:
+                description:
+                    - Filter by ClusterDiscoveryConfig reference(s)
+                    - Returns clusters discovered by the specified ClusterDiscoveryConfigs
+                type: list
+                elements: dict
+                suboptions:
+                    name:
+                        description: Name of the ClusterDiscoveryConfig
+                        type: str
+                    uid:
+                        description: UID of the ClusterDiscoveryConfig
+                        type: str
+            shoot_label_selector:
+                description:
+                    - Filter by Gardener Shoot labels using Kubernetes label selector syntax
+                    - Matches against GardenerShootInfo.labels
+                type: str
+            managed:
+                description:
+                    - Filter by managed state
+                    - When set, only returns clusters where GardenerShootInfo.managed matches this value
+                type: bool
 
 requirements:
     - python >= 3.9
@@ -579,11 +616,53 @@ def enumerate_clusters(module: AnsibleModule, client: PXBackupClient) -> List[Di
             if resource_info.get('version'):
                 params['enumerate_options.resource_info.version'] = resource_info['version']
 
-        response = client.make_request(
-            method='GET',
-            endpoint=f"v1/cluster/{module.params['org_id']}",
-            params=params
+        # Add cluster discovery config based filters
+        # When cluster_enumerate_options are provided, use POST for proper nested object support
+        ceo = module.params.get('cluster_enumerate_options')
+        has_ceo_filters = ceo and any(
+            ceo.get(k) is not None for k in [
+                'project_names', 'cluster_discovery_config_refs',
+                'shoot_label_selector', 'managed'
+            ]
         )
+
+        if has_ceo_filters:
+            # Build POST body for complex nested filters
+            post_body = {
+                'org_id': module.params['org_id'],
+                'labels': module.params.get('labels', {}),
+                'include_secrets': module.params.get('include_secrets', False),
+                'only_backup_share': module.params.get('only_backup_share', False),
+                'cluster_enumerate_options': {},
+            }
+
+            if ceo.get('project_names'):
+                post_body['cluster_enumerate_options']['project_names'] = ceo['project_names']
+
+            if ceo.get('cluster_discovery_config_refs'):
+                # Strip None/null values from refs to avoid sending null uid/name to the API
+                clean_refs = []
+                for ref in ceo['cluster_discovery_config_refs']:
+                    clean_refs.append({k: v for k, v in ref.items() if v is not None})
+                post_body['cluster_enumerate_options']['cluster_discovery_config_refs'] = clean_refs
+
+            if ceo.get('shoot_label_selector'):
+                post_body['cluster_enumerate_options']['shoot_label_selector'] = ceo['shoot_label_selector']
+
+            if ceo.get('managed') is not None:
+                post_body['cluster_enumerate_options']['managed'] = ceo['managed']
+
+            response = client.make_request(
+                method='POST',
+                endpoint=f"v1/cluster/{module.params['org_id']}/enumerate",
+                data=post_body
+            )
+        else:
+            response = client.make_request(
+                method='GET',
+                endpoint=f"v1/cluster/{module.params['org_id']}",
+                params=params
+            )
         return response.get('clusters', [])
 
     except Exception as e:
@@ -1017,6 +1096,25 @@ def run_module():
             ),
             description='Filter to use resource name and namespace. Any cluster that contains the resource will be returned'
         ),
+        # Cluster discovery config based filters
+        cluster_enumerate_options=dict(
+            type='dict',
+            required=False,
+            options=dict(
+                project_names=dict(type='list', elements='str', required=False),
+                cluster_discovery_config_refs=dict(
+                    type='list',
+                    elements='dict',
+                    required=False,
+                    options=dict(
+                        name=dict(type='str', required=False),
+                        uid=dict(type='str', required=False)
+                    )
+                ),
+                shoot_label_selector=dict(type='str', required=False),
+                managed=dict(type='bool', required=False)
+            )
+        ),
         # metadata-related arguments
         ownership=dict(
             type='dict',
@@ -1121,8 +1219,12 @@ def run_module():
         ssl_config = module.params.get('ssl_config', {})
 
         # Validate certificate files exist if provided in ssl_config
+        # Only validate ca_cert when validate_certs is true (it's ignored otherwise)
         import os
-        for cert_param in ['ca_cert', 'client_cert', 'client_key']:
+        certs_to_check = ['client_cert', 'client_key']
+        if ssl_config.get('validate_certs', True):
+            certs_to_check.append('ca_cert')
+        for cert_param in certs_to_check:
             cert_path = ssl_config.get(cert_param)
             if cert_path:
                 if not os.path.exists(cert_path):

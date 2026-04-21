@@ -18,6 +18,14 @@ Complete documentation for the PX-Backup Ansible collection modules, playbooks, 
   - Control cluster access
   - Update cluster configurations
 
+### Cluster Discovery Config Module
+
+- [cluster_discovery_config](modules/cluster_discovery_config.md)
+  - Manage cluster discovery configurations for Gardener Shoot clusters
+  - Automatic and manual cluster discovery with configurable frequency
+  - Credential refresh for discovered clusters
+  - Label selector-based filtering for targeted discovery
+
 ### Backup Location Module
 
 - [backup_location](modules/backup_location.md)
@@ -130,6 +138,7 @@ inventory/
 │   ├── backup_schedule/
 │   ├── cloud_credential/
 │   ├── cluster/
+│   ├── cluster_discovery_config/
 │   ├── common/
 │   ├── restore/
 │   ├── rule/

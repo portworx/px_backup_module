@@ -1,0 +1,5 @@
+---
+# Cluster discovery configurations to delete
+cluster_discovery_configs_delete:
+  # Delete by name
+  - name: "gardener-shoot-manual"
