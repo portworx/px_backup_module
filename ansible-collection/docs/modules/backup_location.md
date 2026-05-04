@@ -1,6 +1,6 @@
 # Backup Location Module
 
-The backup location module provides comprehensive management of PX-Backup storage locations, including creation, modification, deletion, validation, inspection, and ownership management for S3, Azure, Google, and NFS storage destinations.
+The backup location module provides comprehensive management of PX-Backup storage locations, including creation, modification, deletion, validation, inspection, ownership management, and backup sync (federated mode) for S3, Azure, Google, and NFS storage destinations.
 
 ## Synopsis
 
@@ -9,6 +9,7 @@ The backup location module provides comprehensive management of PX-Backup storag
 * Validate backup location configurations
 * Manage backup location ownership and access control
 * Comprehensive inspection and enumeration capabilities
+* Trigger on-demand backup sync from object store (federated mode)
 
 ## Requirements
 
@@ -22,15 +23,16 @@ The backup location module provides comprehensive management of PX-Backup storag
 The module supports the following operations:
 
 
-| Operation        | Description                               |
-| ------------------ | ------------------------------------------- |
-| CREATE           | Create a new backup location              |
-| UPDATE           | Modify existing backup location           |
-| DELETE           | Remove a backup location                  |
-| VALIDATE         | Validate backup location configuration    |
-| INSPECT_ONE      | Get details of a specific backup location |
-| INSPECT_ALL      | List all backup locations                 |
-| UPDATE_OWNERSHIP | Update ownership settings                 |
+| Operation        | Description                                                  |
+| ------------------ | -------------------------------------------------------------- |
+| CREATE           | Create a new backup location                                 |
+| UPDATE           | Modify existing backup location                              |
+| DELETE           | Remove a backup location                                     |
+| VALIDATE         | Validate backup location configuration                       |
+| INSPECT_ONE      | Get details of a specific backup location                    |
+| INSPECT_ALL      | List all backup locations                                    |
+| UPDATE_OWNERSHIP | Update ownership settings                                    |
+| SYNC             | Trigger backup sync from object store (federated mode only)  |
 
 ## Parameters
 
@@ -68,6 +70,20 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 | validate_cloud_credential | boolean    | no       | true                           | Whether to validate cloud credentials      |                                |
 | object_lock_enabled       | boolean    | no       | false                          | Enable object lock for S3 backup locations |                                |
 | cloud_credential_ref      | dictionary | no       | Reference to cloud credentials |                                            |                                |
+
+### Sync Parameters (SYNC operation)
+
+
+| Parameter           | Type    | Required | Default | Description                                                    |
+| --------------------- | --------- | ---------- | --------- | ---------------------------------------------------------------- |
+| sync                | boolean | no       | false   | Trigger backup sync (can also be used with CREATE/UPDATE)      |
+| wait_for_completion | boolean | no       | false   | Wait for sync to complete before returning                     |
+| sync_timeout        | integer | no       | 600     | Max seconds to wait for sync completion                        |
+| sync_poll_interval  | integer | no       | 10      | Seconds between status polls when waiting for completion       |
+
+> **Note:** The SYNC operation is only available when PX-Backup is running in federated deployment mode.
+> Backup sync discovers backups in the object store bucket that are not yet tracked in PX-Backup and imports them.
+> The sync is on-demand (not automatic or periodic). Parallel sync triggers while another sync is in progress are not allowed.
 
 ### cloud_credential_ref Reference
 

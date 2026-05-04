@@ -11,6 +11,7 @@ This Ansible module manages backup locations in PX-Backup, providing operations 
 - Validating backup locations
 - Inspecting backup locations (single or all)
 - Managing backup location ownership
+- Triggering backup sync from object store (federated mode)
 
 """
 
@@ -18,6 +19,7 @@ from __future__ import absolute_import, division, print_function
 __metaclass__ = type
 
 import json
+import time
 import typing
 from typing import Dict, List, Tuple, Optional, Any, Union
 import logging
@@ -53,9 +55,10 @@ options:
             - " - INSPECT_ONE: retrieves details of a specific backup location"
             - " - INSPECT_ALL: lists all backup locations"
             - " - UPDATE_OWNERSHIP: updates ownership settings of a backup location"
+            - " - SYNC: triggers backup sync from object store (federated mode only)"
         required: true
         type: str
-        choices: ['CREATE', 'UPDATE', 'DELETE', 'VALIDATE', 'INSPECT_ONE', 'INSPECT_ALL', 'UPDATE_OWNERSHIP']
+        choices: ['CREATE', 'UPDATE', 'DELETE', 'VALIDATE', 'INSPECT_ONE', 'INSPECT_ALL', 'UPDATE_OWNERSHIP', 'SYNC']
     api_url:
         description: PX-Backup API URL
         required: true
@@ -282,6 +285,38 @@ options:
                         description: Public access type
                         choices: ['Invalid', 'Read', 'Write', 'Admin']
                         type: str
+    sync:
+        description:
+            - Trigger backup sync from the object store
+            - Only valid in federated deployment mode
+            - Can be used with CREATE or UPDATE operations, or via the SYNC operation
+            - The sync is on-demand (not automatic or periodic)
+            - Parallel sync triggers while another sync is in progress are not allowed
+        required: false
+        type: bool
+        default: false
+    sync_timeout:
+        description:
+            - Maximum time in seconds to wait for backup sync to complete
+            - Only used with SYNC operation when wait_for_completion is true
+        required: false
+        type: int
+        default: 600
+    sync_poll_interval:
+        description:
+            - Interval in seconds between sync status polls
+            - Only used with SYNC operation when wait_for_completion is true
+        required: false
+        type: int
+        default: 10
+    wait_for_completion:
+        description:
+            - Whether to wait for the sync operation to complete
+            - Only used with SYNC operation
+            - When true, the module will poll sync_info status until completion or timeout
+        required: false
+        type: bool
+        default: false
     include_secrets:
         description: Include sensitive information in response
         type: bool
@@ -348,6 +383,29 @@ EXAMPLES = r'''
       - name: "cluster-1"
         uid: "cluster-1-uid"
       - name: "cluster-2"
+
+# Trigger backup sync on a federated backup location
+- name: Trigger backup sync
+  backup_location:
+    operation: SYNC
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    name: "prod-azure-federated"
+    org_id: "default"
+    uid: "backup-location-uid"
+
+# Trigger backup sync and wait for completion
+- name: Trigger backup sync and wait
+  backup_location:
+    operation: SYNC
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    name: "prod-azure-federated"
+    org_id: "default"
+    uid: "backup-location-uid"
+    wait_for_completion: true
+    sync_timeout: 900
+    sync_poll_interval: 15
 '''
 
 RETURN = r'''
@@ -384,6 +442,19 @@ backup_locations:
             }
         }
     ]
+sync_info:
+    description: Sync operation status details (returned for SYNC operation)
+    type: dict
+    returned: when operation is SYNC
+    sample: {
+        "status": "Completed",
+        "reason": "Backup sync completed successfully",
+        "cluster_ref": {"name": "cluster-1", "uid": "cluster-uid"},
+        "sync_stats": {
+            "start_time": "2026-05-04T10:00:00Z",
+            "end_time": "2026-05-04T10:05:00Z"
+        }
+    }
 message:
     description: Operation result message
     type: str
@@ -520,6 +591,162 @@ def validate_backup_location(module, client):
     except Exception as e:
         module.fail_json(msg=f"Failed to validate backup location: {str(e)}")
 
+def sync_backup_location(module, client):
+    """Trigger backup sync from object store for a federated backup location.
+
+    This triggers an on-demand backup sync by sending a minimal PUT /v1/backuplocation
+    request with only sync=true set in the backup_location payload.
+
+    The PX-Backup server recognizes this as a "sync-only update" when:
+      - sync=true
+      - type is not set (defaults to Invalid/0 in protobuf)
+      - cloud_credential_ref.name is empty
+    This bypasses provider-specific validation (e.g., Azure environment type checks)
+    and cloud credential requirements. The server hydrates all required fields
+    (type, path, s3_config, cluster_refs, etc.) from the existing backup location
+    object stored in MongoDB.
+
+    In federated mode, PX-Backup will then create a sync BackupLocation CR on an
+    application cluster, and Stork will read the object store bucket and create
+    ApplicationBackup CRs for any backups not yet synced to PX-Backup.
+
+    Optionally waits for the sync to complete by polling the sync_info status.
+    """
+    try:
+        params = dict(module.params)
+
+        # First inspect the current backup location to get its UID
+        inspect_params = {
+            'include_secrets': False,
+            'uid': params.get('uid', '')
+        }
+        url = f"v1/backuplocation/{params['org_id']}/{params['name']}"
+        current_bl = client.make_request(
+            method='GET',
+            endpoint=url,
+            params=inspect_params
+        ).get('backup_location', {})
+
+        if not current_bl:
+            module.fail_json(msg=f"Backup location '{params['name']}' not found")
+
+        bl_uid = params.get('uid') or current_bl.get('metadata', {}).get('uid', '')
+
+        # Build a minimal sync-only update request.
+        # IMPORTANT: Send a minimal request with only sync=true.
+        # Do NOT send type, path, s3_config, cloud_credential_ref, or other fields.
+        # The server treats this as a "sync-only update" (isSyncOnlyUpdate=true)
+        # when type==Invalid (not set) and cloud_credential_ref is empty, which
+        # skips all provider-specific validation (Azure env type, S3 endpoint, etc.).
+        # The server hydrates all required fields from the existing object via
+        # hydrateWLIAzureConfigFromExisting() and other preservation logic.
+        #
+        # However, use_workload_identity MUST match the existing value because
+        # validateBlNonUpdatableParam() checks it BEFORE the server's hydration
+        # logic runs. If the existing BL has use_workload_identity=true and we
+        # omit it (defaults to false), the server rejects the request.
+        bl_info = current_bl.get('backup_location_info', current_bl.get('backup_location', {}))
+
+        update_request = {
+            "metadata": {
+                "name": params['name'],
+                "org_id": params['org_id'],
+                "uid": bl_uid,
+            },
+            "backup_location": {
+                "sync": True,
+                "use_workload_identity": bl_info.get('use_workload_identity', False),
+            }
+        }
+
+        # Trigger sync via update
+        response = client.make_request(
+            method='PUT',
+            endpoint='v1/backuplocation',
+            data=update_request
+        )
+
+        # If wait_for_completion is requested, poll for sync status
+        if params.get('wait_for_completion', False):
+            sync_timeout = params.get('sync_timeout', 600)
+            poll_interval = params.get('sync_poll_interval', 10)
+
+            sync_result = _wait_for_sync_completion(
+                module, client, params['org_id'], params['name'],
+                bl_uid, sync_timeout, poll_interval
+            )
+            return sync_result, True
+
+        return response, True
+
+    except Exception as e:
+        error_msg = str(e)
+        if isinstance(e, requests.exceptions.RequestException) and hasattr(e, 'response'):
+            try:
+                error_detail = e.response.json()
+                error_msg = f"{error_msg}: {error_detail}"
+            except ValueError:
+                error_msg = f"{error_msg}: {e.response.text}"
+        module.fail_json(msg=f"Failed to trigger backup sync: {error_msg}")
+
+
+def _wait_for_sync_completion(module, client, org_id, name, uid, timeout, poll_interval):
+    """Poll sync_info status until completion, failure, or timeout.
+
+    Returns the final backup location state with sync_info.
+
+    Sync status transitions: Invalid -> Pending -> InProgress -> Completed/Failed
+    """
+    start_time = time.time()
+    terminal_statuses = {'Completed', 'Failed', '3', '4'}  # proto enum values or string names
+
+    while True:
+        elapsed = time.time() - start_time
+        if elapsed >= timeout:
+            module.fail_json(
+                msg=f"Backup sync timed out after {timeout}s. "
+                    f"The sync may still be in progress on the server. "
+                    f"Use INSPECT_ONE to check sync_info status."
+            )
+
+        # Inspect the backup location to get current sync status
+        inspect_params = {
+            'include_secrets': False,
+            'uid': uid
+        }
+        try:
+            url = f"v1/backuplocation/{org_id}/{name}"
+            bl_response = client.make_request(
+                method='GET',
+                endpoint=url,
+                params=inspect_params
+            )
+        except Exception as e:
+            logger.warning(f"Error polling sync status: {e}, will retry")
+            time.sleep(poll_interval)
+            continue
+
+        bl = bl_response.get('backup_location', {})
+        bl_info = bl.get('backup_location_info', bl.get('backup_location', {}))
+        sync_info = bl_info.get('sync_info', {})
+        sync_status = str(sync_info.get('status', ''))
+
+        logger.info(f"Sync status: {sync_status}, reason: {sync_info.get('reason', '')}")
+
+        # Check for terminal states
+        if sync_status in terminal_statuses or sync_status.lower() in {'completed', 'failed'}:
+            if sync_status in {'Failed', '4'} or sync_status.lower() == 'failed':
+                module.fail_json(
+                    msg=f"Backup sync failed: {sync_info.get('reason', 'unknown reason')}",
+                    backup_location=bl,
+                    sync_info=sync_info
+                )
+            # Completed successfully
+            return bl
+
+        time.sleep(poll_interval)
+
+
 def enumerate_backup_locations(module, client):
     """List all backup locations"""
     params = {
@@ -606,9 +833,14 @@ def build_backup_location_request(params: Dict[str, Any]) -> Dict[str, Any]:
             "encryption_key": params.get('encryption_key', ''),
             "validate_cloud_credential": params.get('validate_cloud_credential', True),
             "object_lock_enabled": params.get('object_lock_enabled', False),
-            "federated": params.get('federated', False)
+            "federated": params.get('federated', False),
+            "use_workload_identity": params.get('federated', False)
         }
     }
+
+    # Add sync flag if enabled (for federated mode backup sync)
+    if params.get('sync'):
+        request['backup_location']['sync'] = True
 
     # Add optional configurations safely
     if params.get('labels'):
@@ -658,16 +890,30 @@ def build_backup_location_request(params: Dict[str, Any]) -> Dict[str, Any]:
         if s3_config:
             request['backup_location']['s3_config'] = s3_config
             
-    elif location_type == 'Azure' and params.get('azure_config'):
-        azure_config = params.get('azure_config', {})
-        azure_environment = azure_config.get('azure_environment', 'AZURE_GLOBAL')  # Use default if key is missing
+    elif location_type == 'Azure':
+        # Azure backup locations carry their config under s3_config on the wire
+        # (server proto reuses S3Config for Azure-specific fields). Two input shapes:
+        #   - Non-federated: azure_config has azure_environment as a string + creds
+        #     elsewhere via cloud_credential_ref.
+        #   - Federated (use_workload_identity=true): s3_config has azure_environment
+        #     as a dict plus azure_resource_group_name / azure_account_name /
+        #     azure_subscription_id. No cloud_credential_ref.
+        s3_config = {}
 
-        # Include azure_environment in the request payload
-        request['backup_location']['s3_config'] = {
-            "azure_environment": {
-                "type": azure_environment
-            }
-        }
+        if params.get('azure_config'):
+            azure_env_str = params['azure_config'].get('azure_environment')
+            if azure_env_str:
+                s3_config['azure_environment'] = {'type': azure_env_str}
+
+        if params.get('s3_config'):
+            for key in ['azure_environment', 'azure_resource_group_name',
+                        'azure_account_name', 'azure_subscription_id']:
+                val = params['s3_config'].get(key)
+                if val is not None:
+                    s3_config[key] = val
+
+        if s3_config:
+            request['backup_location']['s3_config'] = s3_config
 
 
     elif location_type == 'NFS' and params.get('nfs_config'):
@@ -791,6 +1037,22 @@ def perform_operation(module: AnsibleModule, client: PXBackupClient, operation: 
             message="Backup location deleted successfully"
             )
 
+        elif operation == 'SYNC':
+            backup_location, changed = sync_backup_location(module, client)
+            # Extract sync_info from the response for convenience
+            bl_info = backup_location.get('backup_location_info', backup_location.get('backup_location', {}))
+            sync_info = bl_info.get('sync_info', {})
+            sync_status = sync_info.get('status', 'Unknown')
+            message = f"Backup sync triggered successfully"
+            if module.params.get('wait_for_completion'):
+                message = f"Backup sync completed with status: {sync_status}"
+            return OperationResult(
+                success=True,
+                changed=changed,
+                data={'backup_location': backup_location, 'sync_info': sync_info},
+                message=message
+            )
+
     except Exception as e:
         logger.exception(f"Operation {operation} failed")
         return OperationResult(
@@ -814,7 +1076,8 @@ def run_module():
                 'VALIDATE',
                 'INSPECT_ONE',
                 'INSPECT_ALL',
-                'UPDATE_OWNERSHIP'
+                'UPDATE_OWNERSHIP',
+                'SYNC'
             ]
         ),
         name=dict(type='str', required=False),
@@ -826,6 +1089,10 @@ def run_module():
         validate_cloud_credential=dict(type='bool', required=False, default=True),
         object_lock_enabled=dict(type='bool', required=False, default=False),
         federated=dict(type='bool', required=False, default=False),
+        sync=dict(type='bool', required=False, default=False),
+        sync_timeout=dict(type='int', required=False, default=600),
+        sync_poll_interval=dict(type='int', required=False, default=10),
+        wait_for_completion=dict(type='bool', required=False, default=False),
         cluster_refs=dict(
             type='list',
             required=False,
@@ -922,12 +1189,13 @@ def run_module():
         include_secrets=dict(type='bool', default=False)
     )
 
-    result = dict(
-        changed=False,
-        backup_location={},
-        backup_locations=[],
-        message=''
-    )
+    result = {
+        'changed': False,
+        'backup_location': {},
+        'backup_locations': [],
+        'sync_info': {},
+        'message': ''
+    }
 
     # Define required parameters for each operation
     operation_requirements = {
@@ -937,7 +1205,8 @@ def run_module():
         'VALIDATE': ['name'],
         'INSPECT_ONE': ['name'],
         'INSPECT_ALL': ['org_id'],
-        'UPDATE_OWNERSHIP': ['name', 'ownership']
+        'UPDATE_OWNERSHIP': ['name', 'ownership'],
+        'SYNC': ['name'],
     }
 
     module = AnsibleModule(
@@ -945,7 +1214,6 @@ def run_module():
         supports_check_mode=True,
         required_if=[
             ('location_type', 'S3', ['s3_config']),
-            ('location_type', 'Azure', ['azure_config']),
             ('location_type', 'NFS', ['nfs_config'])
         ]
     )
