@@ -1,0 +1,15 @@
+---
+# Backup locations to trigger sync (federated mode only)
+# Sync discovers backups in the object store that are not yet tracked in PX-Backup
+# and imports them. This is only available when PX-Backup is running in federated mode.
+backup_locations_sync:
+  - name: "prod-azure-federated"
+    # uid: "backup-location-uid"  # Optional: specify UID for precise targeting
+    wait_for_completion: false     # Set to true to wait for sync to finish
+    sync_timeout: 600              # Max seconds to wait (only when wait_for_completion=true)
+    sync_poll_interval: 10         # Poll interval in seconds (only when wait_for_completion=true)
+
+  - name: "staging-azure-federated"
+    wait_for_completion: true
+    sync_timeout: 900
+    sync_poll_interval: 15
