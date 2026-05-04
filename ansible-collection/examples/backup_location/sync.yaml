@@ -1,0 +1,85 @@
+---
+- name: Trigger PX-Backup Location Sync (Federated Mode)
+  hosts: localhost
+  gather_facts: true
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/backup_location/sync.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - backup_locations_sync is defined
+        fail_msg: "Required variables must be defined. Ensure px_backup_api_url and backup_locations_sync are set."
+
+  tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+
+    - name: Trigger backup sync on federated backup locations
+      block:
+        - name: Trigger backup sync
+          backup_location:
+            operation: SYNC
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            org_id: "{{ org_id | default('default') }}"
+            name: "{{ item.name }}"
+            uid: "{{ item.uid | default(omit) }}"
+            wait_for_completion: "{{ item.wait_for_completion | default(false) }}"
+            sync_timeout: "{{ item.sync_timeout | default(600) }}"
+            sync_poll_interval: "{{ item.sync_poll_interval | default(10) }}"
+            # SSL Certificate Parameters
+            ssl_config: "{{ ssl_config.px_backup | default({}) }}"
+          register: sync_result
+          loop: "{{ backup_locations_sync }}"
+          loop_control:
+            label: "{{ item.name }}"
+
+        - name: Get post-sync state
+          backup_location:
+            operation: INSPECT_ONE
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            name: "{{ item.name }}"
+            uid: "{{ item.uid | default(omit) }}"
+            org_id: "{{ org_id | default('default') }}"
+            # SSL Certificate Parameters
+            ssl_config: "{{ ssl_config.px_backup | default({}) }}"
+          register: post_sync_state
+          loop: "{{ backup_locations_sync }}"
+          loop_control:
+            label: "{{ item.name }}"
+
+      rescue:
+        - name: Display error details
+          debug:
+            msg: "Failed to sync backup locations: {{ sync_result.results | default([]) | selectattr('failed', 'true') | map(attribute='msg') | list }}"
+
+        - name: Fail with error message
+          fail:
+            msg: "Failed to sync backup locations. See above for details."
+
+    - name: Show sync results
+      debug:
+        msg:
+          - "Sync Results:"
+          - "----------------------------------------"
+          - "Location: {{ item.item.name }}"
+          - "Sync Triggered: {{ item is success }}"
+          - "Message: {{ item.message | default('N/A') }}"
+          - "----------------------------------------"
+      loop: "{{ sync_result.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+
+    # Output configuration: Display the output or save to file
+    - name: Handle output
+      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
+      vars:
+        output_data: "{{ post_sync_state }}"
+        output_filename_prefix: "backup_location_sync"
+      when: output_config.enabled | default(false)
