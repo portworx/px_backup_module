@@ -25,3 +25,9 @@ max_results: 100
 
 # Filter by managed state
 #managed: true
+
+# Filter by cluster status (one or more)
+# Allowed values: Invalid, DeletePending, Pending, Failed, Success
+#cluster_status:
+#  - "Success"
+#  - "Failed"
