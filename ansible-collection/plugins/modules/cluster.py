@@ -346,6 +346,13 @@ options:
                     - Filter by managed state
                     - When set, only returns clusters where GardenerShootInfo.managed matches this value
                 type: bool
+            cluster_status:
+                description:
+                    - Filter by cluster status
+                    - Returns only clusters whose ClusterInfo.status.status matches any of the specified values
+                type: list
+                elements: str
+                choices: ['Invalid', 'DeletePending', 'Pending', 'Failed', 'Success']
 
 requirements:
     - python >= 3.9
@@ -622,7 +629,7 @@ def enumerate_clusters(module: AnsibleModule, client: PXBackupClient) -> List[Di
         has_ceo_filters = ceo and any(
             ceo.get(k) is not None for k in [
                 'project_names', 'cluster_discovery_config_refs',
-                'shoot_label_selector', 'managed'
+                'shoot_label_selector', 'managed', 'cluster_status'
             ]
         )
 
@@ -651,6 +658,9 @@ def enumerate_clusters(module: AnsibleModule, client: PXBackupClient) -> List[Di
 
             if ceo.get('managed') is not None:
                 post_body['cluster_enumerate_options']['managed'] = ceo['managed']
+
+            if ceo.get('cluster_status'):
+                post_body['cluster_enumerate_options']['cluster_status'] = ceo['cluster_status']
 
             response = client.make_request(
                 method='POST',
@@ -1112,7 +1122,13 @@ def run_module():
                     )
                 ),
                 shoot_label_selector=dict(type='str', required=False),
-                managed=dict(type='bool', required=False)
+                managed=dict(type='bool', required=False),
+                cluster_status=dict(
+                    type='list',
+                    elements='str',
+                    required=False,
+                    choices=['Invalid', 'DeletePending', 'Pending', 'Failed', 'Success']
+                )
             )
         ),
         # metadata-related arguments

@@ -141,6 +141,7 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 | cluster_enumerate_options.cluster_discovery_config_refs[].uid  | string  | no       | UID of the ClusterDiscoveryConfig                                   |
 | cluster_enumerate_options.shoot_label_selector                 | string  | no       | Filter by Gardener Shoot labels (Kubernetes label selector syntax)  |
 | cluster_enumerate_options.managed                              | boolean | no       | Filter by managed state (true = discovered by CDC)                  |
+| cluster_enumerate_options.cluster_status                       | list    | no       | Filter by cluster status. Allowed values: Invalid, DeletePending, Pending, Failed, Success |
 
 ## Error Handling
 
