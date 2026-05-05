@@ -29,6 +29,7 @@
           cluster_discovery_config_refs: "{{ cluster_discovery_config_refs | default(omit) }}"
           shoot_label_selector: "{{ shoot_label_selector | default(omit) }}"
           managed: "{{ managed | default(omit) }}"
+          cluster_status: "{{ cluster_status | default(omit) }}"
         # SSL Certificate Parameters
         ssl_config: "{{ ssl_config.px_backup | default({}) }}"
       register: cluster_result
