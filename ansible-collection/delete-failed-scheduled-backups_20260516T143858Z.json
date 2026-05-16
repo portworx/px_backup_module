@@ -1,0 +1,1211 @@
+{
+  "timestamp_utc": "2026-05-16T14:39:00.240427+00:00",
+  "org_id": "default",
+  "dry_run": false,
+  "filters": {
+    "cluster_name": null,
+    "schedule_name": null,
+    "limit": 0
+  },
+  "totals": {
+    "clusters_considered": 1,
+    "deletions_attempted": 85,
+    "deletions_succeeded": 85,
+    "deletions_failed": 0,
+    "dry_run_listed": 0,
+    "aborted_by_limit": false,
+    "aborted_by_signal": false
+  },
+  "records": [
+    {
+      "cluster": "vadiraj",
+      "schedule": "mixed-vm-sched-01",
+      "backup_name": "mixed-vm-sched-01-f9e36d5-interval-2026-05-16-114325",
+      "backup_uid": "70119dac-1d6f-4880-afeb-47db93b53b2e",
+      "create_time": "2026-05-16T11:43:27Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-12",
+      "backup_name": "bogus-vm-sched-12-a355789-interval-2026-05-16-130524",
+      "backup_uid": "c2d6afef-fd17-432a-9773-586a8eb35069",
+      "create_time": "2026-05-16T13:05:24Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-12",
+      "backup_name": "bogus-vm-sched-12-a355789-interval-2026-05-16-132024",
+      "backup_uid": "bd27ea63-a74c-47c8-bbcd-3e26cdd3cb05",
+      "create_time": "2026-05-16T13:20:27Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-12",
+      "backup_name": "bogus-vm-sched-12-a355789-interval-2026-05-16-133528",
+      "backup_uid": "44189b84-bc25-49af-912d-f019aa4834ba",
+      "create_time": "2026-05-16T13:35:28Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-12",
+      "backup_name": "bogus-vm-sched-12-a355789-interval-2026-05-16-135029",
+      "backup_uid": "4c860282-6305-4037-bc28-0e0502bc8ef5",
+      "create_time": "2026-05-16T13:50:30Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-12",
+      "backup_name": "bogus-vm-sched-12-a355789-interval-2026-05-16-140530",
+      "backup_uid": "6936a86d-0c81-4b1c-9794-e5b41b44e968",
+      "create_time": "2026-05-16T14:05:30Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-12",
+      "backup_name": "bogus-vm-sched-12-a355789-interval-2026-05-16-142031",
+      "backup_uid": "9d78b6e7-1524-4fd0-a51a-8cb8d6aa3360",
+      "create_time": "2026-05-16T14:20:31Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-12",
+      "backup_name": "bogus-vm-sched-12-a355789-interval-2026-05-16-143532",
+      "backup_uid": "a915b082-b40c-49b8-ace1-1e20fc6d180b",
+      "create_time": "2026-05-16T14:35:32Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-11",
+      "backup_name": "bogus-vm-sched-11-e6630f3-interval-2026-05-16-130522",
+      "backup_uid": "627bccd7-cf74-42a1-9721-060e0dff04ad",
+      "create_time": "2026-05-16T13:05:22Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-11",
+      "backup_name": "bogus-vm-sched-11-e6630f3-interval-2026-05-16-132023",
+      "backup_uid": "477d7395-be56-4dbc-9736-93d55f37291b",
+      "create_time": "2026-05-16T13:20:25Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-11",
+      "backup_name": "bogus-vm-sched-11-e6630f3-interval-2026-05-16-133526",
+      "backup_uid": "d53a7a76-971e-4c9e-b938-e0cc2572398c",
+      "create_time": "2026-05-16T13:35:26Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-11",
+      "backup_name": "bogus-vm-sched-11-e6630f3-interval-2026-05-16-135027",
+      "backup_uid": "f0305339-c609-4161-980a-188f57a8d393",
+      "create_time": "2026-05-16T13:50:27Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-11",
+      "backup_name": "bogus-vm-sched-11-e6630f3-interval-2026-05-16-140528",
+      "backup_uid": "b6dbc58e-52c9-49f0-90b3-afaa2dd60303",
+      "create_time": "2026-05-16T14:05:28Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-11",
+      "backup_name": "bogus-vm-sched-11-e6630f3-interval-2026-05-16-142029",
+      "backup_uid": "8d899793-d6fd-4e94-8a5b-7cff76b5791e",
+      "create_time": "2026-05-16T14:20:29Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-11",
+      "backup_name": "bogus-vm-sched-11-e6630f3-interval-2026-05-16-143530",
+      "backup_uid": "f4a1f069-37f6-46f1-b0b8-657218267ee9",
+      "create_time": "2026-05-16T14:35:30Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-10",
+      "backup_name": "bogus-vm-sched-10-1cc3ad8-interval-2026-05-16-130521",
+      "backup_uid": "d93a68ad-b922-420c-86ec-16ed5c39ef46",
+      "create_time": "2026-05-16T13:05:21Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-10",
+      "backup_name": "bogus-vm-sched-10-1cc3ad8-interval-2026-05-16-132022",
+      "backup_uid": "c8972c5c-814a-4323-bf61-bec85c62291a",
+      "create_time": "2026-05-16T13:20:24Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-10",
+      "backup_name": "bogus-vm-sched-10-1cc3ad8-interval-2026-05-16-133524",
+      "backup_uid": "79994b13-6e3a-48f1-98da-0b29de3d0245",
+      "create_time": "2026-05-16T13:35:24Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-10",
+      "backup_name": "bogus-vm-sched-10-1cc3ad8-interval-2026-05-16-135025",
+      "backup_uid": "4e623fc6-d0ea-4323-b280-6f2891748a99",
+      "create_time": "2026-05-16T13:50:25Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-10",
+      "backup_name": "bogus-vm-sched-10-1cc3ad8-interval-2026-05-16-140526",
+      "backup_uid": "be6e0a6d-3d99-41d5-aa97-3e8a0ee80128",
+      "create_time": "2026-05-16T14:05:26Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-10",
+      "backup_name": "bogus-vm-sched-10-1cc3ad8-interval-2026-05-16-142027",
+      "backup_uid": "b1859009-7234-4ee6-bd66-94f7b191f395",
+      "create_time": "2026-05-16T14:20:27Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-10",
+      "backup_name": "bogus-vm-sched-10-1cc3ad8-interval-2026-05-16-143528",
+      "backup_uid": "c9905c11-29be-444b-a1d9-3dac8cc434d3",
+      "create_time": "2026-05-16T14:35:28Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-09",
+      "backup_name": "bogus-vm-sched-09-9a2d285-interval-2026-05-16-130524",
+      "backup_uid": "18a30b48-b222-4522-a084-b7c13a935c43",
+      "create_time": "2026-05-16T13:05:24Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-09",
+      "backup_name": "bogus-vm-sched-09-9a2d285-interval-2026-05-16-132025",
+      "backup_uid": "7ab2a509-3b3f-4e2e-b014-a83a7cab42cb",
+      "create_time": "2026-05-16T13:20:28Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-09",
+      "backup_name": "bogus-vm-sched-09-9a2d285-interval-2026-05-16-133529",
+      "backup_uid": "4cb82382-b482-4816-af26-b1c0dd5b8627",
+      "create_time": "2026-05-16T13:35:29Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-09",
+      "backup_name": "bogus-vm-sched-09-9a2d285-interval-2026-05-16-135029",
+      "backup_uid": "91b64455-f6d9-467f-855c-ad6d617b0206",
+      "create_time": "2026-05-16T13:50:31Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-09",
+      "backup_name": "bogus-vm-sched-09-9a2d285-interval-2026-05-16-140532",
+      "backup_uid": "a48b1863-e83c-4fd8-acc4-0bd648d515cb",
+      "create_time": "2026-05-16T14:05:32Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-09",
+      "backup_name": "bogus-vm-sched-09-9a2d285-interval-2026-05-16-142032",
+      "backup_uid": "319712d0-98c0-427a-b3a1-85e41acac017",
+      "create_time": "2026-05-16T14:20:32Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-09",
+      "backup_name": "bogus-vm-sched-09-9a2d285-interval-2026-05-16-143533",
+      "backup_uid": "d11e3a45-ab95-45e2-abea-90f5d6b836b0",
+      "create_time": "2026-05-16T14:35:33Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-08",
+      "backup_name": "bogus-vm-sched-08-dfb8d50-interval-2026-05-16-130518",
+      "backup_uid": "17f2cd18-b479-4099-bc30-3187ca5e4ff3",
+      "create_time": "2026-05-16T13:05:18Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-08",
+      "backup_name": "bogus-vm-sched-08-dfb8d50-interval-2026-05-16-132019",
+      "backup_uid": "c9bbda32-ee2c-4d6f-8aed-483f444d9875",
+      "create_time": "2026-05-16T13:20:21Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-08",
+      "backup_name": "bogus-vm-sched-08-dfb8d50-interval-2026-05-16-133521",
+      "backup_uid": "8a0dd060-7a8e-46d2-84b5-0326605076d7",
+      "create_time": "2026-05-16T13:35:21Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-08",
+      "backup_name": "bogus-vm-sched-08-dfb8d50-interval-2026-05-16-135022",
+      "backup_uid": "07e54107-2259-40c5-b7a3-7528394b963d",
+      "create_time": "2026-05-16T13:50:22Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-08",
+      "backup_name": "bogus-vm-sched-08-dfb8d50-interval-2026-05-16-140523",
+      "backup_uid": "aa4fa6de-aaaa-4d0e-bcb5-d473335f4654",
+      "create_time": "2026-05-16T14:05:23Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-08",
+      "backup_name": "bogus-vm-sched-08-dfb8d50-interval-2026-05-16-142024",
+      "backup_uid": "28be830d-33d2-4e79-89ef-6f97c03116e6",
+      "create_time": "2026-05-16T14:20:24Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-08",
+      "backup_name": "bogus-vm-sched-08-dfb8d50-interval-2026-05-16-143525",
+      "backup_uid": "bd81a922-4d9c-4d42-b604-05af760e1cea",
+      "create_time": "2026-05-16T14:35:25Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-07",
+      "backup_name": "bogus-vm-sched-07-dfd2b67-interval-2026-05-16-130519",
+      "backup_uid": "c7bc5d6c-99bf-480c-bbd2-f9f2ccce7d71",
+      "create_time": "2026-05-16T13:05:19Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-07",
+      "backup_name": "bogus-vm-sched-07-dfd2b67-interval-2026-05-16-132020",
+      "backup_uid": "6047508f-74f9-472f-96cf-5b4ee47502b3",
+      "create_time": "2026-05-16T13:20:21Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-07",
+      "backup_name": "bogus-vm-sched-07-dfd2b67-interval-2026-05-16-133522",
+      "backup_uid": "10732f1f-a6c0-41a4-8ef0-bc73a7545595",
+      "create_time": "2026-05-16T13:35:22Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-07",
+      "backup_name": "bogus-vm-sched-07-dfd2b67-interval-2026-05-16-135023",
+      "backup_uid": "c781f52a-10c9-4264-98f4-6165779502ad",
+      "create_time": "2026-05-16T13:50:23Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-07",
+      "backup_name": "bogus-vm-sched-07-dfd2b67-interval-2026-05-16-140523",
+      "backup_uid": "bfdfe7a8-5ee4-41dc-9f5b-be6618a6eadd",
+      "create_time": "2026-05-16T14:05:23Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-07",
+      "backup_name": "bogus-vm-sched-07-dfd2b67-interval-2026-05-16-142024",
+      "backup_uid": "2e82a284-b76a-429c-9632-60969b79376d",
+      "create_time": "2026-05-16T14:20:24Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-07",
+      "backup_name": "bogus-vm-sched-07-dfd2b67-interval-2026-05-16-143525",
+      "backup_uid": "089a9770-e666-4f83-8274-948545313c45",
+      "create_time": "2026-05-16T14:35:25Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-06",
+      "backup_name": "bogus-vm-sched-06-ebec725-interval-2026-05-16-130521",
+      "backup_uid": "d7f0285f-93cc-4d1f-a6bd-e649e9f64f93",
+      "create_time": "2026-05-16T13:05:21Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-06",
+      "backup_name": "bogus-vm-sched-06-ebec725-interval-2026-05-16-132022",
+      "backup_uid": "6a874f7c-3348-4b62-a935-83761231480c",
+      "create_time": "2026-05-16T13:20:24Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-06",
+      "backup_name": "bogus-vm-sched-06-ebec725-interval-2026-05-16-133525",
+      "backup_uid": "ac796e95-cf30-452b-ad8b-075a15cb3638",
+      "create_time": "2026-05-16T13:35:25Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-06",
+      "backup_name": "bogus-vm-sched-06-ebec725-interval-2026-05-16-135025",
+      "backup_uid": "d8544261-d6c4-4a89-b028-c9e31f469b34",
+      "create_time": "2026-05-16T13:50:25Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-06",
+      "backup_name": "bogus-vm-sched-06-ebec725-interval-2026-05-16-140526",
+      "backup_uid": "d000dfe9-49e0-425f-a150-bd734d4b05a9",
+      "create_time": "2026-05-16T14:05:26Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-06",
+      "backup_name": "bogus-vm-sched-06-ebec725-interval-2026-05-16-142027",
+      "backup_uid": "90af5386-dfc7-443a-862a-fd65e3fab022",
+      "create_time": "2026-05-16T14:20:27Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-06",
+      "backup_name": "bogus-vm-sched-06-ebec725-interval-2026-05-16-143528",
+      "backup_uid": "425553e8-75bf-4c51-8ed0-9f1bf372842b",
+      "create_time": "2026-05-16T14:35:28Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-05",
+      "backup_name": "bogus-vm-sched-05-4043ae1-interval-2026-05-16-130525",
+      "backup_uid": "649ec073-6054-4f0c-9efe-6ebcdbfe112a",
+      "create_time": "2026-05-16T13:05:25Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-05",
+      "backup_name": "bogus-vm-sched-05-4043ae1-interval-2026-05-16-132026",
+      "backup_uid": "54fc1bcf-9642-4ed6-8068-fe6677cdd100",
+      "create_time": "2026-05-16T13:20:29Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-05",
+      "backup_name": "bogus-vm-sched-05-4043ae1-interval-2026-05-16-133529",
+      "backup_uid": "a6320ee7-79ba-410e-88da-60f7ff433a0b",
+      "create_time": "2026-05-16T13:35:29Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-05",
+      "backup_name": "bogus-vm-sched-05-4043ae1-interval-2026-05-16-135030",
+      "backup_uid": "aca1b037-7781-441b-a3b5-04e1dd9d29e8",
+      "create_time": "2026-05-16T13:50:32Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-05",
+      "backup_name": "bogus-vm-sched-05-4043ae1-interval-2026-05-16-140533",
+      "backup_uid": "4b9fbd08-30dc-4db7-be09-b3d903612abe",
+      "create_time": "2026-05-16T14:05:33Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-05",
+      "backup_name": "bogus-vm-sched-05-4043ae1-interval-2026-05-16-142033",
+      "backup_uid": "b1c6bfea-4259-415d-9453-b03581d45487",
+      "create_time": "2026-05-16T14:20:33Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-05",
+      "backup_name": "bogus-vm-sched-05-4043ae1-interval-2026-05-16-143534",
+      "backup_uid": "fff58046-d266-4027-ab34-ab0ff584a664",
+      "create_time": "2026-05-16T14:35:34Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-04",
+      "backup_name": "bogus-vm-sched-04-ba93844-interval-2026-05-16-130523",
+      "backup_uid": "76f009c3-5ee3-44b0-b109-1cadcfb2925e",
+      "create_time": "2026-05-16T13:05:23Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-04",
+      "backup_name": "bogus-vm-sched-04-ba93844-interval-2026-05-16-132024",
+      "backup_uid": "ba42c356-8e43-4a0d-9705-5e0db1358d1a",
+      "create_time": "2026-05-16T13:20:26Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-04",
+      "backup_name": "bogus-vm-sched-04-ba93844-interval-2026-05-16-133527",
+      "backup_uid": "819049b1-6cff-4281-a87c-5b93fde2e8be",
+      "create_time": "2026-05-16T13:35:27Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-04",
+      "backup_name": "bogus-vm-sched-04-ba93844-interval-2026-05-16-135028",
+      "backup_uid": "ee295744-b64e-4a3b-b241-ca890e5e511c",
+      "create_time": "2026-05-16T13:50:29Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-04",
+      "backup_name": "bogus-vm-sched-04-ba93844-interval-2026-05-16-140529",
+      "backup_uid": "f09b2d0e-7995-4612-a369-ad8a5d43f4b1",
+      "create_time": "2026-05-16T14:05:29Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-04",
+      "backup_name": "bogus-vm-sched-04-ba93844-interval-2026-05-16-142030",
+      "backup_uid": "6c9c53c2-5572-4850-9aa9-82af295e0f5d",
+      "create_time": "2026-05-16T14:20:30Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-04",
+      "backup_name": "bogus-vm-sched-04-ba93844-interval-2026-05-16-143531",
+      "backup_uid": "5de5d49b-ca5e-4c35-ae34-f3d63c8a275a",
+      "create_time": "2026-05-16T14:35:31Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-03",
+      "backup_name": "bogus-vm-sched-03-15ba00d-interval-2026-05-16-130518",
+      "backup_uid": "86711564-aabf-446c-ad3f-7a4a813f73d6",
+      "create_time": "2026-05-16T13:05:18Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-03",
+      "backup_name": "bogus-vm-sched-03-15ba00d-interval-2026-05-16-132018",
+      "backup_uid": "d1412325-ccc2-404c-9827-e55740446d80",
+      "create_time": "2026-05-16T13:20:19Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-03",
+      "backup_name": "bogus-vm-sched-03-15ba00d-interval-2026-05-16-133520",
+      "backup_uid": "afe9b280-348e-4afb-a502-41706948d9a9",
+      "create_time": "2026-05-16T13:35:20Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-03",
+      "backup_name": "bogus-vm-sched-03-15ba00d-interval-2026-05-16-135021",
+      "backup_uid": "612c54e3-a555-4afe-8886-e79d42584a90",
+      "create_time": "2026-05-16T13:50:21Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-03",
+      "backup_name": "bogus-vm-sched-03-15ba00d-interval-2026-05-16-140522",
+      "backup_uid": "cb0d3849-b861-496a-a884-2f963a1bf520",
+      "create_time": "2026-05-16T14:05:22Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-03",
+      "backup_name": "bogus-vm-sched-03-15ba00d-interval-2026-05-16-142022",
+      "backup_uid": "1cf7d078-2e01-4f99-a3f8-3d186d126f13",
+      "create_time": "2026-05-16T14:20:23Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-03",
+      "backup_name": "bogus-vm-sched-03-15ba00d-interval-2026-05-16-143523",
+      "backup_uid": "465274fe-553e-4dba-afa4-88c95213bdb3",
+      "create_time": "2026-05-16T14:35:23Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-02",
+      "backup_name": "bogus-vm-sched-02-4d44ee9-interval-2026-05-16-130519",
+      "backup_uid": "c9a7c1c6-6fed-4102-8616-00f7f813ac02",
+      "create_time": "2026-05-16T13:05:19Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-02",
+      "backup_name": "bogus-vm-sched-02-4d44ee9-interval-2026-05-16-132020",
+      "backup_uid": "7f0d30a7-f442-4369-8366-cba801b60816",
+      "create_time": "2026-05-16T13:20:22Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-02",
+      "backup_name": "bogus-vm-sched-02-4d44ee9-interval-2026-05-16-133523",
+      "backup_uid": "7cacbc39-22e1-4fd2-8265-0448deb9fdad",
+      "create_time": "2026-05-16T13:35:23Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-02",
+      "backup_name": "bogus-vm-sched-02-4d44ee9-interval-2026-05-16-135024",
+      "backup_uid": "6c8234f0-4619-46ce-a361-7426ad5f5129",
+      "create_time": "2026-05-16T13:50:24Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-02",
+      "backup_name": "bogus-vm-sched-02-4d44ee9-interval-2026-05-16-140524",
+      "backup_uid": "a6078b09-889b-4fc4-853e-1a63f49dbdc9",
+      "create_time": "2026-05-16T14:05:24Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-02",
+      "backup_name": "bogus-vm-sched-02-4d44ee9-interval-2026-05-16-142025",
+      "backup_uid": "3d05e015-f255-4296-9eac-6cbd84e875f9",
+      "create_time": "2026-05-16T14:20:25Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-02",
+      "backup_name": "bogus-vm-sched-02-4d44ee9-interval-2026-05-16-143526",
+      "backup_uid": "e210f66e-d2fd-408d-90ab-2bdc52c6a2a1",
+      "create_time": "2026-05-16T14:35:26Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-01",
+      "backup_name": "bogus-vm-sched-01-cf7a183-interval-2026-05-16-130449",
+      "backup_uid": "77b958e2-d225-46c0-b3b3-c6a1a8823d05",
+      "create_time": "2026-05-16T13:04:49Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-01",
+      "backup_name": "bogus-vm-sched-01-cf7a183-interval-2026-05-16-131950",
+      "backup_uid": "9550fa82-e566-46e7-a51e-a5c05e751002",
+      "create_time": "2026-05-16T13:19:50Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-01",
+      "backup_name": "bogus-vm-sched-01-cf7a183-interval-2026-05-16-133451",
+      "backup_uid": "de68d1ce-a41f-4c12-b6d7-9d1c798c2118",
+      "create_time": "2026-05-16T13:34:51Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-01",
+      "backup_name": "bogus-vm-sched-01-cf7a183-interval-2026-05-16-134952",
+      "backup_uid": "2e35e762-e904-4b7d-9369-9a110cec8560",
+      "create_time": "2026-05-16T13:49:52Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-01",
+      "backup_name": "bogus-vm-sched-01-cf7a183-interval-2026-05-16-140453",
+      "backup_uid": "2890ee9b-c0ba-467f-8ee5-d3ed22c8289a",
+      "create_time": "2026-05-16T14:04:53Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-01",
+      "backup_name": "bogus-vm-sched-01-cf7a183-interval-2026-05-16-141953",
+      "backup_uid": "0e2fac06-76d5-4797-ae44-4863ed6c6c55",
+      "create_time": "2026-05-16T14:19:53Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    },
+    {
+      "cluster": "vadiraj",
+      "schedule": "bogus-vm-sched-01",
+      "backup_name": "bogus-vm-sched-01-cf7a183-interval-2026-05-16-143454",
+      "backup_uid": "c319bd50-3b0d-46e7-a186-fb305b5b7aed",
+      "create_time": "2026-05-16T14:34:54Z",
+      "cluster_ref": {
+        "name": "vadiraj",
+        "uid": "3e1be01d-6e74-4414-99ce-470e636ddc75"
+      },
+      "dry_run": false,
+      "accepted": true,
+      "status": "ok"
+    }
+  ]
+}
