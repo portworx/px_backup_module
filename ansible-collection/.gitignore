@@ -1,0 +1,17 @@
+# Operator-local config -- never commit
+.env
+
+# Singleton-run lockfile
+.delete-failed-scheduled-backups.lock
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Future report/log files produced by delete_failed_scheduled_backups.py.
+# The pattern below catches new runs only; the sample report committed at
+# 20260516T143858Z is tracked and not affected (gitignore does not apply to
+# already-tracked files).
+delete-failed-scheduled-backups_*.json
+delete-failed-scheduled-backups_*.log
+delete-failed-scheduled-backups_*.txt
