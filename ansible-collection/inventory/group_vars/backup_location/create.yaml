@@ -5,7 +5,7 @@ backup_locations:
   - name: "s3-backup"
     location_type: "S3"
     path: "my-backup-bucket"
-    cloud_credential_ref: 
+    cloud_credential_ref:
       cloud_credential_name: "s3-credentials"
     encryption_key: "{{ encryption_key }}"
     validate_cloud_credential: true
@@ -18,12 +18,12 @@ backup_locations:
       storage_class: "STANDARD"
       sse_type: "SSE_S3"
 
-  # GCP Configuration  
+  # GCP Configuration
   - name: "gcp-backup"
     location_type: "Google"
     path: "my-gcp-backup-bucket"
-    cloud_credential_ref: 
-      cloud_credential_name: "gcp-credentials" 
+    cloud_credential_ref:
+      cloud_credential_name: "gcp-credentials"
     encryption_key: "{{ encryption_key }}"
     validate_cloud_credential: true
     object_lock_enabled: "{{ object_lock }}"
@@ -51,3 +51,27 @@ backup_locations:
       server_addr: "nfs.example.com"
       sub_path: "/data"
       mount_option: "rw,sync"
+
+  # Federated (Workload Identity) Azure backup location.
+  # No cloud_credential_ref; cluster identities authenticate against Azure.
+  # Validation is asynchronous — the API triggers it on each cluster and returns
+  # immediately. Use INSPECT_ONE to check cluster_status after creation.
+  # Replace azure_resource_group_name, azure_account_name, azure_subscription_id,
+  # and cluster_refs below with your actual Azure and cluster values before running.
+  - name: "prod-azure-federated"
+    location_type: "Azure"
+    path: "my-azure-container"
+    encryption_key: "{{ encryption_key }}"
+    object_lock_enabled: false
+    federated: true
+    s3_config:
+      azure_environment:
+        type: "AZURE_GLOBAL"
+      azure_resource_group_name: "my-rg"
+      azure_account_name: "mystorageaccount"
+      azure_subscription_id: "00000000-0000-0000-0000-000000000000"
+    cluster_refs:
+      - name: "cluster-1"
+        uid: "cluster-1-uid"
+      - name: "cluster-2"
+        uid: "cluster-2-uid"

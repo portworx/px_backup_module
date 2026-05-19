@@ -53,6 +53,8 @@
             cloud_credential_ref: "{{ item.cloud_credential_ref | default(omit) }}"
             validate_cloud_credential: "{{ item.validate_cloud_credential | default(true) }}"
             object_lock_enabled: "{{ item.object_lock_enabled | default(false) }}"
+            federated: "{{ item.federated | default(false) }}"
+            cluster_refs: "{{ item.cluster_refs | default(omit) }}"
             labels: "{{ item.labels | default(omit) }}"
             s3_config: "{{ item.s3_config | default(omit) }}"
             google_config: "{{ item.google_config | default(omit) }}"
