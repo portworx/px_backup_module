@@ -1,17 +1,25 @@
 ---
 # Backup locations to validate
+#
+# For federated (workload-identity) backup locations, validation is asynchronous:
+# the server triggers per-cluster validation via Stork and reports results back
+# in cluster_status. Optionally restrict the validation to a subset of the BL's
+# clusters by listing them under cluster_refs.
 backup_locations_validate:
+  # Non-federated BL: synchronous validation
   - name: "bl-1"
     include_secrets: false
 
-  - name: "bl-2"
+  # Federated BL: validate ALL associated clusters
+  - name: "azure"
     include_secrets: false
-  
-  - name: "bl-3"
+
+  # Federated BL: validate only a SUBSET of associated clusters
+  - name: "bl-with-multiple-clusters"
     include_secrets: false
-  
-  - name: "bl-4"
-    include_secrets: false
-  
+    cluster_refs:
+      - name: "cluster-name"
+        uid: "cluster-uid"
+
 # Global inspect configuration
 default_include_secrets: false

@@ -43,12 +43,12 @@ backup_locations_update:
       mount_option: "rw,sync"
 
 
- # GCP Configuration  
+  # GCP Configuration
   - name: "gcp-bl"
     location_type: "Google"
     path: "my-gcp-backup-bucket"
-    cloud_credential_ref: 
-      cloud_credential_name: "gcp-cred-name" 
+    cloud_credential_ref:
+      cloud_credential_name: "gcp-cred-name"
     encryption_key: "{{ encryption_key }}"
     validate_cloud_credential: true
     object_lock_enabled: "{{ object_lock }}"
@@ -69,7 +69,7 @@ backup_locations_update:
         }
 
 
-#   # # Azure Configuration
+  # Azure Configuration
   - name: "azure-bl"
     location_type: "Azure"
     path: "my-azure-container"
@@ -86,6 +86,30 @@ backup_locations_update:
       tenant_id: "your-azure-tenant-id"
       subscription_id: "your-azure-subscription-id"
       azure_environment: "AZURE_GLOBAL"
+
+
+  # Federated (Workload Identity) Azure backup location.
+  # UPDATE replaces the entire cluster_refs set and re-validates ALL associated clusters,
+  # not just newly added ones. Use INSPECT_ONE to check cluster_status after the update.
+  # Replace azure_resource_group_name, azure_account_name, azure_subscription_id,
+  # and cluster_refs below with your actual Azure and cluster values before running.
+  - name: "prod-azure-federated"
+    location_type: "Azure"
+    path: "my-azure-container"
+    encryption_key: "{{ encryption_key }}"
+    object_lock_enabled: false
+    federated: true
+    s3_config:
+      azure_environment:
+        type: "AZURE_GLOBAL"
+      azure_resource_group_name: "my-rg"
+      azure_account_name: "mystorageaccount"
+      azure_subscription_id: "00000000-0000-0000-0000-000000000000"
+    cluster_refs:
+      - name: "cluster-1"
+        uid: "cluster-1-uid"
+      - name: "cluster-3"
+        uid: "cluster-3-uid"
 
 
 # Global update configuration
