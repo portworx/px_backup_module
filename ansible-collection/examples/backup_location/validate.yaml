@@ -28,6 +28,9 @@
             org_id: "{{ org_id | default('default') }}"
             name: "{{ item.name }}"
             uid: "{{ item.uid | default(omit) }}"
+            cluster_refs: "{{ item.cluster_refs | default(omit) }}"
+            # SSL Certificate Parameters
+            ssl_config: "{{ ssl_config.px_backup | default({}) }}"
           register: validation_result
           loop: "{{ backup_locations_validate }}"
           loop_control:

@@ -51,7 +51,7 @@ options:
             - " - CREATE: creates a new backup location"
             - " - UPDATE: modifies an existing backup location"
             - " - DELETE: removes a backup location"
-            - " - VALIDATE: validates a backup location configuration"
+            - " - VALIDATE: validates a backup location configuration (supports per-cluster validation in federated mode)"
             - " - INSPECT_ONE: retrieves details of a specific backup location"
             - " - INSPECT_ALL: lists all backup locations"
             - " - UPDATE_OWNERSHIP: updates ownership settings of a backup location"
@@ -130,6 +130,12 @@ options:
         description:
             - List of clusters associated with this BackupLocation
             - Each item should have 'name' and optionally 'uid'
+            - Required for CREATE and UPDATE when federated is true
+            - CREATE and UPDATE automatically trigger validation on all clusters in cluster_refs
+            - On UPDATE, the entire cluster_status map is replaced and ALL associated clusters
+              are re-validated, not just newly added ones
+            - For VALIDATE, when set, only the listed clusters are re-validated (must be a subset
+              of the BackupLocation's existing cluster_refs); when omitted, all clusters are re-validated
         required: false
         type: list
         elements: dict
@@ -140,12 +146,6 @@ options:
             uid:
                 description: UID of the cluster
                 type: str
-    cluster_status:
-        description:
-            - Per-cluster validation status map (key is cluster_uid)
-            - Read-only field returned from API, typically not set by user
-        required: false
-        type: dict
     s3_config:
         description: Configuration for S3 backup locations
         required: false
@@ -384,6 +384,19 @@ EXAMPLES = r'''
         uid: "cluster-1-uid"
       - name: "cluster-2"
 
+# Validate only a subset of associated clusters (federated mode)
+- name: Validate federated backup location (subset of clusters)
+  backup_location:
+    operation: VALIDATE
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    org_id: "default"
+    name: "prod-azure-federated"
+    uid: "backup-location-uid"
+    cluster_refs:
+      - name: "cluster-1"
+        uid: "cluster-1-uid"
+
 # Trigger backup sync on a federated backup location
 - name: Trigger backup sync
   backup_location:
@@ -521,11 +534,9 @@ def create_backup_location(module: AnsibleModule, client: PXBackupClient) -> Tup
             endpoint='v1/backuplocation',
             data=backup_location_request
         )
-        
-        # Return the response
+
         return response, True
-            
-        
+
     except Exception as e:
         error_msg = str(e)
         if isinstance(e, requests.exceptions.RequestException) and hasattr(e, 'response'):
@@ -557,8 +568,9 @@ def update_backup_location(module: AnsibleModule, client: PXBackupClient) -> Tup
             endpoint='v1/backuplocation',
             data=backup_location_request
         )
+
         return response, True
-        
+
     except Exception as e:
         module.fail_json(msg=f"Failed to update backup location: {str(e)}")
 
@@ -578,18 +590,48 @@ def update_ownership(module, client):
         module.fail_json(msg=f"Failed to update backup location ownership: {str(e)}")
 
 def validate_backup_location(module, client):
-    """Validate a backup location"""
+    """Validate a backup location.
+
+    For federated (workload-identity) backup locations, validation is asynchronous:
+    the server triggers per-cluster validation via Stork on each associated cluster.
+    An optional cluster_refs list can scope validation to a subset of the
+    BackupLocation's existing clusters. Use INSPECT_ONE to check validation status.
+    """
+    params = module.params
     validate_request = {
-        "org_id": module.params['org_id'],
-        "name": module.params['name'],
-        "uid": module.params.get('uid', '')
+        "org_id": params['org_id'],
+        "name": params['name'],
+        "uid": params.get('uid', '')
     }
-    
+
+    cluster_refs = _build_cluster_refs(params.get('cluster_refs'))
+    if cluster_refs:
+        validate_request['cluster_refs'] = cluster_refs
+
     try:
         response = client.make_request('POST', 'v1/backuplocation/validate', validate_request)
-        return response, True
+        return response, False
     except Exception as e:
         module.fail_json(msg=f"Failed to validate backup location: {str(e)}")
+
+
+def _build_cluster_refs(refs):
+    """Normalize cluster_refs into the API's [{name, uid}] shape, dropping empties."""
+    if not refs:
+        return []
+    out = []
+    for ref in refs:
+        if not ref:
+            continue
+        item = {}
+        if ref.get('name'):
+            item['name'] = ref['name']
+        if ref.get('uid'):
+            item['uid'] = ref['uid']
+        if item:
+            out.append(item)
+    return out
+
 
 def sync_backup_location(module, client):
     """Trigger backup sync from object store for a federated backup location.
@@ -797,7 +839,7 @@ def delete_backup_location(module, client):
     params = {
         'uid': module.params.get('uid', '')
     }
-    
+
     try:
         url = f"v1/backuplocation/{module.params['org_id']}/{module.params['name']}"
         
@@ -850,18 +892,9 @@ def build_backup_location_request(params: Dict[str, Any]) -> Dict[str, Any]:
         request['metadata']['ownership'] = params['ownership']
 
     # Handle cluster_refs for federated backup locations
-    if params.get('cluster_refs'):
-        cluster_refs = []
-        for ref in params['cluster_refs']:
-            cluster_ref = {}
-            if ref.get('name'):
-                cluster_ref['name'] = ref['name']
-            if ref.get('uid'):
-                cluster_ref['uid'] = ref['uid']
-            if cluster_ref:
-                cluster_refs.append(cluster_ref)
-        if cluster_refs:
-            request['backup_location']['cluster_refs'] = cluster_refs
+    cluster_refs = _build_cluster_refs(params.get('cluster_refs'))
+    if cluster_refs:
+        request['backup_location']['cluster_refs'] = cluster_refs
 
     # Handle cloud credential reference (not required for federated identity)
     if params.get('cloud_credential_ref'):
@@ -982,16 +1015,16 @@ def perform_operation(module: AnsibleModule, client: PXBackupClient, operation: 
                 data={'backup_location': backup_location},
                 message="Backup location created successfully"
             )
-        
+
         elif operation == 'VALIDATE':
             backup_location, changed = validate_backup_location(module, client)
             return OperationResult(
-            success=True,
-            changed=changed,
-            data={'backup_location': backup_location},
-            message="Backup location validated successfully"
+                success=True,
+                changed=changed,
+                data={'backup_location': backup_location},
+                message="Backup location validated successfully"
             )
-        
+
         elif operation == 'INSPECT_ALL':
             backup_locations = enumerate_backup_locations(module, client)
             return OperationResult(
@@ -1013,10 +1046,10 @@ def perform_operation(module: AnsibleModule, client: PXBackupClient, operation: 
         elif operation == 'UPDATE':
             backup_location, changed = update_backup_location(module, client)
             return OperationResult(
-            success=True,
-            changed=changed,
-            data={'backup_location': backup_location},
-            message="Backup location updated successfully"
+                success=True,
+                changed=changed,
+                data={'backup_location': backup_location},
+                message="Backup location updated successfully"
             )
 
         elif operation == 'UPDATE_OWNERSHIP':
@@ -1102,7 +1135,6 @@ def run_module():
                 uid=dict(type='str')
             )
         ),
-        cluster_status=dict(type='dict', required=False),
         cloud_credential_ref=dict(
             type='dict',
             required=False,
@@ -1231,7 +1263,16 @@ def run_module():
 
         # Validate certificate files exist if provided in ssl_config
         import os
-        for cert_param in ['ca_cert', 'client_cert', 'client_key']:
+        # ca_cert is only used when server cert verification is enabled
+        if ssl_config.get('validate_certs', True):
+            cert_path = ssl_config.get('ca_cert')
+            if cert_path:
+                if not os.path.exists(cert_path):
+                    module.fail_json(msg=f"ssl_config.ca_cert file not found: {cert_path}")
+                if not os.access(cert_path, os.R_OK):
+                    module.fail_json(msg=f"ssl_config.ca_cert file not readable: {cert_path}")
+        # client_cert and client_key are for mutual TLS — independent of validate_certs
+        for cert_param in ['client_cert', 'client_key']:
             cert_path = ssl_config.get(cert_param)
             if cert_path:
                 if not os.path.exists(cert_path):
