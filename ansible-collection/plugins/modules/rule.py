@@ -32,7 +32,7 @@ module: rule
 
 short_description: Manage rules in PX-Backup
 
-version_added: "2.11.0"
+version_added: "3.0.0"
 
 description: 
     - Manage rules in PX-Backup using different operations

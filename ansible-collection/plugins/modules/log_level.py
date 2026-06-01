@@ -17,7 +17,7 @@ description:
     - Get and set log levels for PX-Backup services
     - Allows runtime log level changes without service restart
     - Supports Debug, Info, and Trace log levels
-version_added: "2.11.0"
+version_added: "3.0.0"
 
 options:
     operation:

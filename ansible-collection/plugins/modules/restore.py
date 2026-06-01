@@ -34,7 +34,7 @@ module: restore
 
 short_description: Manage restores in PX-Backup
 
-version_added: "2.11.0"
+version_added: "3.0.0"
 
 description:
     - Manage restores in PX-Backup using different operations

@@ -11,7 +11,7 @@ The schedule policy module manages schedule policies in PX-Backup, enabling conf
 
 ## Requirements
 
-* PX-Backup >= 2.11.0
+* PX-Backup >= 3.0.0
 * Stork >= 25.3.0
 * Python >= 3.9
 * The `requests` Python package
