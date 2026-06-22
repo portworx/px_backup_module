@@ -132,6 +132,7 @@ scope the call.
 | s3_config.sse_type                  | string  | no       | Server-side encryption type | 'Invalid', 'SSE_S3', 'SSE_KMS'           |
 | s3_config.azure_environment.type    | string  | no       | Azure environment type      | 'Invalid', 'AZURE_GLOBAL', 'AZURE_CHINA' |
 | s3_config.azure_resource_group_name | string  | no       | Azure resource group name   |                                          |
+| s3_config.google_project_id         | string  | no       | Google Cloud project ID (required for Google Federated Identity / Workload Identity) |        |
 
 #### NFS Configuration
 
@@ -157,8 +158,10 @@ scope the call.
 
 | Parameter                | Type   | Required | Description                     |
 | ------------------------ | ------ | -------- | ------------------------------- |
-| google_config.project_id | string | yes      | Google project ID               |
-| google_config.json_key   | string | yes      | Google service account JSON key |
+| google_config.project_id | string | no       | Google Cloud project ID. Mapped to `s3_config.google_project_id` on the wire. Optional for credential-based access (derived from the cloud credential's JSON key); required for Federated Identity / Workload Identity (may instead be set directly via `s3_config.google_project_id`). |
+| google_config.json_key   | string | no       | Google service account JSON key. Credentials are normally supplied via `cloud_credential_ref`; accepted for convenience and not sent in the backup location request. |
+
+> **Note:** For Google (GCS) backup locations the project ID is transmitted under `s3_config.google_project_id`, since the server reuses the S3 config message for GCS. Supply it via either `google_config.project_id` or `s3_config.google_project_id`. With Workload Identity (`federated: true`) the project ID is **required**. The project ID is **immutable**: it is only applied on `CREATE` and is ignored on `UPDATE` (in workload-identity mode the server preserves the stored value; in credential-based mode it is derived from the cloud credential).
 
 ### Ownership Configuration
 

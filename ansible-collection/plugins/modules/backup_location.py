@@ -122,7 +122,7 @@ options:
             - Enable Federated Identity (Workload Identity/OIDC) authentication
             - When true, authentication uses workload identity instead of cloud credentials
             - When true, cloud_credential_ref should be empty
-            - Cloud-specific config (azure_account_name, azure_subscription_id) should be in s3_config
+            - Cloud-specific config (azure_account_name, azure_subscription_id, google_project_id) should be in s3_config
         required: false
         type: bool
         default: false
@@ -192,6 +192,33 @@ options:
                     - Azure subscription ID
                     - Required for Federated Identity when using Azure
                     - When using federated identity, provide subscription ID here instead of in cloud credential
+                type: str
+            google_project_id:
+                description:
+                    - Google Cloud project ID for Google (GCS) backup locations
+                    - Required for Federated Identity (Workload Identity) when using Google
+                    - For credential-based access this is optional; the server derives it from the cloud credential's JSON key
+                    - May also be supplied via I(google_config.project_id)
+                    - Only applied on CREATE; the project ID is immutable and ignored on UPDATE
+                type: str
+    google_config:
+        description:
+            - Configuration for Google (GCS) backup locations
+            - Used to supply the Google Cloud project ID for the backup location
+        required: false
+        type: dict
+        suboptions:
+            project_id:
+                description:
+                    - Google Cloud project ID
+                    - Mapped to s3_config.google_project_id on the wire
+                    - Required when federated (workload identity) is enabled; optional otherwise (derived from the cloud credential)
+                    - Only applied on CREATE; the project ID is immutable and ignored on UPDATE
+                type: str
+            json_key:
+                description:
+                    - Google service account JSON key
+                    - Credentials are normally supplied via cloud_credential_ref; this field is accepted for convenience and not sent in the backup location request
                 type: str
     nfs_config:
         description: Configuration for NFS backup locations
@@ -384,6 +411,39 @@ EXAMPLES = r'''
         uid: "cluster-1-uid"
       - name: "cluster-2"
 
+# Create a Google (GCS) backup location using a cloud credential
+- name: Create Google backup location
+  backup_location:
+    operation: CREATE
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    name: "prod-gcs-backup"
+    org_id: "default"
+    location_type: "Google"
+    path: "my-gcs-bucket"
+    cloud_credential_ref:
+      cloud_credential_name: "gcp-cred-name"
+    google_config:
+      project_id: "my-gcp-project"
+
+# Create a Google (GCS) backup location with Federated Identity (Workload Identity)
+# project_id is required for workload identity and is sent as s3_config.google_project_id
+- name: Create Google backup location with federated identity
+  backup_location:
+    operation: CREATE
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    name: "prod-gcs-federated"
+    org_id: "default"
+    location_type: "Google"
+    path: "my-gcs-bucket"
+    federated: true
+    s3_config:
+      google_project_id: "my-gcp-project"
+    cluster_refs:
+      - name: "cluster-1"
+        uid: "cluster-1-uid"
+
 # Validate only a subset of associated clusters (federated mode)
 - name: Validate federated backup location (subset of clusters)
   backup_location:
@@ -519,7 +579,23 @@ def validate_params(params: Dict[str, Any], operation: str, required_params: Lis
     missing = [param for param in required_params if not params.get(param)]
     if missing:
         raise ValidationError(f"Operation '{operation}' requires parameters: {', '.join(missing)}")
-    
+
+    # Google (GCS) workload-identity backup locations carry the project ID in the
+    # backup location itself (no cloud credential is referenced), so it must be
+    # supplied on CREATE. Mirrors px-backup-console validateGoogleBackupLocationParams
+    # (PB-15818). Not enforced on UPDATE since the project ID is immutable.
+    if operation == 'CREATE' and params.get('location_type') == 'Google' and params.get('federated'):
+        project_id = None
+        if params.get('google_config'):
+            project_id = params['google_config'].get('project_id')
+        if not project_id and params.get('s3_config'):
+            project_id = params['s3_config'].get('google_project_id')
+        if not project_id or not str(project_id).strip():
+            raise ValidationError(
+                "google_config.project_id (or s3_config.google_project_id) is required "
+                "for Google backup locations when federated (workload identity) is enabled"
+            )
+
 
 def create_backup_location(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict[str, Any], bool]:
     """Create a new backup location"""
@@ -949,6 +1025,34 @@ def build_backup_location_request(params: Dict[str, Any]) -> Dict[str, Any]:
             request['backup_location']['s3_config'] = s3_config
 
 
+    elif location_type == 'Google':
+        # Google (GCS) backup locations carry their config under s3_config on the
+        # wire (the server proto reuses S3Config; google_project_id is field 11).
+        # The project id may be supplied either via google_config.project_id
+        # (convenient) or directly via s3_config.google_project_id (federated
+        # workload-identity shape). For workload identity the project id is
+        # required; for credential-based access the server can derive it from the
+        # cloud credential's JSON key, so it is optional there.
+        #
+        # google_project_id is only sent on CREATE: it is immutable in
+        # WLI/federated mode (the server preserves the persisted value) and unused
+        # in non-federated mode (derived from the cloud credential), so UPDATE
+        # leaves it untouched. This mirrors px-backup-console behavior (PB-15818).
+        if params.get('operation') == 'CREATE':
+            s3_config = {}
+
+            google_project_id = None
+            if params.get('google_config'):
+                google_project_id = params['google_config'].get('project_id')
+            if not google_project_id and params.get('s3_config'):
+                google_project_id = params['s3_config'].get('google_project_id')
+
+            if google_project_id:
+                s3_config['google_project_id'] = google_project_id
+
+            if s3_config:
+                request['backup_location']['s3_config'] = s3_config
+
     elif location_type == 'NFS' and params.get('nfs_config'):
         nfs_config = {}
         nfs_fields = ['server_addr', 'sub_path', 'mount_option']
@@ -1163,10 +1267,11 @@ def run_module():
                 ),
                 azure_resource_group_name=dict(type='str'),
                 azure_account_name=dict(type='str', no_log=True),
-                azure_subscription_id=dict(type='str', no_log=True)
+                azure_subscription_id=dict(type='str', no_log=True),
+                google_project_id=dict(type='str', no_log=True)
             )
         ),
-        
+
         # Azure Configuration
         azure_config=dict(
             type='dict',

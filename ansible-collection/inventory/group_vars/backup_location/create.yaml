@@ -27,6 +27,8 @@ backup_locations:
     encryption_key: "{{ encryption_key }}"
     validate_cloud_credential: true
     object_lock_enabled: "{{ object_lock }}"
+    google_config:
+      project_id: "my-gcp-project"
 
   # Azure Configuration
   - name: "azure-backup"
@@ -70,6 +72,24 @@ backup_locations:
       azure_resource_group_name: "my-rg"
       azure_account_name: "mystorageaccount"
       azure_subscription_id: "00000000-0000-0000-0000-000000000000"
+    cluster_refs:
+      - name: "cluster-1"
+        uid: "cluster-1-uid"
+      - name: "cluster-2"
+        uid: "cluster-2-uid"
+
+  # Federated (Workload Identity) Google (GCS) backup location.
+  # No cloud_credential_ref; cluster identities authenticate against GCP.
+  # google_project_id is REQUIRED for workload identity and is sent under s3_config.
+  # Replace google_project_id and cluster_refs below with your actual values before running.
+  - name: "prod-gcs-federated"
+    location_type: "Google"
+    path: "my-gcs-bucket"
+    encryption_key: "{{ encryption_key }}"
+    object_lock_enabled: false
+    federated: true
+    s3_config:
+      google_project_id: "my-gcp-project"
     cluster_refs:
       - name: "cluster-1"
         uid: "cluster-1-uid"
