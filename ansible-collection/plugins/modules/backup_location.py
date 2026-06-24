@@ -582,11 +582,28 @@ def validate_google_backup_location_params(params: Dict[str, Any]) -> None:
         )
 
 
+def validate_s3_backup_location_params(params: Dict[str, Any]) -> None:
+    """Validate S3-specific backup location parameters.
+
+    s3_config is required for S3 backup locations in non-federated mode, where it
+    carries region/endpoint and related settings. In federated (Workload Identity)
+    mode it is optional: region falls back to AWS_REGION on the Stork pod, matching
+    the CLI which allows an S3 workload-identity backup location with no region.
+    """
+    if (params.get('location_type') == 'S3'
+            and not params.get('federated')
+            and not params.get('s3_config')):
+        raise ValidationError(
+            "s3_config is required for S3 backup locations when federated is false"
+        )
+
+
 def create_backup_location(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict[str, Any], bool]:
     """Create a new backup location"""
     try:
         # Get module parameters directly
         params = dict(module.params)
+        validate_s3_backup_location_params(params)
         validate_google_backup_location_params(params)
         backup_location_request = build_backup_location_request(params)
 
@@ -614,6 +631,7 @@ def update_backup_location(module: AnsibleModule, client: PXBackupClient) -> Tup
     try:
         # Build request using module.params
         params = dict(module.params)
+        validate_s3_backup_location_params(params)
         backup_location_request = build_backup_location_request(params)
 
         if params.get('uid'):
@@ -926,6 +944,17 @@ def build_backup_location_request(params: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Dict containing the request object
     """
+    federated = params.get('federated', False)
+
+    # In federated (Workload Identity) mode there is no cloud credential to validate,
+    # so cloud-credential validation is forced off regardless of the requested value.
+    # This matches the CLI (validateAndSetCloudCredentialsForCreate in
+    # pkg/pxb/backuplocation.go), which sets ValidateCloudCredential=false in WLI mode;
+    # otherwise the server may attempt to validate against a non-existent credential.
+    validate_cloud_credential = (
+        False if federated else params.get('validate_cloud_credential', True)
+    )
+
     request = {
         "metadata": {
             "name": params.get('name'),
@@ -935,10 +964,13 @@ def build_backup_location_request(params: Dict[str, Any]) -> Dict[str, Any]:
             "type": params.get('location_type'),
             "path": params.get('path'),
             "encryption_key": params.get('encryption_key', ''),
-            "validate_cloud_credential": params.get('validate_cloud_credential', True),
+            "validate_cloud_credential": validate_cloud_credential,
             "object_lock_enabled": params.get('object_lock_enabled', False),
-            "federated": params.get('federated', False),
-            "use_workload_identity": params.get('federated', False)
+            # 'federated' is the user-facing param name only; BackupLocationInfo in the
+            # px-backup-api proto has no 'federated' field (use_workload_identity = 10),
+            # so the server ignores it. Emit only use_workload_identity to match the
+            # wire payload produced by the CLI and the proto.
+            "use_workload_identity": federated
         }
     }
 
@@ -1320,7 +1352,11 @@ def run_module():
         argument_spec=module_args,
         supports_check_mode=True,
         required_if=[
-            ('location_type', 'S3', ['s3_config']),
+            # S3 is intentionally omitted here: s3_config is required only in
+            # non-federated mode (enforced in validate_s3_backup_location_params).
+            # In federated (Workload Identity) mode s3_config is optional - region
+            # falls back to AWS_REGION on the Stork pod - matching the CLI, which
+            # allows an S3 workload-identity backup location with no region.
             ('location_type', 'NFS', ['nfs_config'])
         ]
     )
