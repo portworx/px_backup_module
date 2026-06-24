@@ -75,3 +75,36 @@ backup_locations:
         uid: "cluster-1-uid"
       - name: "cluster-2"
         uid: "cluster-2-uid"
+
+  # Federated (Workload Identity) AWS S3 backup location.
+  # Uses AWS IRSA / EKS Pod Identity — no cloud_credential_ref.
+  # endpoint and disable_ssl are ignored in federated mode (TLS always enforced);
+  # region is optional and falls back to AWS_REGION on the Stork pod if omitted.
+  # Replace region and cluster_refs below with your actual values before running.
+  - name: "prod-aws-federated"
+    location_type: "S3"
+    path: "my-bucket/backups"
+    encryption_key: "{{ encryption_key }}"
+    object_lock_enabled: false
+    federated: true
+    s3_config:
+      region: "us-west-2"
+    cluster_refs:
+      - name: "cluster-1"
+        uid: "cluster-1-uid"
+
+  # Federated (Workload Identity) Google backup location.
+  # No cloud_credential_ref; cluster identities authenticate against Google Cloud.
+  # google_project_id is required in federated mode since no cloud credential is
+  # referenced. Replace google_project_id and cluster_refs with your actual values.
+  - name: "prod-gcs-federated"
+    location_type: "Google"
+    path: "my-bucket/backups"
+    encryption_key: "{{ encryption_key }}"
+    object_lock_enabled: false
+    federated: true
+    s3_config:
+      google_project_id: "my-gcp-project"
+    cluster_refs:
+      - name: "cluster-1"
+        uid: "cluster-1-uid"

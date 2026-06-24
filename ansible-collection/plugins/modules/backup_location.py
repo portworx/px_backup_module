@@ -122,7 +122,8 @@ options:
             - Enable Federated Identity (Workload Identity/OIDC) authentication
             - When true, authentication uses workload identity instead of cloud credentials
             - When true, cloud_credential_ref should be empty
-            - Cloud-specific config (azure_account_name, azure_subscription_id) should be in s3_config
+            - "Supported for S3 (AWS IRSA / EKS Pod Identity), Azure (Workload Identity) and Google (Workload Identity)"
+            - "Cloud-specific config should be in s3_config (azure_account_name, azure_subscription_id for Azure; google_project_id for Google)"
         required: false
         type: bool
         default: false
@@ -192,6 +193,12 @@ options:
                     - Azure subscription ID
                     - Required for Federated Identity when using Azure
                     - When using federated identity, provide subscription ID here instead of in cloud credential
+                type: str
+            google_project_id:
+                description:
+                    - Google Cloud project ID
+                    - Required for Federated Identity (Workload Identity) when using Google, since no cloud credential is referenced
+                    - Not required in non-federated mode, where it is derived from the cloud credential's JSON key
                 type: str
     nfs_config:
         description: Configuration for NFS backup locations
@@ -384,6 +391,43 @@ EXAMPLES = r'''
         uid: "cluster-1-uid"
       - name: "cluster-2"
 
+# Create an AWS S3 backup location with Federated Identity (AWS IRSA / EKS Pod Identity)
+# No cloud credential is referenced. endpoint/disable_ssl are ignored in WLI mode and
+# region is optional (falls back to AWS_REGION on the Stork pod if omitted).
+- name: Create AWS S3 backup location with federated identity
+  backup_location:
+    operation: CREATE
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    name: "prod-aws-federated"
+    org_id: "default"
+    location_type: "S3"
+    path: "my-bucket/backups"
+    federated: true
+    s3_config:
+      region: "us-west-2"
+    cluster_refs:
+      - name: "cluster-1"
+        uid: "cluster-1-uid"
+
+# Create a Google backup location with Federated Identity (Workload Identity)
+# google_project_id is required in federated mode since no cloud credential is referenced.
+- name: Create Google backup location with federated identity
+  backup_location:
+    operation: CREATE
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    name: "prod-gcs-federated"
+    org_id: "default"
+    location_type: "Google"
+    path: "my-bucket/backups"
+    federated: true
+    s3_config:
+      google_project_id: "my-gcp-project"
+    cluster_refs:
+      - name: "cluster-1"
+        uid: "cluster-1-uid"
+
 # Validate only a subset of associated clusters (federated mode)
 - name: Validate federated backup location (subset of clusters)
   backup_location:
@@ -519,13 +563,31 @@ def validate_params(params: Dict[str, Any], operation: str, required_params: Lis
     missing = [param for param in required_params if not params.get(param)]
     if missing:
         raise ValidationError(f"Operation '{operation}' requires parameters: {', '.join(missing)}")
-    
+
+
+def validate_google_backup_location_params(params: Dict[str, Any]) -> None:
+    """Validate Google-specific backup location parameters.
+
+    The GCP project ID is required only in federated (Workload Identity) mode, where no
+    cloud credential is referenced and the project ID must be supplied directly in the
+    backup location. In non-federated mode it is derived from the cloud credential's JSON
+    key, so it is not required here.
+    """
+    if (params.get('location_type') == 'Google'
+            and params.get('federated')
+            and not (params.get('s3_config') or {}).get('google_project_id')):
+        raise ValidationError(
+            "s3_config.google_project_id is required for Google backup locations "
+            "when federated is true"
+        )
+
 
 def create_backup_location(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict[str, Any], bool]:
     """Create a new backup location"""
     try:
         # Get module parameters directly
         params = dict(module.params)
+        validate_google_backup_location_params(params)
         backup_location_request = build_backup_location_request(params)
 
         # Make the create request
@@ -948,6 +1010,18 @@ def build_backup_location_request(params: Dict[str, Any]) -> Dict[str, Any]:
         if s3_config:
             request['backup_location']['s3_config'] = s3_config
 
+    elif location_type == 'Google':
+        # Google backup locations carry their WLI config under s3_config on the wire
+        # (server proto reuses S3Config). In federated (use_workload_identity=true) mode
+        # the GCP project ID must be supplied directly here since no cloud credential is
+        # referenced; in non-federated mode it is derived from the cloud credential's JSON
+        # key. The project ID is immutable, so it is only sent on CREATE and is preserved
+        # by the server on UPDATE.
+        google_project_id = (params.get('s3_config') or {}).get('google_project_id')
+        if google_project_id is not None and params.get('operation') == 'CREATE':
+            request['backup_location']['s3_config'] = {
+                'google_project_id': google_project_id
+            }
 
     elif location_type == 'NFS' and params.get('nfs_config'):
         nfs_config = {}
@@ -1163,7 +1237,8 @@ def run_module():
                 ),
                 azure_resource_group_name=dict(type='str'),
                 azure_account_name=dict(type='str', no_log=True),
-                azure_subscription_id=dict(type='str', no_log=True)
+                azure_subscription_id=dict(type='str', no_log=True),
+                google_project_id=dict(type='str')
             )
         ),
         
