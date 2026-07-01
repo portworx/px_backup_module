@@ -1,10 +1,11 @@
 # Backup Module
 
-The backup module provides comprehensive management of PX-Backup backups, including creation, modification, deletion, inspection, and backup sharing configuration.
+The backup module provides comprehensive management of PX-Backup backups, including creation, modification, single and bulk deletion, inspection, and backup sharing configuration.
 
 ## Synopsis
 
 * Create and manage backups in PX-Backup
+* Delete a single backup by name, or bulk delete many backups by include/exclude objects, name filters, backup location, or cluster scope (3.2.0+)
 * Control backup sharing settings
 * Support both Generic and Normal backup types
 * Configure namespace and resource selection
@@ -29,7 +30,7 @@ The module supports the following operations:
 | ----------------------------- | ---------------------------------------------- |
 | CREATE                      | Create a new backup                          |
 | UPDATE                      | Modify existing backup configuration         |
-| DELETE                      | Remove a backup                              |
+| DELETE                      | Remove a backup (single or bulk)             |
 | INSPECT_ONE                 | Get details of a specific backup             |
 | INSPECT_ALL                 | List all backups                             |
 | UPDATE_BACKUP_SHARE         | Update backup sharing settings               |
@@ -45,7 +46,7 @@ The module supports the following operations:
 | ---------------- | --------- | ---------- | --------- | --------------------------------------------------------------------- |
 | api_url        | string  | yes      |         | PX-Backup API URL                                                   |
 | token          | string  | yes      |         | Authentication token                                                |
-| name           | string  | varies   |         | Name of the backup (required for all operations except INSPECT_ALL) |
+| name           | string  | varies   |         | Name of the backup (required for all operations except INSPECT_ALL and bulk DELETE) |
 | org_id         | string  | yes      |         | Organization ID                                                     |
 | operation      | string  | yes      |         | Operation to perform                                                |
 | uid            | string  | varies   |         | Unique identifier of the backup                                     |
@@ -64,29 +65,37 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 ### Backup Configuration Parameters
 
 
-| Parameter                        | Type       | Required | Default  | Description                                                                 |
-| ---------------------------------- | ------------ | ---------- | ---------- | ----------------------------------------------------------------------------- |
-| backup_location_ref              | dictionary | varies   |          | Reference to backup location                                                |
-| cluster_ref                      | dictionary | varies   |          | Reference to cluster                                                        |
-| pre_exec_rule_ref                | dictionary | no       |          | Reference to pre exec rule                                                  |
-| post_exec_rule_ref               | dictionary | no       |          | Reference to post exec rule                                                 |
-| backup_type                      | string     | no       | 'Normal' | Type of backup ('Generic' or 'Normal')                                      |
-| namespaces                       | list       | no       |          | List of namespaces to backup                                                |
-| label_selectors                  | dictionary | no       |          | Label selectors to choose resources                                         |
-| resource_types                   | list       | no       |          | List of resource types to backup                                            |
-| exclude_resource_types           | list       | no       |          | List of resource types to exclude                                           |
-| backup_object_type               | dictionary | no       |          | Backup object type configuration                                            |
-| ns_label_selectors               | string     | no       |          | Label selectors for namespaces                                              |
-| cluster                          | string     | no       |          | Name or UID of the cluster                                                  |
-| direct_kdmp                      | boolean    | no       | false    | Take backup as direct kdmp                                                  |
-| skip_vm_auto_exec_rules          | boolean    | no       | false    | Skip auto rules for VirtualMachine backup object type                       |
-| volume_snapshot_class_mapping    | dictionary | no       |          | Volume snapshot class mapping for CSI based backup                          |
-| parallel_backup                  | boolean    | no       | false    | Option to enable parallel schedule backups                                  |
-| keep_cr_status                   | boolean    | no       | false    | Option to enable to keep the CR status of the resources in the backup       |
-| advanced_resource_label_selector | string     | no       |          | Advanced label selector for resources (string format with operator support) |
-| force                            | boolean    | no       | false    | Force metadata-only deletion when no valid cluster is available (federated mode only) |
-| volume_resource_only_policy_ref  | dictionary | no       |          | Reference to Volume Resource Only policy                                    |
-| cloud_credential_ref             | dictionary | no       |          | Reference to cloud credentials for backup                                   |
+| Parameter                        | Type       | Required | Default  | Description                                                                 | Supported Versions |
+| ---------------------------------- | ------------ | ---------- | ---------- | ----------------------------------------------------------------------------- | -------------------- |
+| backup_location_ref              | dictionary | varies   |          | Reference to backup location                                                |          |
+| cluster_ref                      | dictionary | varies   |          | Reference to cluster                                                        |          |
+| pre_exec_rule_ref                | dictionary | no       |          | Reference to pre exec rule                                                  |          |
+| post_exec_rule_ref               | dictionary | no       |          | Reference to post exec rule                                                 |          |
+| backup_type                      | string     | no       | 'Normal' | Type of backup ('Generic' or 'Normal')                                      |          |
+| namespaces                       | list       | no       |          | List of namespaces to backup                                                |          |
+| label_selectors                  | dictionary | no       |          | Label selectors to choose resources                                         |          |
+| resource_types                   | list       | no       |          | List of resource types to backup                                            |          |
+| exclude_resource_types           | list       | no       |          | List of resource types to exclude                                           |          |
+| backup_object_type               | dictionary | no       |          | Backup object type configuration                                            |          |
+| ns_label_selectors               | string     | no       |          | Label selectors for namespaces                                              |          |
+| cluster                          | string     | no       |          | Name or UID of the cluster                                                  |          |
+| direct_kdmp                      | boolean    | no       | false    | Take backup as direct kdmp                                                  |          |
+| skip_vm_auto_exec_rules          | boolean    | no       | false    | Skip auto rules for VirtualMachine backup object type                       |          |
+| volume_snapshot_class_mapping    | dictionary | no       |          | Volume snapshot class mapping for CSI based backup                          |          |
+| parallel_backup                  | boolean    | no       | false    | Option to enable parallel schedule backups                                  |          |
+| keep_cr_status                   | boolean    | no       | false    | Option to enable to keep the CR status of the resources in the backup       |          |
+| advanced_resource_label_selector | string     | no       |          | Advanced label selector for resources (string format with operator support) |          |
+| force                            | boolean    | no       | false    | Force metadata-only deletion when no valid cluster is available (federated mode only) |          |
+| volume_resource_only_policy_ref  | dictionary | no       |          | Reference to Volume Resource Only policy                                    |          |
+| cloud_credential_ref             | dictionary | no       |          | Reference to cloud credentials for backup                                   |          |
+| include_objects                  | list       | no       |          | Bulk DELETE: exact backups to include (each entry needs at least name or uid; mutually exclusive with include_filter and exclude_objects) | 3.2.0 |
+| exclude_objects                  | list       | no       |          | Bulk DELETE: exact backups to exclude (each entry needs at least name or uid; mutually exclusive with exclude_filter and include_objects) | 3.2.0 |
+| include_filter                   | string     | no       |          | Bulk DELETE: case-insensitive regex matched against backup names to include (use ".*" to match all; literal "*" is invalid) | 3.2.0 |
+| exclude_filter                   | string     | no       |          | Bulk DELETE: case-insensitive regex matched against backup names to exclude | 3.2.0 |
+| backup_location_ref_filter       | list       | no       |          | Bulk DELETE: filter backups by one or more backup location references | 3.2.0 |
+| cluster_scope                    | dictionary | no       |          | Bulk DELETE: restrict to specific clusters (cluster_refs) or all clusters (all_clusters) | 3.2.0 |
+
+> The `include_objects` / `exclude_objects` / `include_filter` / `exclude_filter` / `backup_location_ref_filter` / `cluster_scope` parameters apply only to the DELETE operation and select **bulk delete** (POST `/v1/backup/{org_id}/delete`). Omit them for a single-backup delete by `name`; `name` cannot be combined with any of them. See the Bulk Delete Backups example.
 
 #### backup_location_ref
 
@@ -142,6 +151,38 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 | --------------------------- | -------- | ---------- | ------------------------------ |
 | cloud_credential_ref.name | string | no       | Name of the cloud credential |
 | cloud_credential_ref.uid  | string | no       | UID of the cloud credential  |
+
+#### include_objects / exclude_objects Entry Format (bulk DELETE)
+
+
+| Parameter | Type   | Required | Description        |
+| ----------- | -------- | ---------- | -------------------- |
+| name      | string | no       | Name of the backup |
+| uid       | string | no       | UID of the backup  |
+
+#### backup_location_ref_filter Entry Format (bulk DELETE)
+
+
+| Parameter | Type   | Required | Description                 |
+| ----------- | -------- | ---------- | ----------------------------- |
+| name      | string | yes      | Name of the backup location |
+| uid       | string | no       | UID of the backup location  |
+
+#### cluster_scope (bulk DELETE)
+
+
+| Parameter                  | Type    | Required | Description                                      |
+| ---------------------------- | --------- | ---------- | -------------------------------------------------- |
+| cluster_scope.cluster_refs | list    | no       | List of cluster references to scope the delete   |
+| cluster_scope.all_clusters | boolean | no       | Apply the bulk delete to backups on all clusters |
+
+#### cluster_scope.cluster_refs Entry Format
+
+
+| Parameter | Type   | Required | Description         |
+| ----------- | -------- | ---------- | --------------------- |
+| name      | string | yes      | Name of the cluster |
+| uid       | string | no       | UID of the cluster  |
 
 ### Resource Selection Parameters
 
@@ -435,6 +476,55 @@ backup:
     cluster_ref:
       name: "prod-cluster"
       uid: "cluster-uid"
+```
+
+### Bulk Delete Backups
+
+> Bulk delete removes multiple backups in one request. Provide one or more
+> selectors (include/exclude objects or filters, backup location, or cluster
+> scope) instead of `name`. Filters are case-insensitive regex; use ".*" to
+> match all.
+
+```yaml
+# Delete backups by name regex across all clusters, excluding some by regex
+- name: Bulk delete backups by filter
+  backup:
+    operation: DELETE
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    org_id: "default"
+    include_filter: ".*test.*"
+    exclude_filter: "^keep-"
+    cluster_scope:
+      all_clusters: true
+
+# Delete an explicit list of backups (uid-only entries are valid)
+- name: Bulk delete specific backups
+  backup:
+    operation: DELETE
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    org_id: "default"
+    include_objects:
+      - name: "backup-1"
+        uid: "backup-uid-1"
+      - uid: "backup-uid-2"
+
+# Delete backups in a specific backup location, scoped to given clusters
+- name: Bulk delete backups in a backup location
+  backup:
+    operation: DELETE
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    org_id: "default"
+    include_filter: ".*"
+    backup_location_ref_filter:
+      - name: "s3-location"
+        uid: "location-uid"
+    cluster_scope:
+      cluster_refs:
+        - name: "prod-cluster"
+          uid: "cluster-uid"
 ```
 
 ### Force Delete Backup (Metadata-Only)
