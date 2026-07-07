@@ -781,6 +781,13 @@ def sync_backup_location(module, client):
             }
         }
 
+        # For federated/WLI locations the server does not preserve cluster_refs on
+        # sync-only updates — it diffs the payload and wipes any refs not included.
+        # Pass them through so the sync goroutine has a cluster to run against.
+        cluster_refs = _build_cluster_refs(params.get('cluster_refs'))
+        if cluster_refs:
+            update_request["backup_location"]["cluster_refs"] = cluster_refs
+
         # Trigger sync via update
         response = client.make_request(
             method='PUT',
