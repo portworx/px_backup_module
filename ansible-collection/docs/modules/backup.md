@@ -88,6 +88,7 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 | force                            | boolean    | no       | false    | Force metadata-only deletion when no valid cluster is available (federated mode only) |          |
 | volume_resource_only_policy_ref  | dictionary | no       |          | Reference to Volume Resource Only policy                                    |          |
 | cloud_credential_ref             | dictionary | no       |          | Reference to cloud credentials for backup                                   |          |
+| acknowledge                      | boolean    | no       | false    | Bulk DELETE can remove many backups at once, so it must be `true` to confirm intent; without it the request is rejected. Ignored for single delete | 3.2.0 |
 | include_objects                  | list       | no       |          | Bulk DELETE: exact backups to include (each entry needs at least name or uid; mutually exclusive with include_filter and exclude_objects) | 3.2.0 |
 | exclude_objects                  | list       | no       |          | Bulk DELETE: exact backups to exclude (each entry needs at least name or uid; mutually exclusive with exclude_filter and include_objects) | 3.2.0 |
 | include_filter                   | string     | no       |          | Bulk DELETE: case-insensitive regex matched against backup names to include (use ".*" to match all; literal "*" is invalid) | 3.2.0 |
@@ -95,7 +96,7 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 | backup_location_ref_filter       | list       | no       |          | Bulk DELETE: filter backups by one or more backup location references | 3.2.0 |
 | cluster_scope                    | dictionary | no       |          | Bulk DELETE: restrict to specific clusters (cluster_refs) or all clusters (all_clusters) | 3.2.0 |
 
-> The `include_objects` / `exclude_objects` / `include_filter` / `exclude_filter` / `backup_location_ref_filter` / `cluster_scope` parameters apply only to the DELETE operation and select **bulk delete** (POST `/v1/backup/{org_id}/delete`). Omit them for a single-backup delete by `name`; `name` cannot be combined with any of them. See the Bulk Delete Backups example.
+> The `include_objects` / `exclude_objects` / `include_filter` / `exclude_filter` / `backup_location_ref_filter` / `cluster_scope` parameters apply only to the DELETE operation and select **bulk delete** (POST `/v1/backup/{org_id}/delete`). Omit them for a single-backup delete by `name`; `name` cannot be combined with any of them. A bulk delete also requires `acknowledge: true` to confirm the operation, otherwise it is rejected. See the Bulk Delete Backups example.
 
 #### backup_location_ref
 
@@ -482,8 +483,8 @@ backup:
 
 > Bulk delete removes multiple backups in one request. Provide one or more
 > selectors (include/exclude objects or filters, backup location, or cluster
-> scope) instead of `name`. Filters are case-insensitive regex; use ".*" to
-> match all.
+> scope) instead of `name`, and set `acknowledge: true` to confirm the
+> operation. Filters are case-insensitive regex; use ".*" to match all.
 
 ```yaml
 # Delete backups by name regex across all clusters, excluding some by regex
@@ -493,6 +494,7 @@ backup:
     api_url: "https://px-backup.example.com"
     token: "{{ px_backup_token }}"
     org_id: "default"
+    acknowledge: true
     include_filter: ".*test.*"
     exclude_filter: "^keep-"
     cluster_scope:
@@ -505,6 +507,7 @@ backup:
     api_url: "https://px-backup.example.com"
     token: "{{ px_backup_token }}"
     org_id: "default"
+    acknowledge: true
     include_objects:
       - name: "backup-1"
         uid: "backup-uid-1"
@@ -517,6 +520,7 @@ backup:
     api_url: "https://px-backup.example.com"
     token: "{{ px_backup_token }}"
     org_id: "default"
+    acknowledge: true
     include_filter: ".*"
     backup_location_ref_filter:
       - name: "s3-location"
