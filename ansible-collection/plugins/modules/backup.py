@@ -447,6 +447,19 @@ options:
         required: false
         default: false
 
+    acknowledge:
+        description:
+            - Explicit confirmation required for a bulk delete to proceed.
+            - A bulk delete (any of include_objects, exclude_objects, include_filter,
+              exclude_filter, backup_location_ref_filter or cluster_scope) is rejected
+              unless this is set to true, since it can remove many backups at once.
+            - Ignored for a single-backup delete by name.
+            - Only applicable for DELETE operation.
+        type: bool
+        required: false
+        default: false
+        version_added: "3.2.0"
+
     include_objects:
         description:
             - List of exact backups to include in a bulk delete
@@ -795,12 +808,14 @@ EXAMPLES = r'''
 
 # Bulk delete backups matching a name regex, excluding specific backups
 # NOTE: include_filter/exclude_filter are case-insensitive regex; use ".*" to match all
+# NOTE: bulk delete requires acknowledge: true to confirm the operation
 - name: Bulk delete backups
   backup:
     operation: DELETE
     api_url: "https://px-backup.example.com"
     token: "{{ px_backup_token }}"
     org_id: "default"
+    acknowledge: true
     include_filter: ".*test.*"
     exclude_filter: "^keep-"
     cluster_scope:
@@ -813,6 +828,7 @@ EXAMPLES = r'''
     api_url: "https://px-backup.example.com"
     token: "{{ px_backup_token }}"
     org_id: "default"
+    acknowledge: true
     include_objects:
       - name: "backup-1"
         uid: "backup-uid-1"
@@ -825,6 +841,7 @@ EXAMPLES = r'''
     api_url: "https://px-backup.example.com"
     token: "{{ px_backup_token }}"
     org_id: "default"
+    acknowledge: true
     include_filter: ".*"
     backup_location_ref_filter:
       - name: "s3-location"
@@ -1038,6 +1055,8 @@ def validate_delete_params(params: Dict[str, Any]) -> None:
       bulk selector.
     - A bulk delete is selected by include/exclude objects or filters, backup
       location references or cluster scope, and must not provide 'name'.
+    - A bulk delete must set acknowledge=true to confirm the (potentially
+      wide-reaching) operation before it proceeds.
     - include_objects and include_filter are mutually exclusive.
     - exclude_objects and exclude_filter are mutually exclusive.
     - include_objects and exclude_objects cannot be combined.
@@ -1065,6 +1084,14 @@ def validate_delete_params(params: Dict[str, Any]) -> None:
 
     if not has_bulk_params:
         return
+
+    # Bulk delete can remove many backups in a single request, so require the
+    # caller to explicitly confirm intent and guard against accidental mass deletion
+    if not params.get('acknowledge'):
+        raise ValidationError(
+            "bulk delete can remove many backups in a single request, so it "
+            "requires 'acknowledge: true' to explicitly confirm intent and "
+            "guard against accidental mass deletion")
 
     # Bulk delete mutual-exclusivity rules
     if params.get('include_objects') and params.get('include_filter'):
@@ -1517,10 +1544,14 @@ def delete_backup(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict[s
             )
             return response, True
 
-        # Bulk delete via POST endpoint
+        # Bulk delete via POST endpoint.
+        # validate_delete_params() already rejected the request unless
+        # acknowledge=true, so this is always true here; forward the actual
+        # value so the server also gates on it.
         delete_request = {
             "org_id": params['org_id'],
-            "name": params.get('name', '')
+            "name": params.get('name', ''),
+            "acknowledge": params.get('acknowledge', False)
         }
 
         if params.get('uid'):
@@ -2066,6 +2097,7 @@ def run_module():
 
         # Delete options
         force=dict(type='bool', required=False, default=False),
+        acknowledge=dict(type='bool', required=False, default=False),
 
         # Bulk delete options
         include_objects=dict(

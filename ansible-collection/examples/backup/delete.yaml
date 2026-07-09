@@ -32,7 +32,8 @@
             uid: "{{ item.uid | default(omit) }}"
             cluster_ref: "{{ item.cluster_ref | default(omit) }}"
             force: "{{ item.force | default(omit) }}"
-            # Bulk delete selectors
+            # Bulk delete selectors (acknowledge must be true for bulk delete)
+            acknowledge: "{{ item.acknowledge | default(omit) }}"
             include_objects: "{{ item.include_objects | default(omit) }}"
             exclude_objects: "{{ item.exclude_objects | default(omit) }}"
             include_filter: "{{ item.include_filter | default(omit) }}"
