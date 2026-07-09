@@ -11,20 +11,24 @@ backup_deletes:
 
   # Bulk delete: match backups by name regex, exclude others by regex.
   # include_filter / exclude_filter are case-insensitive regex; use ".*" to match all.
-  - include_filter: ".*test.*"
+  # NOTE: bulk delete requires acknowledge: true to confirm the operation.
+  - acknowledge: true
+    include_filter: ".*test.*"
     exclude_filter: "^keep-"
     cluster_scope:
       all_clusters: true
 
   # Bulk delete: explicit list of backups (each entry needs at least name or uid).
   # include_objects is mutually exclusive with include_filter and exclude_objects.
-  - include_objects:
+  - acknowledge: true
+    include_objects:
       - name: "backup-1"
         uid: "backup-uid-1"
       - uid: "backup-uid-2"
 
   # Bulk delete: match all, filter by backup location and cluster scope
-  - include_filter: ".*"
+  - acknowledge: true
+    include_filter: ".*"
     backup_location_ref_filter:
       - name: "s3-location"
         uid: "location-uid"
