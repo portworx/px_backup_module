@@ -95,11 +95,13 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 | exclude_filter                   | string     | no       |          | Bulk DELETE: case-insensitive regex matched against backup names to exclude | 3.2.0 |
 | backup_location_ref_filter       | list       | no       |          | Bulk DELETE: filter backups by one or more backup location references | 3.2.0 |
 | cluster_scope                    | dictionary | no       |          | Bulk DELETE: restrict to specific clusters (cluster_refs) or all clusters (all_clusters) | 3.2.0 |
-| backup_delete_enumerate_options  | dictionary | no       |          | Bulk DELETE: advanced filters (labels, time_range, owners, backup_object_type, status, schedule_policy_ref, backup_schedule_ref) that narrow which backups are deleted | 3.2.0 |
+| backup_delete_enumerate_options  | dictionary | no       |          | Bulk DELETE: advanced filters (labels, time_range, owners, backup_object_type, statuses, schedule_policy_ref, backup_schedule_ref) that narrow which backups are deleted | 3.2.0 |
 
 > The `include_objects` / `exclude_objects` / `include_filter` / `exclude_filter` / `backup_location_ref_filter` / `cluster_scope` / `backup_delete_enumerate_options` parameters apply only to the DELETE operation and select **bulk delete** (POST `/v1/backup/{org_id}/delete`). Omit them for a single-backup delete by `name`; `name` cannot be combined with any of them. A bulk delete also requires `acknowledge: true` to confirm the operation, otherwise it is rejected. See the Bulk Delete Backups example.
 
-> The filters in `backup_delete_enumerate_options` are enough on their own to select a bulk delete — `status: ["Failed"]` with no `include_filter` deletes every failed backup. They behave the same as the identically-named filters on INSPECT_ALL, and are nested because most of those names already exist as top-level parameters used by CREATE and INSPECT_ALL.
+> The filters in `backup_delete_enumerate_options` are enough on their own to select a bulk delete — `statuses: ["Failed"]` with no `include_filter` deletes every failed backup. They are nested because most of those names already exist as top-level parameters used by CREATE and INSPECT_ALL.
+
+> Two of these filters differ from their INSPECT_ALL counterparts, so they are not copy-paste compatible: the status filter is named `statuses` (not `status`) and accepts only the enum values listed below, and `backup_object_type` is a nested dict here rather than the plain string INSPECT_ALL uses.
 
 #### backup_location_ref
 
@@ -197,7 +199,7 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 | backup_delete_enumerate_options.time_range           | dictionary | no       | Restrict the delete to backups created within a time range                  |
 | backup_delete_enumerate_options.owners               | list       | no       | Filter the backups to delete by owner UIDs                                  |
 | backup_delete_enumerate_options.backup_object_type   | dictionary | no       | Filter the backups to delete by backup object type                          |
-| backup_delete_enumerate_options.status               | list       | no       | Filter the backups to delete by status (e.g. `["Failed", "PartialSuccess"]`) |
+| backup_delete_enumerate_options.statuses             | list       | no       | Filter the backups to delete by backup status; accepted values are `Invalid`, `Pending`, `InProgress`, `Aborted`, `Failed`, `Deleting`, `Success`, `Captured`, `PartialSuccess`, `DeletePending`, `CloudBackupMissing` |
 | backup_delete_enumerate_options.schedule_policy_ref  | list       | no       | Filter the backups to delete by schedule policy references                  |
 | backup_delete_enumerate_options.backup_schedule_ref  | list       | no       | Filter the backups to delete by backup schedule references                  |
 
@@ -580,7 +582,7 @@ backup:
     org_id: "default"
     acknowledge: true
     backup_delete_enumerate_options:
-      status:
+      statuses:
         - "Failed"
 
 # Delete backups created in a time range, narrowed by label and object type
@@ -613,7 +615,7 @@ backup:
       backup_schedule_ref:
         - name: "nightly-schedule"
           uid: "schedule-uid"
-      status:
+      statuses:
         - "Failed"
         - "PartialSuccess"
 ```

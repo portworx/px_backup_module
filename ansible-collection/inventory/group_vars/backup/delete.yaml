@@ -42,7 +42,7 @@ backup_deletes:
   # needed - the entry below deletes every failed backup.
   # - acknowledge: true
   #   backup_delete_enumerate_options:
-  #     status:
+  #     statuses:
   #       - "Failed"
 
   # Bulk delete: every advanced filter, combined with a name regex.
@@ -63,8 +63,10 @@ backup_deletes:
   #     # One of 'Invalid', 'All', 'VirtualMachine'
   #     backup_object_type:
   #       type: "VirtualMachine"
-  #     # String status values, e.g. "Success", "Failed", "PartialSuccess"
-  #     status:
+  #     # Note: 'statuses', not 'status' as used by INSPECT_ALL. One or more of
+  #     # Invalid, Pending, InProgress, Aborted, Failed, Deleting, Success,
+  #     # Captured, PartialSuccess, DeletePending, CloudBackupMissing
+  #     statuses:
   #       - "Failed"
   #       - "PartialSuccess"
   #     # Only backups produced by these schedule policies

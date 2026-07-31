@@ -569,8 +569,8 @@ options:
             - Nested because most of these names already exist as top-level parameters
               used by CREATE and INSPECT_ALL
             - Providing any filter here selects a bulk delete, so a filters-only
-              request (for example status=Failed with no include_filter) is valid and
-              deletes every backup matching the filters
+              request (for example statuses=Failed with no include_filter) is valid
+              and deletes every backup matching the filters
             - Only applicable for DELETE operation
         type: dict
         required: false
@@ -607,12 +607,26 @@ options:
                             - Invalid
                             - All
                             - VirtualMachine
-            status:
+            statuses:
                 description:
-                    - Filter the backups to delete by status
+                    - Filter the backups to delete by backup status
                     - 'For example: ["Failed", "PartialSuccess"]'
+                    - Note this is 'statuses', not the free-form 'status' list used
+                      by INSPECT_ALL, and only the values below are accepted
                 type: list
                 elements: str
+                choices:
+                    - Invalid
+                    - Pending
+                    - InProgress
+                    - Aborted
+                    - Failed
+                    - Deleting
+                    - Success
+                    - Captured
+                    - PartialSuccess
+                    - DeletePending
+                    - CloudBackupMissing
             schedule_policy_ref:
                 description: Filter the backups to delete by schedule policy references
                 type: list
@@ -940,7 +954,7 @@ EXAMPLES = r'''
     org_id: "default"
     acknowledge: true
     backup_delete_enumerate_options:
-      status:
+      statuses:
         - "Failed"
 
 # Bulk delete backups created in a time range, narrowed by label and object type
@@ -973,7 +987,7 @@ EXAMPLES = r'''
       backup_schedule_ref:
         - name: "nightly-schedule"
           uid: "schedule-uid"
-      status:
+      statuses:
         - "Failed"
         - "PartialSuccess"
 
@@ -1178,9 +1192,13 @@ def build_delete_enumerate_options(params: Dict[str, Any]) -> Dict[str, Any]:
 
     AnsibleModule materialises every declared suboption as None once the parent
     dict is supplied, so the empty values are stripped here to avoid sending a
-    request body full of nulls. 'backup_object_type' is a nested dict on the
-    Ansible side but a plain string on the wire, so it is unwrapped exactly as
-    enumerate_backups() does.
+    request body full of nulls.
+
+    Note that 'backup_object_type' is passed through as a nested dict rather than
+    flattened to a scalar the way enumerate_backups() does it. The two are not
+    interchangeable: EnumerateOptions.backup_object_type is a plain string, while
+    BackupDeleteEnumerateOptions.backup_object_type is a BackupObjectType message
+    carrying a 'type' enum.
 
     Returns:
         The cleaned filter options, or an empty dict if no filter was actually set
@@ -1192,15 +1210,12 @@ def build_delete_enumerate_options(params: Dict[str, Any]) -> Dict[str, Any]:
     # None-strip first so an all-defaults dict collapses to nothing
     options = {key: value for key, value in raw.items() if value}
 
-    if options.get('backup_object_type'):
-        options['backup_object_type'] = options['backup_object_type'].get('type')
-
     if options.get('time_range'):
         options['time_range'] = {
             key: value for key, value in options['time_range'].items() if value
         }
 
-    # Drop anything the unwrapping above emptied out
+    # Drop anything the None-strip above emptied out
     return {key: value for key, value in options.items() if value}
 
 
@@ -2384,7 +2399,18 @@ def run_module():
                         )
                     )
                 ),
-                status=dict(type='list', elements='str'),
+                # 'statuses' (not 'status') and constrained to the
+                # BackupInfo.StatusInfo.Status enum, unlike the free-form
+                # 'status' strings accepted by INSPECT_ALL
+                statuses=dict(
+                    type='list',
+                    elements='str',
+                    choices=[
+                        'Invalid', 'Pending', 'InProgress', 'Aborted', 'Failed',
+                        'Deleting', 'Success', 'Captured', 'PartialSuccess',
+                        'DeletePending', 'CloudBackupMissing'
+                    ]
+                ),
                 schedule_policy_ref=dict(
                     type='list',
                     elements='dict',
