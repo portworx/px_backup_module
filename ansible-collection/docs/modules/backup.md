@@ -101,7 +101,7 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 
 > The filters in `backup_delete_enumerate_options` are enough on their own to select a bulk delete — `statuses: ["Failed"]` with no `include_filter` deletes every failed backup. They are nested because most of those names already exist as top-level parameters used by CREATE and INSPECT_ALL.
 
-> Two of these filters differ from their INSPECT_ALL counterparts, so they are not copy-paste compatible: the status filter is named `statuses` (not `status`) and accepts only the enum values listed below, and `backup_object_type` is a nested dict here rather than the plain string INSPECT_ALL uses.
+> Two of these filters differ from their INSPECT_ALL counterparts, so they are not copy-paste compatible: the status filter is named `statuses` (not `status`) and accepts only the enum values listed below, and `backup_object_type` is a nested dict here rather than the plain string INSPECT_ALL uses. This is by design — INSPECT_ALL sends the API's shared enumerate options, which are reused by cluster, restore and role enumeration and so must accept free-form status strings, whereas bulk delete has its own backup-specific options message and can therefore validate against the backup status enum.
 
 #### backup_location_ref
 
