@@ -565,9 +565,12 @@ options:
     backup_delete_enumerate_options:
         description:
             - Advanced filters that narrow which backups a bulk delete removes
-            - Behaves the same as the identically-named filters on INSPECT_ALL
             - Nested because most of these names already exist as top-level parameters
               used by CREATE and INSPECT_ALL
+            - Not copy-paste compatible with the INSPECT_ALL filters, tempting as it
+              looks. The status filter is 'statuses' here and takes only the values
+              listed below, where INSPECT_ALL takes free-form 'status' strings, and
+              'backup_object_type' is a dict here where INSPECT_ALL takes a string
             - Providing any filter here selects a bulk delete, so a filters-only
               request (for example statuses=Failed with no include_filter) is valid
               and deletes every backup matching the filters
