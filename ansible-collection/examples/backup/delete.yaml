@@ -40,6 +40,7 @@
             exclude_filter: "{{ item.exclude_filter | default(omit) }}"
             backup_location_ref_filter: "{{ item.backup_location_ref_filter | default(omit) }}"
             cluster_scope: "{{ item.cluster_scope | default(omit) }}"
+            backup_delete_enumerate_options: "{{ item.backup_delete_enumerate_options | default(omit) }}"
             # SSL Certificate Parameters
             ssl_config: "{{ ssl_config.px_backup | default({}) }}"
           register: delete_result
