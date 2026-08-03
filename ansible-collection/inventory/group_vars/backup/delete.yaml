@@ -36,3 +36,44 @@ backup_deletes:
       cluster_refs:
         - name: "prod-cluster"
           uid: "cluster-uid"
+
+  # Bulk delete: advanced filters via backup_delete_enumerate_options.
+  # These filters select the backups on their own, so no include_filter is
+  # needed - the entry below deletes every failed backup.
+  # - acknowledge: true
+  #   backup_delete_enumerate_options:
+  #     statuses:
+  #       - "Failed"
+
+  # Bulk delete: every advanced filter, combined with a name regex.
+  # All filters are optional; omit the ones you do not need.
+  # - acknowledge: true
+  #   include_filter: ".*test.*"
+  #   backup_delete_enumerate_options:
+  #     # Restrict to backups created in this window (RFC3339 timestamps)
+  #     time_range:
+  #       start_time: "2026-01-01T00:00:00Z"
+  #       end_time: "2026-03-31T23:59:59Z"
+  #     # Only backups carrying these labels
+  #     labels:
+  #       environment: "staging"
+  #     # Only backups owned by these user UIDs
+  #     owners:
+  #       - "owner-uid-1"
+  #     # One of 'Invalid', 'All', 'VirtualMachine'
+  #     backup_object_type:
+  #       type: "VirtualMachine"
+  #     # Note: 'statuses', not 'status' as used by INSPECT_ALL. One or more of
+  #     # Invalid, Pending, InProgress, Aborted, Failed, Deleting, Success,
+  #     # Captured, PartialSuccess, DeletePending, CloudBackupMissing
+  #     statuses:
+  #       - "Failed"
+  #       - "PartialSuccess"
+  #     # Only backups produced by these schedule policies
+  #     schedule_policy_ref:
+  #       - name: "daily-policy"
+  #         uid: "policy-uid"
+  #     # Only backups produced by these backup schedules
+  #     backup_schedule_ref:
+  #       - name: "nightly-schedule"
+  #         uid: "schedule-uid"
