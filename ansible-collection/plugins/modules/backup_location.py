@@ -222,7 +222,7 @@ options:
         required: false
         type: dict
         default: {}
-        options:
+        suboptions:
             validate_certs:
                 description:
                     - Verify SSL certificates
