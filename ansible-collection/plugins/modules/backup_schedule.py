@@ -482,6 +482,31 @@ options:
             all_clusters:
                 description: Boolean flag to apply the operation to all clusters
                 type: bool
+    # New in 3.1.1
+    filter_options:
+        description:
+            - Selectors that narrow which backup schedules a bulk UPDATE or DELETE
+              (including bulk suspend/resume via UPDATE) acts on.
+            - Distinct from C(volume_resource_only_policy_ref), which sets the
+              Volume Resource Only policy on the schedule being updated. The
+              selector here instead picks the schedules to operate on by the
+              Volume Resource Only policy they already reference.
+        required: false
+        type: dict
+        version_added: '3.1.1'
+        suboptions:
+            volume_resource_only_policy_ref:
+                description: Select schedules that reference any of these Volume Resource Only policies
+                type: list
+                elements: dict
+                suboptions:
+                    name:
+                        description: Volume Resource Only policy name
+                        type: str
+                        required: true
+                    uid:
+                        description: Volume Resource Only policy UID
+                        type: str
 
 requirements:
     - python >= 3.9
@@ -725,9 +750,9 @@ def delete_backup_schedules(module, client):
     # Check if only the basic required parameters are provided
     # (org_id and name are always required, so we check for additional parameters)
     additional_params = [
-        'policy_ref', 'include_objects', 'exclude_objects', 'include_filter', 
+        'policy_ref', 'include_objects', 'exclude_objects', 'include_filter',
         'exclude_filter', 'cluster_scope', 'delete_backups', 'backup_object_type',
-        'cluster_ref', 'volume_resource_only_policy_ref'
+        'cluster_ref', 'volume_resource_only_policy_ref', 'filter_options'
     ]
     
     has_additional_params = any(params.get(param) is not None for param in additional_params)
@@ -804,7 +829,12 @@ def delete_backup_schedules(module, client):
                     delete_request["cluster_scope"]["cluster_refs"] = {"refs": cluster_scope['cluster_refs']}
                 elif cluster_scope.get('all_clusters'):
                     delete_request["cluster_scope"]["all_clusters"] = cluster_scope['all_clusters']
-            
+
+            # Bulk selector narrowing which schedules the delete acts on (3.1.1+)
+            filter_options = build_backup_schedule_filter_options(module)
+            if filter_options:
+                delete_request["filter_options"] = filter_options
+
             response = client.make_request(
                 'POST',
                 f"v1/backupschedule/{params['org_id']}/delete",
@@ -813,6 +843,26 @@ def delete_backup_schedules(module, client):
             return response, True
         except Exception as e:
             handle_request_exception(e, module, "delete backup schedule")
+
+def build_backup_schedule_filter_options(module):
+    """Build the nested filter_options wrapper used to narrow which backup
+    schedules a bulk update/delete acts on.
+
+    The API double-wraps the common BackupScheduleFilterOptions inside a
+    request-specific BackupSchedule{Update,Delete}FilterOptions, so the wire
+    format is filter_options -> filter_options -> volume_resource_only_policy_ref.
+    Returns None (so the request omits filter_options entirely) when no
+    selectors are provided.
+    """
+    filter_options = module.params.get('filter_options') or {}
+    vro_refs = filter_options.get('volume_resource_only_policy_ref')
+    if not vro_refs:
+        return None
+    return {
+        "filter_options": {
+            "volume_resource_only_policy_ref": vro_refs
+        }
+    }
 
 def backup_schedule_request_body(module):
     """Build the backup schedule request object"""
@@ -877,6 +927,11 @@ def backup_schedule_request_body(module):
                 backup_schedule_request["cluster_scope"]["cluster_refs"] = {"refs": cluster_scope['cluster_refs']}
             elif cluster_scope.get('all_clusters'):
                 backup_schedule_request["cluster_scope"]["all_clusters"] = cluster_scope['all_clusters']
+
+        # Bulk selector narrowing which schedules the update acts on
+        filter_options = build_backup_schedule_filter_options(module)
+        if filter_options:
+            backup_schedule_request["filter_options"] = filter_options
 
     if module.params.get('volume_resource_only_policy_ref'):
         backup_schedule_request['volume_resource_only_policy_ref'] = module.params['volume_resource_only_policy_ref']
@@ -1126,6 +1181,22 @@ def run_module():
                     )
                 ),
                 all_clusters=dict(type='bool')
+            )
+        ),
+
+        # New in 3.1.1 - Bulk selector filter options (VolumeResourceOnly policy)
+        filter_options=dict(
+            type='dict',
+            required=False,
+            options=dict(
+                volume_resource_only_policy_ref=dict(
+                    type='list',
+                    elements='dict',
+                    options=dict(
+                        name=dict(type='str', required=True),
+                        uid=dict(type='str', required=False)
+                    )
+                )
             )
         ),
 

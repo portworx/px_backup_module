@@ -54,6 +54,7 @@
             include_filter: "{{ item.include_filter | default(omit) }}"
             exclude_filter: "{{ item.exclude_filter | default(omit) }}"
             cluster_scope: "{{ item.cluster_scope | default(omit) }}"
+            filter_options: "{{ item.filter_options | default(omit) }}"
             labels: "{{ item.labels | default(omit) }}"
             advanced_resource_label_selector: "{{ item.advanced_resource_label_selector | default(omit) }}"
             ns_label_selectors: "{{ item.ns_label_selectors | default(omit) }}"
