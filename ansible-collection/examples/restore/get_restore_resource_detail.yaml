@@ -1,0 +1,60 @@
+# ansible-collection/examples/restore/get_restore_resource_detail.yaml
+---
+- name: Get Restore Resource Details from PX-Backup
+  hosts: localhost
+  gather_facts: true
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/restore/get_restore_resource_detail.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - org_id is defined
+          - restore_name is defined
+        fail_msg: "Required variables must be defined"
+
+  tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+
+    - name: Get restore resource details
+      block:
+        - name: Ask px-backup for restore resource details
+          restore:
+            operation: GET_RESTORE_RESOURCE_DETAILS
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            org_id: "{{ org_id }}"
+            name: "{{ restore_name }}"
+            uid: "{{ restore_uid | default(omit) }}"
+            # Enhanced filtering options
+            max_objects: "{{ max_objects | default(omit) }}"
+            object_index: "{{ object_index | default(omit) }}"
+            resource_status_filter: "{{ resource_status_filter | default(omit) }}"
+            namespace_filter: "{{ namespace_filter | default(omit) }}"
+            virtual_machine_restore_filter: "{{ virtual_machine_restore_filter | default(omit) }}"
+            # SSL Certificate Parameters
+            ssl_config: "{{ ssl_config.px_backup | default({}) }}"
+          register: restore_result
+
+      rescue:
+        - name: Display error details
+          debug:
+            msg: "Failed to get restore resource details: {{ restore_result.msg if restore_result.msg is defined else 'Unknown error occurred' }}"
+          when: restore_result is defined
+
+        - name: Fail with error message
+          fail:
+            msg: "Failed to get restore resource details. See above for details."
+
+    # Output configuration: Display the output or save to file
+    - name: Handle output
+      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
+      vars:
+        output_data: "{{ restore_result }}"
+        output_filename_prefix: "restore_resource_details"
+      when: output_config.enabled | default(false)

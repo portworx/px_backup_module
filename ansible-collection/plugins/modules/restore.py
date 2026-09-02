@@ -62,9 +62,10 @@ options:
             - "- INSPECT_ONE: retrieves details of a specific restore"
             - "- INSPECT_ALL: lists all restores"
             - "- GET_CR_DOWNLOAD_LOCATION: gets a signed URL (S3-family) or NFS access metadata for the restore CR JSON stored on the BackupLocation"
+            - "- GET_RESTORE_RESOURCE_DETAILS: retrieves paginated/filtered restore resource details (parallel to GET_BACKUP_RESOURCE_DETAILS on the backup module)"
         required: true
         type: str
-        choices: ['CREATE', 'DELETE', 'INSPECT_ONE', 'INSPECT_ALL', 'GET_CR_DOWNLOAD_LOCATION']
+        choices: ['CREATE', 'DELETE', 'INSPECT_ONE', 'INSPECT_ALL', 'GET_CR_DOWNLOAD_LOCATION', 'GET_RESTORE_RESOURCE_DETAILS']
     api_url:
         description: PX-Backup API URL
         required: true
@@ -445,6 +446,115 @@ options:
         type: int
         required: false
         version_added: "3.2.0"
+    object_index:
+        description: Object index from which to start fetching for pagination in GET_RESTORE_RESOURCE_DETAILS
+        type: int
+        required: false
+        version_added: "3.2.0"
+    resource_status_filter:
+        description:
+            - Filter resources by status for GET_RESTORE_RESOURCE_DETAILS operation
+            - 'For example: ["Success", "Failed"]. Default is ["Success"] when not provided'
+        type: list
+        elements: str
+        required: false
+        version_added: "3.2.0"
+    namespace_filter:
+        description:
+            - Advanced namespace filtering options for GET_RESTORE_RESOURCE_DETAILS operation
+            - Cannot be used together with virtual_machine_restore_filter (mutually exclusive)
+        type: dict
+        required: false
+        version_added: "3.2.0"
+        suboptions:
+            namespace_name_pattern:
+                description: Substring or regex pattern to match namespace names
+                type: str
+            include_namespaces:
+                description: List of namespace names to include
+                type: list
+                elements: str
+            exclude_namespaces:
+                description: List of namespace names to exclude
+                type: list
+                elements: str
+            include_resources:
+                description: List of resources to include
+                type: list
+                elements: dict
+                suboptions:
+                    name:
+                        description: Resource name
+                        type: str
+                    namespace:
+                        description: Resource namespace
+                        type: str
+                    gvk:
+                        description: Resource GVK in format 'group/version/kind' or 'version/kind' for core resources
+                        type: str
+                        required: true
+            exclude_resources:
+                description: List of resources to exclude
+                type: list
+                elements: dict
+                suboptions:
+                    name:
+                        description: Resource name
+                        type: str
+                    namespace:
+                        description: Resource namespace
+                        type: str
+                    gvk:
+                        description: Resource GVK in format 'group/version/kind' or 'version/kind' for core resources
+                        type: str
+                        required: true
+            gvks:
+                description: List of Kubernetes Group/Version/Kind identifiers (e.g. "apps/v1/Deployment", "v1/Pod")
+                type: list
+                elements: str
+            resource_name_pattern:
+                description: Substring or regex pattern to match resource names
+                type: str
+    virtual_machine_restore_filter:
+        description:
+            - Virtual machine filtering options for GET_RESTORE_RESOURCE_DETAILS operation
+            - Cannot be used together with namespace_filter (mutually exclusive)
+            - VMs are identified by name and namespace using the shared VirtualMachine message
+        type: dict
+        required: false
+        version_added: "3.2.0"
+        suboptions:
+            vm_name_pattern:
+                description: Substring or regex pattern to match virtual machine names
+                type: str
+            os_name:
+                description: List of OS names to include for filtering
+                type: list
+                elements: str
+            include_vms:
+                description: List of VMs to include (mutually exclusive with exclude_vms)
+                type: list
+                elements: dict
+                suboptions:
+                    name:
+                        description: Virtual machine name
+                        type: str
+                        required: true
+                    namespace:
+                        description: Virtual machine namespace
+                        type: str
+            exclude_vms:
+                description: List of VMs to exclude (mutually exclusive with include_vms)
+                type: list
+                elements: dict
+                suboptions:
+                    name:
+                        description: Virtual machine name
+                        type: str
+                        required: true
+                    namespace:
+                        description: Virtual machine namespace
+                        type: str
 
 requirements:
     - python >= 3.9
@@ -458,6 +568,71 @@ notes:
     - "INSPECT_ONE: name, org_id"
     - "INSPECT_ALL: org_id"
     - "GET_CR_DOWNLOAD_LOCATION: name, org_id (uid recommended)"
+    - "GET_RESTORE_RESOURCE_DETAILS: name, org_id (uid recommended)"
+'''
+
+EXAMPLES = r'''
+# Create a new restore
+- name: Create restore
+  restore:
+    operation: CREATE
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    name: "prod-restore"
+    org_id: "default"
+    backup_ref:
+      name: "prod-backup"
+      uid: "backup-uid"
+    cluster_ref:
+      name: "prod-cluster"
+      uid: "cluster-uid"
+
+# Get restore resource details (paginated/filtered per-VM restore detail)
+- name: Get restore resource details
+  restore:
+    operation: GET_RESTORE_RESOURCE_DETAILS
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    name: "vm-restore"
+    org_id: "default"
+    uid: "restore-uid"
+
+# Get restore resource details with namespace filtering
+- name: Get restore details with namespace filtering
+  restore:
+    operation: GET_RESTORE_RESOURCE_DETAILS
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    name: "app-restore"
+    org_id: "default"
+    uid: "restore-uid"
+    namespace_filter:
+      namespace_name_pattern: "prod-*"
+      include_namespaces: ["production", "staging"]
+      exclude_namespaces: ["system"]
+      gvks: ["apps/v1/Deployment", "v1/Pod"]
+    resource_status_filter: ["Success", "Failed"]
+    max_objects: 100
+    object_index: 0
+
+# Get restore resource details with VM filtering
+# NOTE: virtual_machine_restore_filter and namespace_filter are mutually exclusive
+- name: Get VM restore details with VM filtering
+  restore:
+    operation: GET_RESTORE_RESOURCE_DETAILS
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    name: "vm-restore"
+    org_id: "default"
+    uid: "restore-uid"
+    virtual_machine_restore_filter:
+      vm_name_pattern: "vm-prod-*"
+      os_name: ["ubuntu", "rhel"]
+      include_vms:
+        - name: "vm-1"
+          namespace: "prod"
+    resource_status_filter: ["Failed"]
+    max_objects: 100
 '''
 
 # Configure logging
@@ -1085,6 +1260,78 @@ def get_cr_download_location(module: AnsibleModule, client: PXBackupClient) -> D
                 error_msg = f"API returned status code {e.response.status_code}: {error_msg}"
         module.fail_json(msg=f"Failed to get restore CR download location: {error_msg}")
 
+def get_restore_resource_details(module: AnsibleModule, client: PXBackupClient) -> Dict[str, Any]:
+    """
+    Get paginated/filtered restore resource details (per-VM restore status,
+    volumes and resources) via the Restore.GetRestoreResourceDetails API.
+    Parallel to the backup module's GET_BACKUP_RESOURCE_DETAILS operation.
+    """
+    try:
+        request_body = {
+            "org_id": module.params['org_id'],
+            "name": module.params['name'],
+            "uid": module.params.get('uid', '')
+        }
+
+        # Build filter object if any filter parameters are provided
+        filter_obj = {}
+
+        # Namespace filter and virtual machine filter are mutually exclusive
+        # (oneof resource_filter on the API)
+        if module.params.get('namespace_filter') and module.params.get('virtual_machine_restore_filter'):
+            module.fail_json(
+                msg="namespace_filter and virtual_machine_restore_filter are mutually exclusive"
+            )
+
+        # Add namespace filter
+        if module.params.get('namespace_filter'):
+            filter_obj["namespace_filter"] = module.params['namespace_filter']
+
+        # Add virtual machine restore filter
+        if module.params.get('virtual_machine_restore_filter'):
+            filter_obj["virtual_machine_filter"] = module.params['virtual_machine_restore_filter']
+
+        # Add status filter
+        if module.params.get('resource_status_filter'):
+            filter_obj["status"] = module.params['resource_status_filter']
+
+        # Add pagination parameters
+        if module.params.get('max_objects'):
+            filter_obj["max_objects"] = str(module.params['max_objects'])
+
+        if module.params.get('object_index'):
+            filter_obj["object_index"] = str(module.params['object_index'])
+
+        # Add filter to request if any filter parameters were provided
+        if filter_obj:
+            request_body["filter"] = filter_obj
+
+        response = client.make_request(
+            'POST',
+            "v1/restore/getrestoreresourcedetails",
+            data=request_body
+        )
+
+        module.debug(f"API Response: {response}")
+
+        return {
+            'restore': response.get('restore', {}),
+            'message': "Successfully retrieved restore resource details",
+            'changed': False
+        }
+
+    except Exception as e:
+        error_msg = str(e)
+        if isinstance(e, requests.exceptions.RequestException) and hasattr(e, 'response'):
+            try:
+                error_detail = e.response.json()
+                error_msg = f"{error_msg}: {error_detail}"
+            except ValueError:
+                error_msg = f"{error_msg}: {e.response.text}"
+            if hasattr(e.response, 'status_code'):
+                error_msg = f"API returned status code {e.response.status_code}: {error_msg}"
+        module.fail_json(msg=f"Failed to get restore resource details: {error_msg}")
+
 def handle_api_error(e: Exception, operation: str) -> str:
     """
     Handle API errors and format error message
@@ -1164,6 +1411,15 @@ def perform_operation(module: AnsibleModule, client: PXBackupClient, operation: 
                 message="Successfully retrieved restore CR download location"
             )
 
+        elif operation == 'GET_RESTORE_RESOURCE_DETAILS':
+            result = get_restore_resource_details(module, client)
+            return OperationResult(
+                success=True,
+                changed=False,
+                data=result,
+                message="Successfully retrieved restore resource details"
+            )
+
     except Exception as e:
         logger.exception(f"Operation {operation} failed")
         return OperationResult(
@@ -1186,6 +1442,7 @@ def run_module():
                 'INSPECT_ONE',
                 'INSPECT_ALL',
                 'GET_CR_DOWNLOAD_LOCATION',
+                'GET_RESTORE_RESOURCE_DETAILS',
             ]
         ),
         name=dict(type='str', required=False),
@@ -1439,6 +1696,65 @@ def run_module():
         # Server clamps to [60, 604800]; 0/unset uses the server default (1800s).
         expiry_seconds=dict(type='int', required=False),
 
+        # GET_RESTORE_RESOURCE_DETAILS options (parallel to the backup module's
+        # GET_BACKUP_RESOURCE_DETAILS). namespace_filter and
+        # virtual_machine_restore_filter are mutually exclusive (oneof on the API).
+        object_index=dict(type='int', required=False),
+        resource_status_filter=dict(type='list', elements='str', required=False),
+        namespace_filter=dict(
+            type='dict',
+            required=False,
+            options=dict(
+                namespace_name_pattern=dict(type='str'),
+                include_namespaces=dict(type='list', elements='str'),
+                exclude_namespaces=dict(type='list', elements='str'),
+                include_resources=dict(
+                    type='list',
+                    elements='dict',
+                    options=dict(
+                        name=dict(type='str'),
+                        namespace=dict(type='str'),
+                        gvk=dict(type='str', required=True)
+                    )
+                ),
+                exclude_resources=dict(
+                    type='list',
+                    elements='dict',
+                    options=dict(
+                        name=dict(type='str'),
+                        namespace=dict(type='str'),
+                        gvk=dict(type='str', required=True)
+                    )
+                ),
+                gvks=dict(type='list', elements='str'),
+                resource_name_pattern=dict(type='str')
+            )
+        ),
+        virtual_machine_restore_filter=dict(
+            type='dict',
+            required=False,
+            options=dict(
+                vm_name_pattern=dict(type='str'),
+                os_name=dict(type='list', elements='str'),
+                include_vms=dict(
+                    type='list',
+                    elements='dict',
+                    options=dict(
+                        name=dict(type='str', required=True),
+                        namespace=dict(type='str')
+                    )
+                ),
+                exclude_vms=dict(
+                    type='list',
+                    elements='dict',
+                    options=dict(
+                        name=dict(type='str', required=True),
+                        namespace=dict(type='str')
+                    )
+                )
+            )
+        ),
+
         # SSL cert implementation
         ssl_config=dict(
             type='dict',
@@ -1471,6 +1787,8 @@ def run_module():
         'INSPECT_ALL': ['org_id'],
 
         'GET_CR_DOWNLOAD_LOCATION': ['name', 'org_id'],
+
+        'GET_RESTORE_RESOURCE_DETAILS': ['name', 'org_id'],
     }
 
     module = AnsibleModule(
@@ -1487,6 +1805,8 @@ def run_module():
             ('operation', 'INSPECT_ALL', ['org_id']),
 
             ('operation', 'GET_CR_DOWNLOAD_LOCATION', ['name', 'org_id']),
+
+            ('operation', 'GET_RESTORE_RESOURCE_DETAILS', ['name', 'org_id']),
 
             ('is_sfr', True, ['file_level_restore_info']),
         ]
