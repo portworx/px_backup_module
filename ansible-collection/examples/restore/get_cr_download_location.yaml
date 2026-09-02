@@ -1,0 +1,64 @@
+# ansible-collection/examples/restore/get_cr_download_location.yaml
+---
+- name: Get Restore CR Download Location from PX-Backup
+  hosts: localhost
+  gather_facts: true
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/restore/get_cr_download_location.yaml"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - org_id is defined
+          - restore_name is defined
+        fail_msg: "Required variables must be defined"
+
+  tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+
+    - name: Get restore CR download location
+      block:
+        - name: Ask px-backup for the CR download location
+          restore:
+            operation: GET_CR_DOWNLOAD_LOCATION
+            api_url: "{{ px_backup_api_url }}"
+            token: "{{ px_backup_token }}"
+            org_id: "{{ org_id }}"
+            name: "{{ restore_name }}"
+            uid: "{{ restore_uid | default(omit) }}"
+            expiry_seconds: "{{ expiry_seconds | default(omit) }}"
+            ssl_config: "{{ ssl_config.px_backup | default({}) }}"
+          register: cr_download_result
+
+        - name: Show returned location (redacted for logs — signed URL is a bearer token)
+          debug:
+            msg:
+              backend_type: "{{ cr_download_result.location.backend_type | default('unknown') }}"
+              has_signed_url: "{{ 'signed_url' in cr_download_result.location }}"
+              has_nfs_location: "{{ 'nfs_location' in cr_download_result.location }}"
+              expires_at: "{{ cr_download_result.location.signed_url.expires_at | default('n/a — NFS response has no expiry') }}"
+
+    # Optional next step for S3-family responses: fetch the CR JSON directly with
+    # ansible.builtin.get_url. px-backup is off the data path — the client fetches
+    # from the storage backend using the presigned URL.
+    - name: Download restore CR JSON to disk (S3-family only)
+      ansible.builtin.get_url:
+        url: "{{ cr_download_result.location.signed_url.url }}"
+        dest: "/tmp/{{ restore_name }}-cr.json"
+        mode: '0600'
+      when:
+        - cr_download_result.location.signed_url is defined
+        - cr_download_result.location.signed_url.url is defined
+
+    # Output configuration: Display the output or save to file
+    - name: Handle output
+      include_tasks: "{{ playbook_dir | dirname }}/output_handler/main.yaml"
+      vars:
+        output_data: "{{ cr_download_result }}"
+        output_filename_prefix: "restore_cr_download_location"
+      when: output_config.enabled | default(false)

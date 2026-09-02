@@ -24,12 +24,13 @@ The restore module enables management of backup restoration operations in PX-Bac
 The module supports the following operations:
 
 
-| Operation   | Description                       |
-| ------------- | ----------------------------------- |
-| CREATE      | Create a new restore operation    |
-| DELETE      | Remove a restore operation        |
-| INSPECT_ONE | Get details of a specific restore |
-| INSPECT_ALL | List all restore operations       |
+| Operation                | Description                                                                                     |
+| -------------------------- | ------------------------------------------------------------------------------------------------- |
+| CREATE                   | Create a new restore operation                                                                  |
+| DELETE                   | Remove a restore operation                                                                      |
+| INSPECT_ONE              | Get details of a specific restore                                                               |
+| INSPECT_ALL              | List all restore operations                                                                     |
+| GET_CR_DOWNLOAD_LOCATION | Get access details (signed URL or NFS metadata) for the restore CR JSON stored on the BackupLocation |
 
 ## Parameters
 
@@ -143,6 +144,13 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 | cluster_name_filter        | string  | no       |         | Filter by cluster name              |
 | include_detailed_resources | boolean | no       | false   | Include detailed resource info      |
 
+### CR Download Location Parameters
+
+
+| Parameter       | Type    | Required | Default | Description                                                                                       |
+| ----------------- | --------- | ---------- | --------- | --------------------------------------------------------------------------------------------------- |
+| expiry_seconds  | integer | no       |         | Requested TTL of the signed URL (S3-family only). Server clamps to `[60, 604800]`; 0/unset uses the server default (1800). Ignored for NFS BackupLocations. |
+
 ## Examples
 
 ### Standard Restore
@@ -223,6 +231,32 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
           destination_path: "/tmp/mysql-logs/"
           is_dir: true
 ```
+
+### Get CR Download Location
+
+For a restore in `PartialSuccess` or `Failed`, ask px-backup for the location of the CR JSON that Stork uploaded to the BackupLocation. The response is a `oneof` — exactly one of `signed_url` or `nfs_location` is populated based on the underlying BackupLocation type.
+
+```yaml
+- name: Fetch signed URL for the restore CR (S3-family BackupLocation)
+  restore:
+    operation: GET_CR_DOWNLOAD_LOCATION
+    api_url: "{{ px_backup_api_url }}"
+    token: "{{ px_backup_token }}"
+    org_id: "{{ org_id }}"
+    name: "my-partial-restore"
+    uid: "restore-uid-abc"
+    expiry_seconds: 1800
+  register: cr_result
+
+- name: Download the CR JSON off the returned URL
+  ansible.builtin.get_url:
+    url: "{{ cr_result.location.signed_url.url }}"
+    dest: "/tmp/{{ restore_name }}-cr.json"
+    mode: '0600'
+  when: cr_result.location.signed_url is defined
+```
+
+For an NFS BackupLocation the response instead contains `location.nfs_location` with `server`, `export_path`, `file_path`, and `mount_options` — the caller is expected to mount the export themselves and read the file at `file_path`.
 
 ## Error Handling
 

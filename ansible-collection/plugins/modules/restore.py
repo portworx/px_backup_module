@@ -9,6 +9,15 @@ This Ansible module manages restores in PX-Backup, providing operations for:
 - Enumerating restores
 - Inspecting restores
 - Deleting restores
+- Getting the CR download location for a PartialSuccess or Failed restore.
+  When a restore lands in PartialSuccess or Failed and the serialized CR
+  exceeds Stork's large-resource threshold, Stork uploads the full
+  ApplicationRestore CR JSON to the BackupLocation so per-resource failure
+  details can be retrieved out-of-band. This operation asks px-backup for
+  a signed URL (S3, Azure, GCS BackupLocations) or NFS access metadata
+  (NFS BackupLocations) so the caller can fetch or mount the CR JSON
+  themselves. px-backup does not stream the file — the client is off the
+  data path.
 
 """
 
@@ -52,9 +61,10 @@ options:
             - "- DELETE: removes a restore"
             - "- INSPECT_ONE: retrieves details of a specific restore"
             - "- INSPECT_ALL: lists all restores"
+            - "- GET_CR_DOWNLOAD_LOCATION: gets a signed URL (S3-family) or NFS access metadata for the restore CR JSON stored on the BackupLocation"
         required: true
         type: str
-        choices: ['CREATE', 'DELETE', 'INSPECT_ONE', 'INSPECT_ALL']
+        choices: ['CREATE', 'DELETE', 'INSPECT_ONE', 'INSPECT_ALL', 'GET_CR_DOWNLOAD_LOCATION']
     api_url:
         description: PX-Backup API URL
         required: true
@@ -427,6 +437,14 @@ options:
                     - File permissions should be restricted (e.g., 600)
                 type: path
         version_added: "2.10.0"
+    expiry_seconds:
+        description:
+            - Requested TTL of the signed URL for GET_CR_DOWNLOAD_LOCATION on S3-family BackupLocations
+            - Server clamps to [60, 604800]; a value of 0 or unset uses the server default of 1800 (30 minutes)
+            - Ignored for NFS BackupLocations, which return access metadata rather than a time-bound token
+        type: int
+        required: false
+        version_added: "3.2.0"
 
 requirements:
     - python >= 3.9
@@ -439,6 +457,7 @@ notes:
     - "DELETE: name, org_id"
     - "INSPECT_ONE: name, org_id"
     - "INSPECT_ALL: org_id"
+    - "GET_CR_DOWNLOAD_LOCATION: name, org_id (uid recommended)"
 '''
 
 # Configure logging
@@ -1001,6 +1020,71 @@ def inspect_restore(module: AnsibleModule, client: PXBackupClient) -> Dict[str, 
                 error_msg = f"API returned status code {e.response.status_code}: {error_msg}"
         module.fail_json(msg=f"Failed to inspect restore: {error_msg}")
 
+def get_cr_download_location(module: AnsibleModule, client: PXBackupClient) -> Dict[str, Any]:
+    """
+    Fetch the CR download location for a restore.
+
+    The px-backup handler returns a proto oneof — exactly one of two branches is
+    populated per call:
+
+    - S3-family (S3, Azure Blob, GCS): 'signed_url' with a short-lived presigned
+      URL and 'expires_at' timestamp. The playbook can then fetch the URL with
+      ansible.builtin.get_url or an equivalent HTTP client. px-backup is off the
+      data path.
+    - NFS: 'nfs_location' with server, export_path, file_path and mount_options.
+      The playbook mounts the export itself.
+
+    Server-side gates that can cause this call to fail:
+    - Restore is not in a terminal state (InProgress/Pending) -> FailedPrecondition
+    - Restore succeeded (nothing to download) -> FailedPrecondition
+    - No CR uploaded (restore did not meet stork's upload conditions) -> NotFound
+    - BackupLocation was deleted after the restore -> FailedPrecondition
+    - Encrypted-BL uploads from pre-3.2.0 stork -> FailedPrecondition
+    """
+    try:
+        params = {}
+        uid = module.params.get('uid')
+        if uid:
+            params['uid'] = uid
+        expiry_seconds = module.params.get('expiry_seconds')
+        if expiry_seconds is not None:
+            params['expiry_seconds'] = expiry_seconds
+
+        response = client.make_request(
+            'GET',
+            f"v1/restore/{module.params['org_id']}/{module.params['name']}/crDownloadLocation",
+            params=params
+        )
+
+        module.debug(f"API Response: {response}")
+
+        if not response:
+            module.fail_json(
+                msg=(
+                    f"No CR download location returned for restore {module.params['name']}. "
+                    "The restore may not be in a terminal state, may have succeeded fully, "
+                    "or the CR may not have been uploaded by stork."
+                )
+            )
+
+        return {
+            'location': response,
+            'message': "Successfully retrieved restore CR download location",
+            'changed': False
+        }
+
+    except Exception as e:
+        error_msg = str(e)
+        if isinstance(e, requests.exceptions.RequestException) and hasattr(e, 'response'):
+            try:
+                error_detail = e.response.json()
+                error_msg = f"{error_msg}: {error_detail}"
+            except ValueError:
+                error_msg = f"{error_msg}: {e.response.text}"
+            if hasattr(e.response, 'status_code'):
+                error_msg = f"API returned status code {e.response.status_code}: {error_msg}"
+        module.fail_json(msg=f"Failed to get restore CR download location: {error_msg}")
+
 def handle_api_error(e: Exception, operation: str) -> str:
     """
     Handle API errors and format error message
@@ -1071,6 +1155,15 @@ def perform_operation(module: AnsibleModule, client: PXBackupClient, operation: 
                 message="Restore deleted successfully"
             )
 
+        elif operation == 'GET_CR_DOWNLOAD_LOCATION':
+            result = get_cr_download_location(module, client)
+            return OperationResult(
+                success=True,
+                changed=False,
+                data=result,
+                message="Successfully retrieved restore CR download location"
+            )
+
     except Exception as e:
         logger.exception(f"Operation {operation} failed")
         return OperationResult(
@@ -1092,6 +1185,7 @@ def run_module():
                 'DELETE',
                 'INSPECT_ONE',
                 'INSPECT_ALL',
+                'GET_CR_DOWNLOAD_LOCATION',
             ]
         ),
         name=dict(type='str', required=False),
@@ -1341,6 +1435,10 @@ def run_module():
             description='Filter to use resource name and namespace. Any restore that contains the resource will be returned'
         ),
 
+        # GET_CR_DOWNLOAD_LOCATION option — signed URL TTL for S3-family BLs.
+        # Server clamps to [60, 604800]; 0/unset uses the server default (1800s).
+        expiry_seconds=dict(type='int', required=False),
+
         # SSL cert implementation
         ssl_config=dict(
             type='dict',
@@ -1371,6 +1469,8 @@ def run_module():
         'INSPECT_ONE': ['name', 'org_id'],
 
         'INSPECT_ALL': ['org_id'],
+
+        'GET_CR_DOWNLOAD_LOCATION': ['name', 'org_id'],
     }
 
     module = AnsibleModule(
@@ -1385,6 +1485,8 @@ def run_module():
             ('operation', 'INSPECT_ONE', ['name', 'org_id']),
 
             ('operation', 'INSPECT_ALL', ['org_id']),
+
+            ('operation', 'GET_CR_DOWNLOAD_LOCATION', ['name', 'org_id']),
 
             ('is_sfr', True, ['file_level_restore_info']),
         ]
