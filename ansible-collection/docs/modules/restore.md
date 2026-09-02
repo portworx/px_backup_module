@@ -31,6 +31,7 @@ The module supports the following operations:
 | INSPECT_ONE              | Get details of a specific restore                                                               |
 | INSPECT_ALL              | List all restore operations                                                                     |
 | GET_CR_DOWNLOAD_LOCATION | Get access details (signed URL or NFS metadata) for the restore CR JSON stored on the BackupLocation |
+| GET_RESTORE_RESOURCE_DETAILS | Get paginated/filtered restore resource details (per-VM restore status, volumes and resources) |
 
 ## Parameters
 
@@ -151,6 +152,18 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 | ----------------- | --------- | ---------- | --------- | --------------------------------------------------------------------------------------------------- |
 | expiry_seconds  | integer | no       |         | Requested TTL of the signed URL (S3-family only). Server clamps to `[60, 604800]`; 0/unset uses the server default (1800). Ignored for NFS BackupLocations. |
 
+### Restore Resource Details Parameters
+
+Used by `GET_RESTORE_RESOURCE_DETAILS`. `namespace_filter` and `virtual_machine_restore_filter` are mutually exclusive (a `oneof` on the API).
+
+| Parameter                     | Type    | Required | Description                                                                                       |
+| ------------------------------- | --------- | ---------- | --------------------------------------------------------------------------------------------------- |
+| namespace_filter                | dict    | no       | Namespace-based filter (`namespace_name_pattern`, `include_namespaces`/`exclude_namespaces`, `include_resources`/`exclude_resources`, `gvks`, `resource_name_pattern`) |
+| virtual_machine_restore_filter  | dict    | no       | VM-based filter (`vm_name_pattern`, `os_name`, `include_vms`/`exclude_vms` with `name` + `namespace`)   |
+| resource_status_filter          | list    | no       | Filter resources by status (e.g. `["Success", "Failed"]`). Default is `["Success"]` when empty        |
+| max_objects                     | integer | no       | Maximum number of entries to return                                                                  |
+| object_index                    | integer | no       | Pagination cursor — object index from which to start fetching                                       |
+
 ## Examples
 
 ### Standard Restore
@@ -257,6 +270,30 @@ For a restore in `PartialSuccess` or `Failed`, ask px-backup for the location of
 ```
 
 For an NFS BackupLocation the response instead contains `location.nfs_location` with `server`, `export_path`, `file_path`, and `mount_options` — the caller is expected to mount the export themselves and read the file at `file_path`.
+
+### Get Restore Resource Details
+
+Returns paginated/filtered restore resource details — per-VM restore status with each VM's owned volumes and resources grouped and counted. Mirrors the backup module's `GET_BACKUP_RESOURCE_DETAILS`.
+
+```yaml
+- name: Get restore resource details with VM filtering
+  restore:
+    operation: GET_RESTORE_RESOURCE_DETAILS
+    api_url: "{{ px_backup_api_url }}"
+    token: "{{ px_backup_token }}"
+    org_id: "{{ org_id }}"
+    name: "vm-restore"
+    uid: "restore-uid"
+    virtual_machine_restore_filter:
+      vm_name_pattern: "vm-prod-*"
+      include_vms:
+        - name: "vm-1"
+          namespace: "production"
+    resource_status_filter: ["Success", "Failed"]
+    max_objects: 100
+    object_index: 0
+  register: restore_details
+```
 
 ## Error Handling
 
