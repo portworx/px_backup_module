@@ -20,6 +20,7 @@ import typing
 from typing import Dict, List, Tuple, Optional, Any, Union
 import logging
 from dataclasses import dataclass
+from datetime import datetime
 
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.purepx.px_backup.plugins.module_utils.px_backup.api import PXBackupClient
@@ -31,6 +32,13 @@ BACKUP_OBJECT_TYPE_MAP = {
     'All': 1,
     'VirtualMachine': 2
 }
+
+# Parameters that, when provided, switch DELETE into bulk (POST) mode
+BULK_DELETE_PARAMS = [
+    'include_objects', 'exclude_objects', 'include_filter',
+    'exclude_filter', 'backup_location_ref_filter', 'cluster_scope',
+    'backup_delete_enumerate_options'
+]
 
 DOCUMENTATION = r'''
 ---
@@ -53,7 +61,7 @@ options:
             - "Operation to perform on the backup"
             - " - CREATE: creates a new backup"
             - " - UPDATE: modifies an existing backup"
-            - " - DELETE: removes a backup"
+            - " - DELETE: removes a backup (single or bulk)"
             - " - INSPECT_ONE: retrieves details of a specific backup"
             - " - INSPECT_ALL: lists all backups"
             - " - UPDATE_BACKUP_SHARE: updates backup sharing settings"
@@ -441,6 +449,212 @@ options:
         required: false
         default: false
 
+    acknowledge:
+        description:
+            - Explicit confirmation required for a bulk delete to proceed.
+            - A bulk delete (any of include_objects, exclude_objects, include_filter,
+              exclude_filter, backup_location_ref_filter, cluster_scope or
+              backup_delete_enumerate_options) is rejected unless this is set to true,
+              since it can remove many backups at once.
+            - Ignored for a single-backup delete by name.
+            - Only applicable for DELETE operation.
+        type: bool
+        required: false
+        default: false
+        version_added: "3.2.0"
+
+    include_objects:
+        description:
+            - List of exact backups to include in a bulk delete
+            - Each entry must provide at least a name or a uid
+            - The UID identifies the exact backup when multiple backups share a name
+            - Mutually exclusive with include_filter and with exclude_objects
+            - Only applicable for DELETE operation
+        type: list
+        elements: dict
+        required: false
+        version_added: "3.2.0"
+        suboptions:
+            name:
+                description: Name of the backup
+                type: str
+            uid:
+                description: UID of the backup
+                type: str
+
+    exclude_objects:
+        description:
+            - List of exact backups to exclude from a bulk delete
+            - Each entry must provide at least a name or a uid
+            - The UID identifies the exact backup when multiple backups share a name
+            - Mutually exclusive with exclude_filter and with include_objects
+            - Only applicable for DELETE operation
+        type: list
+        elements: dict
+        required: false
+        version_added: "3.2.0"
+        suboptions:
+            name:
+                description: Name of the backup
+                type: str
+            uid:
+                description: UID of the backup
+                type: str
+
+    include_filter:
+        description:
+            - Case-insensitive regex matched against backup names to include in a bulk delete
+            - 'Use ".*" to match all backups (a literal "*" is not a valid regex)'
+            - Mutually exclusive with include_objects
+            - Only applicable for DELETE operation
+        type: str
+        required: false
+        version_added: "3.2.0"
+
+    exclude_filter:
+        description:
+            - Case-insensitive regex matched against backup names to exclude from a bulk delete
+            - 'Use ".*" to match all backups (a literal "*" is not a valid regex)'
+            - Mutually exclusive with exclude_objects
+            - Only applicable for DELETE operation
+        type: str
+        required: false
+        version_added: "3.2.0"
+
+    backup_location_ref_filter:
+        description:
+            - List of backup location references to filter backups by during a bulk delete
+            - Only applicable for DELETE operation
+        type: list
+        elements: dict
+        required: false
+        version_added: "3.2.0"
+        suboptions:
+            name:
+                description: Name of the backup location
+                type: str
+                required: true
+            uid:
+                description: UID of the backup location
+                type: str
+
+    cluster_scope:
+        description:
+            - Cluster scope configuration to filter backups by during a bulk delete
+            - Only applicable for DELETE operation
+        type: dict
+        required: false
+        version_added: "3.2.0"
+        suboptions:
+            cluster_refs:
+                description: List of cluster references
+                type: list
+                elements: dict
+                suboptions:
+                    name:
+                        description: Name of the cluster
+                        type: str
+                        required: true
+                    uid:
+                        description: UID of the cluster
+                        type: str
+            all_clusters:
+                description: Apply the bulk delete to backups across all clusters
+                type: bool
+
+    backup_delete_enumerate_options:
+        description:
+            - Advanced filters that narrow which backups a bulk delete removes
+            - Nested because most of these names already exist as top-level parameters
+              used by CREATE and INSPECT_ALL
+            - Not copy-paste compatible with the INSPECT_ALL filters, tempting as it
+              looks. The status filter is 'statuses' here and takes only the values
+              listed below, where INSPECT_ALL takes free-form 'status' strings, and
+              'backup_object_type' is a dict here where INSPECT_ALL takes a string
+            - Providing any filter here selects a bulk delete, so a filters-only
+              request (for example statuses=Failed with no include_filter) is valid
+              and deletes every backup matching the filters
+            - Only applicable for DELETE operation
+        type: dict
+        required: false
+        version_added: "3.2.0"
+        suboptions:
+            labels:
+                description: Label selectors used to filter the backups to delete
+                type: dict
+            time_range:
+                description:
+                    - Restrict the delete to backups created within a time range
+                    - Timestamps are RFC3339, for example "2026-01-01T00:00:00Z"
+                type: dict
+                suboptions:
+                    start_time:
+                        description: Start of the time range
+                        type: str
+                    end_time:
+                        description: End of the time range
+                        type: str
+            owners:
+                description: Filter the backups to delete by owner UIDs
+                type: list
+                elements: str
+            backup_object_type:
+                description: Filter the backups to delete by backup object type
+                type: dict
+                suboptions:
+                    type:
+                        description: Type of backup object
+                        type: str
+                        required: true
+                        choices:
+                            - Invalid
+                            - All
+                            - VirtualMachine
+            statuses:
+                description:
+                    - Filter the backups to delete by backup status
+                    - 'For example: ["Failed", "PartialSuccess"]'
+                    - Note this is 'statuses', not the free-form 'status' list used
+                      by INSPECT_ALL, and only the values below are accepted
+                type: list
+                elements: str
+                choices:
+                    - Invalid
+                    - Pending
+                    - InProgress
+                    - Aborted
+                    - Failed
+                    - Deleting
+                    - Success
+                    - Captured
+                    - PartialSuccess
+                    - DeletePending
+                    - CloudBackupMissing
+            schedule_policy_ref:
+                description: Filter the backups to delete by schedule policy references
+                type: list
+                elements: dict
+                suboptions:
+                    name:
+                        description: Name of the schedule policy
+                        type: str
+                        required: true
+                    uid:
+                        description: UID of the schedule policy
+                        type: str
+            backup_schedule_ref:
+                description: Filter the backups to delete by backup schedule references
+                type: list
+                elements: dict
+                suboptions:
+                    name:
+                        description: Name of the backup schedule
+                        type: str
+                        required: true
+                    uid:
+                        description: UID of the backup schedule
+                        type: str
+
     force_resync:
         description: Force resync of failed sync process for GET_BACKUP_RESOURCE_DETAILS operation
         type: bool
@@ -688,6 +902,98 @@ EXAMPLES = r'''
     uid: "backup-uid"
     skip_vm_auto_exec_rules: true
 
+# Bulk delete backups matching a name regex, excluding specific backups
+# NOTE: include_filter/exclude_filter are case-insensitive regex; use ".*" to match all
+# NOTE: bulk delete requires acknowledge: true to confirm the operation
+- name: Bulk delete backups
+  backup:
+    operation: DELETE
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    org_id: "default"
+    acknowledge: true
+    include_filter: ".*test.*"
+    exclude_filter: "^keep-"
+    cluster_scope:
+      all_clusters: true
+
+# Bulk delete an explicit list of backups (uid-only entries are also valid)
+- name: Bulk delete specific backups
+  backup:
+    operation: DELETE
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    org_id: "default"
+    acknowledge: true
+    include_objects:
+      - name: "backup-1"
+        uid: "backup-uid-1"
+      - uid: "backup-uid-2"
+
+# Bulk delete backups filtered by backup location
+- name: Bulk delete backups in a backup location
+  backup:
+    operation: DELETE
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    org_id: "default"
+    acknowledge: true
+    include_filter: ".*"
+    backup_location_ref_filter:
+      - name: "s3-location"
+        uid: "location-uid"
+    cluster_scope:
+      cluster_refs:
+        - name: "prod-cluster"
+          uid: "cluster-uid"
+
+# Bulk delete every failed backup, using the advanced filters alone.
+# NOTE: no include_filter is needed; the filters themselves select the backups
+- name: Bulk delete failed backups
+  backup:
+    operation: DELETE
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    org_id: "default"
+    acknowledge: true
+    backup_delete_enumerate_options:
+      statuses:
+        - "Failed"
+
+# Bulk delete backups created in a time range, narrowed by label and object type
+- name: Bulk delete backups by time range
+  backup:
+    operation: DELETE
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    org_id: "default"
+    acknowledge: true
+    include_filter: ".*"
+    backup_delete_enumerate_options:
+      time_range:
+        start_time: "2026-01-01T00:00:00Z"
+        end_time: "2026-03-31T23:59:59Z"
+      labels:
+        environment: "staging"
+      backup_object_type:
+        type: "VirtualMachine"
+
+# Bulk delete backups produced by a specific schedule
+- name: Bulk delete backups from a backup schedule
+  backup:
+    operation: DELETE
+    api_url: "https://px-backup.example.com"
+    token: "{{ px_backup_token }}"
+    org_id: "default"
+    acknowledge: true
+    backup_delete_enumerate_options:
+      backup_schedule_ref:
+        - name: "nightly-schedule"
+          uid: "schedule-uid"
+      statuses:
+        - "Failed"
+        - "PartialSuccess"
+
 # Create backup with custom SSL certificates
 - name: Create backup with mutual TLS
   backup:
@@ -881,6 +1187,156 @@ def validate_params(params: Dict[str, Any], operation: str, required_params: Lis
     if missing:
         raise ValidationError(
             f"Operation '{operation}' requires parameters: {', '.join(missing)}")
+
+
+def build_delete_enumerate_options(params: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Build the backup_delete_enumerate_options payload for a bulk delete.
+
+    AnsibleModule materialises every declared suboption as None once the parent
+    dict is supplied, so the empty values are stripped here to avoid sending a
+    request body full of nulls.
+
+    Note that 'backup_object_type' is passed through as a nested dict rather than
+    flattened to a scalar the way enumerate_backups() does it. The two are not
+    interchangeable: EnumerateOptions.backup_object_type is a plain string, while
+    BackupDeleteEnumerateOptions.backup_object_type is a BackupObjectType message
+    carrying a 'type' enum.
+
+    Returns:
+        The cleaned filter options, or an empty dict if no filter was actually set
+    """
+    raw = params.get('backup_delete_enumerate_options')
+    if not raw:
+        return {}
+
+    # None-strip first so an all-defaults dict collapses to nothing
+    options = {key: value for key, value in raw.items() if value}
+
+    if options.get('time_range'):
+        options['time_range'] = {
+            key: value for key, value in options['time_range'].items() if value
+        }
+
+    # Drop anything the None-strip above emptied out
+    return {key: value for key, value in options.items() if value}
+
+
+def is_bulk_delete(params: Dict[str, Any]) -> bool:
+    """
+    Determine whether a DELETE request should use the bulk (POST) endpoint.
+
+    A nested dict parameter is truthy even when every suboption defaulted to
+    None, so backup_delete_enumerate_options is measured by its cleaned payload
+    rather than by its raw presence.
+    """
+    for param in BULK_DELETE_PARAMS:
+        if param == 'backup_delete_enumerate_options':
+            if build_delete_enumerate_options(params):
+                return True
+        elif params.get(param):
+            return True
+    return False
+
+
+def parse_timestamp(value: str) -> Optional[datetime]:
+    """
+    Best-effort parse of an RFC3339 timestamp for local validation.
+
+    Returns None when the value cannot be parsed, leaving the authoritative
+    check to the server rather than rejecting a format it would have accepted.
+    """
+    if not isinstance(value, str):
+        return None
+    try:
+        return datetime.fromisoformat(value.strip().replace('Z', '+00:00'))
+    except ValueError:
+        return None
+
+
+def validate_delete_params(params: Dict[str, Any]) -> None:
+    """
+    Validate parameters for the DELETE operation.
+
+    Mirrors the px-backup BackupDelete contract for single vs bulk delete:
+    - A single delete is selected by 'name' and must not be combined with any
+      bulk selector.
+    - A bulk delete is selected by include/exclude objects or filters, backup
+      location references, cluster scope or the advanced filter options in
+      backup_delete_enumerate_options, and must not provide 'name'.
+    - A bulk delete must set acknowledge=true to confirm the (potentially
+      wide-reaching) operation before it proceeds.
+    - include_objects and include_filter are mutually exclusive.
+    - exclude_objects and exclude_filter are mutually exclusive.
+    - include_objects and exclude_objects cannot be combined.
+    - Each include/exclude object must have at least a name or a uid.
+    - A backup_delete_enumerate_options time_range must not end before it starts.
+
+    Raises:
+        ValidationError: If validation fails
+    """
+    has_bulk_params = is_bulk_delete(params)
+    # Derived from BULK_DELETE_PARAMS so the messages cannot drift from the list
+    bulk_selectors = '/'.join(BULK_DELETE_PARAMS)
+
+    if not params.get('name') and not has_bulk_params:
+        raise ValidationError(
+            f"Operation 'DELETE' requires 'name' for single delete, or one of "
+            f"{bulk_selectors} for bulk delete"
+        )
+
+    # name and bulk selectors are mutually exclusive (matches server contract)
+    if params.get('name') and has_bulk_params:
+        raise ValidationError(
+            f"'name' is for single delete and cannot be combined with bulk delete "
+            f"selectors ({bulk_selectors})"
+        )
+
+    if not has_bulk_params:
+        return
+
+    # Bulk delete can remove many backups in a single request, so require the
+    # caller to explicitly confirm intent and guard against accidental mass deletion
+    if not params.get('acknowledge'):
+        raise ValidationError(
+            "bulk delete can remove many backups in a single request, so it "
+            "requires 'acknowledge: true' to explicitly confirm intent and "
+            "guard against accidental mass deletion")
+
+    # Bulk delete mutual-exclusivity rules
+    if params.get('include_objects') and params.get('include_filter'):
+        raise ValidationError(
+            "only one of include_objects or include_filter should be set")
+
+    if params.get('exclude_objects') and params.get('exclude_filter'):
+        raise ValidationError(
+            "only one of exclude_objects or exclude_filter should be set")
+
+    if params.get('include_objects') and params.get('exclude_objects'):
+        raise ValidationError(
+            "include_objects and exclude_objects cannot be combined; use "
+            "include_objects with exclude_filter, or exclude_objects alone")
+
+    # Each include/exclude object must carry at least a name or a uid
+    for field in ('include_objects', 'exclude_objects'):
+        for obj in params.get(field) or []:
+            if not obj.get('name') and not obj.get('uid'):
+                raise ValidationError(
+                    f"each entry in {field} must have at least a name or a uid")
+
+    # A reversed time range silently matches nothing, so catch it before the
+    # request is sent rather than reporting a successful delete of zero backups.
+    # Comparing a naive against an offset-aware timestamp raises, so the check is
+    # skipped when the two differ and the server remains the authority.
+    time_range = build_delete_enumerate_options(params).get('time_range') or {}
+    start_time = parse_timestamp(time_range.get('start_time'))
+    end_time = parse_timestamp(time_range.get('end_time'))
+    comparable = (start_time and end_time
+                  and (start_time.tzinfo is None) == (end_time.tzinfo is None))
+    if comparable and end_time < start_time:
+        raise ValidationError(
+            "backup_delete_enumerate_options.time_range.end_time must not be "
+            "earlier than start_time")
 
 
 def build_backup_request(params: Dict[str, Any]) -> Dict[str, Any]:
@@ -1268,32 +1724,107 @@ def inspect_backup(module: AnsibleModule, client: PXBackupClient) -> Dict[str, A
 
 
 def delete_backup(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict[str, Any], bool]:
-    """Delete a backup"""
-    try:
-        # Build delete request parameters
-        params = {
-            'uid': module.params.get('uid', '')
-        }
-        
-        # Add cluster information
-        if module.params.get('cluster'):
-            params['cluster'] = module.params['cluster']
-        
-        if module.params.get('cluster_ref'):
-            params['cluster_ref'] = {}
-            if module.params['cluster_ref'].get('name'):
-                params['cluster_ref.name'] = module.params['cluster_ref']['name']
-            if module.params['cluster_ref'].get('uid'):
-                params['cluster_ref.uid'] = module.params['cluster_ref']['uid']
+    """Delete a backup
 
-        # Add force flag for metadata-only deletion
-        if module.params.get('force'):
-            params['force'] = 'true'
+    Supports two modes:
+    - Single delete: removes a single backup identified by name (and optional uid)
+      using the DELETE endpoint.
+    - Bulk delete: removes multiple backups matched by include/exclude objects,
+      include/exclude filters, backup location references, cluster scope or the
+      advanced filters in backup_delete_enumerate_options, using the POST
+      endpoint (v1/backup/{org_id}/delete).
+    """
+    params = module.params
+
+    # Bulk delete is triggered when any of the bulk-only selection parameters
+    # are provided. Otherwise we fall back to the single-backup DELETE endpoint.
+    is_bulk = is_bulk_delete(params)
+
+    try:
+        if not is_bulk:
+            # Build delete request parameters for single backup delete
+            request_params = {
+                'uid': params.get('uid', '')
+            }
+
+            # Add cluster information
+            if params.get('cluster'):
+                request_params['cluster'] = params['cluster']
+
+            if params.get('cluster_ref'):
+                request_params['cluster_ref'] = {}
+                if params['cluster_ref'].get('name'):
+                    request_params['cluster_ref.name'] = params['cluster_ref']['name']
+                if params['cluster_ref'].get('uid'):
+                    request_params['cluster_ref.uid'] = params['cluster_ref']['uid']
+
+            # Add force flag for metadata-only deletion
+            if params.get('force'):
+                request_params['force'] = 'true'
+
+            response = client.make_request(
+                'DELETE',
+                f"v1/backup/{params['org_id']}/{params['name']}",
+                params=request_params
+            )
+            return response, True
+
+        # Bulk delete via POST endpoint.
+        # validate_delete_params() already rejected the request unless
+        # acknowledge=true, so this is always true here; forward the actual
+        # value so the server also gates on it.
+        delete_request = {
+            "org_id": params['org_id'],
+            "name": params.get('name', ''),
+            "acknowledge": params.get('acknowledge', False)
+        }
+
+        if params.get('uid'):
+            delete_request['uid'] = params['uid']
+
+        if params.get('cluster'):
+            delete_request['cluster'] = params['cluster']
+
+        if params.get('cluster_ref'):
+            delete_request['cluster_ref'] = params['cluster_ref']
+
+        if params.get('force'):
+            delete_request['force'] = params['force']
+
+        if params.get('include_objects'):
+            delete_request['include_objects'] = params['include_objects']
+
+        if params.get('exclude_objects'):
+            delete_request['exclude_objects'] = params['exclude_objects']
+
+        if params.get('include_filter'):
+            delete_request['include_filter'] = params['include_filter']
+
+        if params.get('exclude_filter'):
+            delete_request['exclude_filter'] = params['exclude_filter']
+
+        if params.get('backup_location_ref_filter'):
+            delete_request['backup_location_ref'] = params['backup_location_ref_filter']
+
+        # Add cluster_scope support
+        if params.get('cluster_scope'):
+            cluster_scope = params['cluster_scope']
+            delete_request['cluster_scope'] = {}
+            if cluster_scope.get('cluster_refs'):
+                delete_request['cluster_scope']['cluster_refs'] = {"refs": cluster_scope['cluster_refs']}
+            elif cluster_scope.get('all_clusters'):
+                delete_request['cluster_scope']['all_clusters'] = cluster_scope['all_clusters']
+
+        # Add the advanced filter options, already None-stripped and with
+        # backup_object_type flattened to the scalar the API expects
+        enumerate_options = build_delete_enumerate_options(params)
+        if enumerate_options:
+            delete_request['backup_delete_enumerate_options'] = enumerate_options
 
         response = client.make_request(
-            'DELETE',
-            f"v1/backup/{module.params['org_id']}/{module.params['name']}",
-            params=params
+            'POST',
+            f"v1/backup/{params['org_id']}/delete",
+            data=delete_request
         )
         return response, True
     except Exception as e:
@@ -1797,6 +2328,110 @@ def run_module():
 
         # Delete options
         force=dict(type='bool', required=False, default=False),
+        acknowledge=dict(type='bool', required=False, default=False),
+
+        # Bulk delete options
+        include_objects=dict(
+            type='list',
+            elements='dict',
+            required=False,
+            options=dict(
+                name=dict(type='str', required=False),
+                uid=dict(type='str', required=False)
+            )
+        ),
+        exclude_objects=dict(
+            type='list',
+            elements='dict',
+            required=False,
+            options=dict(
+                name=dict(type='str', required=False),
+                uid=dict(type='str', required=False)
+            )
+        ),
+        include_filter=dict(type='str', required=False),
+        exclude_filter=dict(type='str', required=False),
+        backup_location_ref_filter=dict(
+            type='list',
+            elements='dict',
+            required=False,
+            options=dict(
+                name=dict(type='str', required=True),
+                uid=dict(type='str', required=False)
+            )
+        ),
+        cluster_scope=dict(
+            type='dict',
+            required=False,
+            options=dict(
+                cluster_refs=dict(
+                    type='list',
+                    elements='dict',
+                    options=dict(
+                        name=dict(type='str', required=True),
+                        uid=dict(type='str', required=False)
+                    )
+                ),
+                all_clusters=dict(type='bool')
+            )
+        ),
+        # Advanced bulk delete filters. Nested rather than flattened because six
+        # of these names (labels, owners, status, backup_object_type,
+        # schedule_policy_ref, backup_schedule_ref) already exist as top-level
+        # params shared by CREATE and INSPECT_ALL.
+        backup_delete_enumerate_options=dict(
+            type='dict',
+            required=False,
+            options=dict(
+                labels=dict(type='dict'),
+                time_range=dict(
+                    type='dict',
+                    options=dict(
+                        start_time=dict(type='str'),
+                        end_time=dict(type='str')
+                    )
+                ),
+                owners=dict(type='list', elements='str'),
+                backup_object_type=dict(
+                    type='dict',
+                    options=dict(
+                        type=dict(
+                            type='str',
+                            required=True,
+                            choices=['Invalid', 'All', 'VirtualMachine']
+                        )
+                    )
+                ),
+                # 'statuses' (not 'status') and constrained to the
+                # BackupInfo.StatusInfo.Status enum, unlike the free-form
+                # 'status' strings accepted by INSPECT_ALL
+                statuses=dict(
+                    type='list',
+                    elements='str',
+                    choices=[
+                        'Invalid', 'Pending', 'InProgress', 'Aborted', 'Failed',
+                        'Deleting', 'Success', 'Captured', 'PartialSuccess',
+                        'DeletePending', 'CloudBackupMissing'
+                    ]
+                ),
+                schedule_policy_ref=dict(
+                    type='list',
+                    elements='dict',
+                    options=dict(
+                        name=dict(type='str', required=True),
+                        uid=dict(type='str', required=False)
+                    )
+                ),
+                backup_schedule_ref=dict(
+                    type='list',
+                    elements='dict',
+                    options=dict(
+                        name=dict(type='str', required=True),
+                        uid=dict(type='str', required=False)
+                    )
+                )
+            )
+        ),
 
         # Enhanced GetBackupResourceDetails options
         force_resync=dict(type='bool', required=False, default=False),
@@ -1895,7 +2530,10 @@ def run_module():
 
         'UPDATE': ['name'],
 
-        'DELETE': ['name'],
+        # DELETE requires 'name' for single delete, but bulk delete may instead
+        # be driven by include/exclude objects or filters. This is validated
+        # separately below.
+        'DELETE': [],
 
         'INSPECT_ONE': ['name'],
 
@@ -1917,8 +2555,6 @@ def run_module():
 
             ('operation', 'UPDATE', ['name']),
 
-            ('operation', 'DELETE', ['name']),
-
             ('operation', 'INSPECT_ONE', ['name']),
             
             ('operation', 'INSPECT_ALL', ['org_id']),
@@ -1938,6 +2574,12 @@ def run_module():
         operation = module.params['operation']
         validate_params(module.params, operation,
                         operation_requirements[operation])
+
+        # DELETE supports both single delete (requires 'name') and bulk delete
+        # (driven by include/exclude objects or filters). Validate the request
+        # shape against the px-backup BackupDelete contract.
+        if operation == 'DELETE':
+            validate_delete_params(module.params)
 
         if module.check_mode:
             module.exit_json(**result)

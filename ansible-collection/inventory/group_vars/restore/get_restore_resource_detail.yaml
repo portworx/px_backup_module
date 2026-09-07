@@ -1,0 +1,36 @@
+# ansible-collection/inventory/group_vars/restore/get_restore_resource_detail.yaml
+
+restore_name: "restore-1"
+restore_uid: "restore-1-uid"
+
+# Pagination options (optional)
+max_objects: 100
+object_index: 0
+
+# Resource status filtering
+resource_status_filter:
+  - "Success"
+  - "Failed"
+
+# Namespace filtering example
+# NOTE: namespace_filter and virtual_machine_restore_filter are mutually exclusive
+# Use only one of them in a single request
+namespace_filter:
+  namespace_name_pattern: "prod-*"
+  include_namespaces: # use either include_namespaces or exclude_namespaces
+    - "production"
+    - "staging"
+  gvks:
+    - "apps/v1/Deployment"
+    - "v1/Pod"
+    - "v1/Service"
+  resource_name_pattern: "config*"
+
+# Virtual machine filtering example (comment out namespace_filter above to use this)
+# virtual_machine_restore_filter:
+#   vm_name_pattern: "vm-prod-*"
+#   os_name:
+#     - "ubuntu"
+#   include_vms: # mutually exclusive with exclude_vms
+#     - name: "vm-1"
+#       namespace: "production"
