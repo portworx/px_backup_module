@@ -16,6 +16,14 @@ BACKUP_OBJECT_TYPE_MAP = {
     'NS': 1   # Alias for All (namespace backup)
 }
 
+# Maps the user-facing run-state to the BackupScheduleRunState enum name the
+# REST/gRPC-gateway expects (delete-only bulk selector, new in 3.2.0).
+BACKUP_SCHEDULE_RUN_STATE_MAP = {
+    'Invalid': 'BackupScheduleRunStateInvalid',
+    'Running': 'BackupScheduleRunStateRunning',
+    'Suspended': 'BackupScheduleRunStateSuspended',
+}
+
 
 DOCUMENTATION = r'''
 ---
@@ -507,6 +515,35 @@ options:
                     uid:
                         description: Volume Resource Only policy UID
                         type: str
+            owners:
+                description:
+                    - Select schedules owned by any of these owner UIDs (Super Admin only).
+                    - Applies to both bulk UPDATE and DELETE.
+                type: list
+                elements: str
+                version_added: '3.2.0'
+            backup_location_refs:
+                description:
+                    - Select schedules that use any of these backup locations.
+                    - Applies to both bulk UPDATE and DELETE.
+                type: list
+                elements: dict
+                version_added: '3.2.0'
+                suboptions:
+                    name:
+                        description: Backup location name
+                        type: str
+                        required: true
+                    uid:
+                        description: Backup location UID
+                        type: str
+            status:
+                description:
+                    - Select schedules by run state. Applies to bulk DELETE only
+                      (ignored for UPDATE/suspend/resume).
+                type: str
+                choices: ['Invalid', 'Running', 'Suspended']
+                version_added: '3.2.0'
 
 requirements:
     - python >= 3.9
@@ -830,8 +867,9 @@ def delete_backup_schedules(module, client):
                 elif cluster_scope.get('all_clusters'):
                     delete_request["cluster_scope"]["all_clusters"] = cluster_scope['all_clusters']
 
-            # Bulk selector narrowing which schedules the delete acts on (3.1.1+)
-            filter_options = build_backup_schedule_filter_options(module)
+            # Bulk selector narrowing which schedules the delete acts on (3.1.1+;
+            # owners/backup_location_refs/status added in 3.2.0)
+            filter_options = build_backup_schedule_filter_options(module, for_delete=True)
             if filter_options:
                 delete_request["filter_options"] = filter_options
 
@@ -844,25 +882,41 @@ def delete_backup_schedules(module, client):
         except Exception as e:
             handle_request_exception(e, module, "delete backup schedule")
 
-def build_backup_schedule_filter_options(module):
+def build_backup_schedule_filter_options(module, for_delete=False):
     """Build the nested filter_options wrapper used to narrow which backup
     schedules a bulk update/delete acts on.
 
     The API double-wraps the common BackupScheduleFilterOptions inside a
     request-specific BackupSchedule{Update,Delete}FilterOptions, so the wire
-    format is filter_options -> filter_options -> volume_resource_only_policy_ref.
-    Returns None (so the request omits filter_options entirely) when no
-    selectors are provided.
+    format is filter_options -> filter_options -> {selectors}. The shared inner
+    selectors (volume_resource_only_policy_ref, owners, backup_location_refs)
+    apply to both update and delete; ``status`` (run state) is a delete-only
+    selector that sits alongside the inner block, so it is emitted only when
+    ``for_delete`` is set. Returns None (so the request omits filter_options
+    entirely) when no selectors are provided.
     """
     filter_options = module.params.get('filter_options') or {}
-    vro_refs = filter_options.get('volume_resource_only_policy_ref')
-    if not vro_refs:
-        return None
-    return {
-        "filter_options": {
-            "volume_resource_only_policy_ref": vro_refs
-        }
-    }
+
+    # Shared selectors common to update and delete
+    shared = {}
+    if filter_options.get('volume_resource_only_policy_ref'):
+        shared["volume_resource_only_policy_ref"] = filter_options['volume_resource_only_policy_ref']
+    if filter_options.get('owners'):
+        shared["owners"] = filter_options['owners']
+    if filter_options.get('backup_location_refs'):
+        shared["backup_location_refs"] = filter_options['backup_location_refs']
+
+    wrapper = {}
+    if shared:
+        wrapper["filter_options"] = shared
+
+    # Delete-only run-state selector (sibling of the shared inner block)
+    if for_delete:
+        status = filter_options.get('status')
+        if status and status != 'Invalid':
+            wrapper["status"] = BACKUP_SCHEDULE_RUN_STATE_MAP.get(status, status)
+
+    return wrapper or None
 
 def backup_schedule_request_body(module):
     """Build the backup schedule request object"""
@@ -1196,7 +1250,19 @@ def run_module():
                         name=dict(type='str', required=True),
                         uid=dict(type='str', required=False)
                     )
-                )
+                ),
+                # New in 3.2.0 - additional bulk selectors
+                owners=dict(type='list', elements='str', required=False),
+                backup_location_refs=dict(
+                    type='list',
+                    elements='dict',
+                    options=dict(
+                        name=dict(type='str', required=True),
+                        uid=dict(type='str', required=False)
+                    )
+                ),
+                status=dict(type='str', required=False,
+                            choices=['Invalid', 'Running', 'Suspended']),
             )
         ),
 

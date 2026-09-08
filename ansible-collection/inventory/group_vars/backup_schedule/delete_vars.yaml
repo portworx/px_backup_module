@@ -13,3 +13,26 @@ schedule_deletes:
     backup_object_type:
       type: "VM"  # Can be "All" or "VM" or "NS"
 
+  # OR Bulk delete selected by filter_options (3.1.1+ / 3.2.0+).
+  # Selectors narrow WHICH schedules are deleted; they AND together and combine
+  # with include_filter/cluster_scope.
+  - backup_object_type:
+      type: "All"
+    cluster_scope:
+      all_clusters: true
+    include_filter: "*"
+    filter_options:
+      # Select schedules that reference any of these VolumeResourceOnly policies
+      volume_resource_only_policy_ref:
+        - name: "vro-policy-a"
+          uid: "vro-uid-a"
+      # New in 3.2.0: select schedules owned by these owner UIDs (Super Admin only)
+      owners:
+        - "owner-uid-1"
+      # New in 3.2.0: select schedules that use these backup locations
+      backup_location_refs:
+        - name: "minio"
+          uid: "bl-uid-1"
+      # New in 3.2.0 (DELETE only): select schedules by run state
+      status: "Suspended"   # Options: Running, Suspended
+
