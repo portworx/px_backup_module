@@ -142,28 +142,29 @@ changes; only `RETURN` + docs need updating.
 - Some docs tables still list `validate_certs` top-level though modules take `ssl_config`.
 - `backup_schedule.py` `INSPECT_ALL_POST_REQUEST` branch references undefined `params` when
   `volume_resource_only_policy_ref` is set (NameError). Pre-existing; mention, don't fix silently.
-- Known argument_spec-only (undocumented) params as of 2026-10-01, from the drift check:
-  - `backup_schedule`: `backup_location`, `cloud_credential`, `cluster`, `delete_backups`, `schedule_policy` (deprecated string refs)
-  - `restore`: `backup_object_type`, `cluster_name_filter`, `cluster_uid_filter`, `include_detailed_resources`, `max_objects`, `name_filter`, `owners`, `replace_policy`, `status`
-  - `backup`: none
-  Don't report these as new drift; report only deltas vs this list.
+- Known DOCUMENTATION/argument_spec drift lives in `scripts/drift_check.py` `BASELINE`
+  (per module, `spec_only` / `doc_only`). The script subtracts it and tells you when a
+  baseline entry stopped drifting. Report only deltas; update `BASELINE` when a param gets
+  documented.
+- `plugins/modules/__pycache__/*.pyc` are **tracked**. Run everything with
+  `PYTHONDONTWRITEBYTECODE=1`; never `rm -rf __pycache__` (you would delete tracked files).
+- `RETURN` blocks are `description:` + `sample:` dicts, not `contains:` trees. Some
+  modules have no `RETURN` at all (`backup_schedule`). Docs return sections are often
+  YAML-ish code blocks (`backup.md` "Backup Object Structure"), not tables.
+- Example playbook names vary per op: `delete.yaml` vs `delete_schedule.yaml`,
+  `inspect.yaml` vs `inspect_one.yaml`. `ls examples/<m>/` before editing.
+- Several playbooks already pass a whole dict param through
+  (`filter_options: "{{ item.filter_options | default(omit) }}"`). Adding a sub-field then
+  needs no playbook change; only the inventory sample and docs.
 
 ## Drift check (run after edits)
 
 ```bash
-cd ansible-collection && python3 - <<'EOF'
-import re, yaml, ast, sys
-m = sys.argv[1] if len(sys.argv) > 1 else 'backup'
-src = open(f'plugins/modules/{m}.py').read()
-doc = yaml.safe_load(re.search(r"DOCUMENTATION = r'''(.*?)'''", src, re.S).group(1))
-doc_opts = set(doc['options'])
-# crude: collect top-level keys of module_args = dict( ... )
-body = re.search(r"module_args\s*=\s*dict\((.*?)\n    \)", src, re.S).group(1)
-spec_opts = set(re.findall(r"^\s{8}(\w+)\s*=\s*dict\(", body, re.M))
-print("in DOCUMENTATION only:", sorted(doc_opts - spec_opts))
-print("in argument_spec only:", sorted(spec_opts - doc_opts))
-EOF
+cd ansible-collection
+PYTHONDONTWRITEBYTECODE=1 python3 ../.claude/skills/proto-sync/scripts/drift_check.py backup backup_schedule
 ```
+
+Top-level options only; nested suboptions are not compared.
 
 ## Docs table column sets seen
 

@@ -41,28 +41,27 @@ No example playbook change, no inventory change. Say so in the final message.
 
 ## Step 1 — `plugins/modules/backup.py` `RETURN` block
 
-Locate the `backup_info` → `volumes` entry in `RETURN` (if `volumes` is not described,
-add it under `backup_info.contains`). Add:
+The collection's `RETURN` blocks are `description:` + `sample:` dicts, not `contains:`
+trees. Extend the `backup` entry's description and sample:
 
 ```yaml
-                volumes:
-                    description: Per-volume backup status
-                    type: list
-                    elements: dict
-                    contains:
-                        ...existing keys...
-                        start_time:
-                            description:
-                                - Time the volume backup was first observed in progress (RFC3339).
-                                - Reconcile-observation time, not data-mover timing. May be absent.
-                            type: str
-                            version_added: '<next collection version>'
-                        finish_time:
-                            description:
-                                - Time the volume backup was observed complete (RFC3339).
-                                - May be present without start_time; do not compute durations unless both exist.
-                            type: str
-                            version_added: '<next collection version>'
+backup:
+    description:
+        - Details of the backup
+        - backup_info.volumes[].start_time / finish_time (PX-Backup >= 3.3.0) are reconcile-observation
+          times in RFC3339; either may be absent, finish_time may appear without start_time
+    type: dict
+    returned: success
+    sample: {
+        "backup_info": {
+            "volumes": [{
+                "name": "pvc-1",
+                "status": {"status": "Success"},
+                "start_time": "2026-05-04T10:00:00Z",
+                "finish_time": "2026-05-04T10:04:12Z"
+            }]
+        }
+    }
 ```
 
 `restore.py`: same under `restore_info.volumes` if a `RETURN` block exists; if the

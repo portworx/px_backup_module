@@ -74,15 +74,40 @@ no plain `X.Y.Z` branches or tags for 3.x.
 Nothing is committed. Review the diff and commit as usual. Claude will not bump
 `galaxy.yml` or write a changelog unless you ask.
 
-## Running the diff script by hand
+## Running the scripts by hand
 
 ```
 python3 .claude/skills/proto-sync/scripts/swagger_diff.py <api-repo> <base-ref> <head-ref> [--json]
 ```
 
-Prints added / removed / type-changed swagger properties per definition, new or removed
-enum values, and new or removed REST paths. If a topic-branch diff shows many `removed`
-rows, the topic branch is behind its base; rebase it or ignore the removals.
+Prints new definitions expanded to their fields, added / removed / type-changed
+properties, description-only changes, enum values, and REST paths. Each row has a
+direction (`request`, `response`, `both`, `orphan`) computed by following `$ref` links
+from every `*Request` / `*Response` definition, with the request roots named. That is
+what decides whether a field becomes a module parameter. If a topic-branch diff shows
+many `removed` rows, the topic branch is behind its base; rebase it or ignore the removals.
+
+```
+cd ansible-collection
+PYTHONDONTWRITEBYTECODE=1 python3 ../.claude/skills/proto-sync/scripts/drift_check.py backup backup_schedule
+```
+
+Lists top-level options present in `DOCUMENTATION` but not `argument_spec` or vice versa,
+minus a known baseline kept in the script. Edit `BASELINE` when you document an old param.
+
+## Trial results
+
+Trialled on `origin/3.2.0-fc1 → origin/3.3.0-fc1` (13 fields after expansion) with two
+model tiers before the reachability and expansion steps were added:
+
+| Model | Outcome |
+|---|---|
+| Sonnet | Correct classification, correct wrapper placement, enum as int. Edits usable as-is. |
+| Haiku | Misclassified `sync_manual` as response-only (went by the `*Info` name), put `status` inside the inner filter instead of the delete wrapper, sent enum as wire string. |
+
+Both gaps are now closed by the script (direction by reachability, new definitions
+expanded) and SKILL.md rules (wrapper messages, enum short-name→int). Sonnet is the
+sensible default for routine syncs; use a stronger model for new services (class E).
 
 ## Files
 
@@ -90,7 +115,8 @@ rows, the topic branch is behind its base; rebase it or ignore the removals.
 .claude/skills/proto-sync/
 ├── SKILL.md                                  entry point: inputs, classification, edit order, verify, report
 ├── README.md                                 this file
-├── scripts/swagger_diff.py                   swagger diff between two git refs
+├── scripts/swagger_diff.py                   swagger diff between two git refs, direction by $ref reachability
+├── scripts/drift_check.py                    DOCUMENTATION vs argument_spec, with known-drift baseline
 └── references/
     ├── repo-conventions.md                   collection layout, module anatomy, naming quirks, drift check
     ├── proto-to-ansible-mapping.md           proto type -> ansible type table, request vs response rules
