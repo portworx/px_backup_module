@@ -111,6 +111,55 @@ backup_locations_update:
       - name: "cluster-3"
         uid: "cluster-3-uid"
 
+  # --- sync_manual UPDATE test cases (PB-18144) ---
+  # Flip sync_manual on the two BLs created via create.yaml.
+  # Match location_type / path / cloud_credential_ref / s3_config to what was
+  # used at CREATE — UPDATE re-sends the full BL spec.
+
+  # Was created with sync_manual: false → flip to true
+  - name: "test-s3-sync-manual-false"
+    location_type: "S3"
+    path: "test"
+    cloud_credential_ref:
+      cloud_credential_name: "mybl"
+    validate_cloud_credential: false
+    object_lock_enabled: false
+    sync_manual: true
+    s3_config:
+      region: "us-east-1"
+      endpoint: "s3.example.com"
+      disable_ssl: true
+
+  # Was created with sync_manual: true → flip to false
+  - name: "test-s3-sync-manual-true"
+    location_type: "S3"
+    path: "test"
+    cloud_credential_ref:
+      cloud_credential_name: "mybl"
+    validate_cloud_credential: false
+    object_lock_enabled: false
+    sync_manual: false
+    s3_config:
+      region: "us-east-1"
+      endpoint: "s3.example.com"
+      disable_ssl: true
+
+  # Federated UPDATE: re-assert sync_manual: true on a federated BL.
+  # sync_manual: true is the only valid value in federated mode — the server
+  # rejects false. To test the negative case, run inline with -e (see docs).
+  # Replace path / region / cluster_refs with the values used at CREATE.
+  - name: "test-aws-federated-sync-manual-true"
+    location_type: "S3"
+    path: "my-bucket/backups"
+    object_lock_enabled: false
+    federated: true
+    sync_manual: true
+    s3_config:
+      region: "us-west-2"
+    cluster_refs:
+      - name: "cluster-1"
+        uid: "cluster-1-uid"
+
 
 # Global update configuration
 backup_configs: true
