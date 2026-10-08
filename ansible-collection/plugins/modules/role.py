@@ -737,10 +737,11 @@ def perform_operation(module: AnsibleModule, client: PXBackupClient, operation: 
         
         elif operation == 'INSPECT_ALL':
             roles = enumerate_roles(module, client)
+            # Role enumerate is not paginated and returns no total_count; the list is complete.
             return OperationResult(
                 success=True,
                 changed=False,
-                data={'roles': roles},
+                data={'roles': roles, 'total_count': len(roles)},
                 message=f"Found {len(roles)} roles"
             )
 

@@ -328,6 +328,14 @@ options:
         description: Include sensitive information in response
         type: bool
         default: false
+    max_objects:
+        description: Maximum number of objects to return per enumerate response (pagination)
+        type: int
+        required: false
+    object_index:
+        description: Starting index for pagination through enumerate results
+        type: int
+        required: false
 
 requirements:
     - python >= 3.9
@@ -883,7 +891,7 @@ def enumerate_backup_locations(module, client):
         'include_secrets': module.params.get('include_secrets', False),
         'include_validation_state': True
     }
-    
+
     if module.params.get('cloud_credential_ref'):
         cloud_cred_ref = {}
         if module.params['cloud_credential_ref'].get('cloud_credential_name'):
@@ -893,10 +901,19 @@ def enumerate_backup_locations(module, client):
 
         if cloud_cred_ref:
             params['cloud_credential_ref'] = cloud_cred_ref
-    
+
+    # Pagination: only send when the caller set them.
+    if module.params.get('max_objects') is not None:
+        params['enumerate_options.max_objects'] = str(module.params['max_objects'])
+    if module.params.get('object_index') is not None:
+        params['enumerate_options.object_index'] = str(module.params['object_index'])
+
     try:
         response = client.make_request('GET', f"v1/backuplocation/{module.params['org_id']}", params=params)
-        return response.get('backup_locations', [])
+        return {
+            "backup_locations": response.get('backup_locations', []),
+            "total_count": int(response.get('total_count', 0)),
+        }
     except Exception as e:
         module.fail_json(msg=f"Failed to enumerate backup locations: {str(e)}")
 
@@ -1139,12 +1156,14 @@ def perform_operation(module: AnsibleModule, client: PXBackupClient, operation: 
             )
 
         elif operation == 'INSPECT_ALL':
-            backup_locations = enumerate_backup_locations(module, client)
+            result = enumerate_backup_locations(module, client)
+            backup_locations = result['backup_locations']
+            total_count = result['total_count']
             return OperationResult(
                 success=True,
                 changed=False,
-                data={'backup_locations': backup_locations},
-                message=f"Found {len(backup_locations)} backup locations"
+                data={'backup_locations': backup_locations, 'total_count': total_count},
+                message=f"Found {len(backup_locations)} of {total_count} backup locations"
             )
 
         elif operation == 'INSPECT_ONE':
@@ -1332,7 +1351,9 @@ def run_module():
         
         labels=dict(type='dict', required=False),
         ownership=dict(type='dict', required=False),
-        include_secrets=dict(type='bool', default=False)
+        include_secrets=dict(type='bool', default=False),
+        max_objects=dict(type='int', required=False),
+        object_index=dict(type='int', required=False)
     )
 
     result = {

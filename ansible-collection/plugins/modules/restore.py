@@ -446,8 +446,12 @@ options:
         type: int
         required: false
         version_added: "3.2.0"
+    max_objects:
+        description: Maximum number of objects to return per INSPECT_ALL response (pagination)
+        type: int
+        required: false
     object_index:
-        description: Object index from which to start fetching for pagination in GET_RESTORE_RESOURCE_DETAILS
+        description: Object index from which to start fetching for pagination in INSPECT_ALL and GET_RESTORE_RESOURCE_DETAILS
         type: int
         required: false
         version_added: "3.2.0"
@@ -724,7 +728,7 @@ def validate_sfr_params(params: Dict[str, Any]) -> None:
                 raise ValidationError(f"restore_files[{i}].source_path is required")
 
 
-def enumerate_restores(module: AnsibleModule, client: PXBackupClient) -> List[Dict[str, Any]]:
+def enumerate_restores(module: AnsibleModule, client: PXBackupClient) -> Dict[str, Any]:
     """List all restores"""
     # First, let's log the input parameters for debugging
     logger.debug(f"Enumerate parameters module: {module.params}")
@@ -735,9 +739,11 @@ def enumerate_restores(module: AnsibleModule, client: PXBackupClient) -> List[Di
         'enumerate_options.cluster_uid_filter': module.params.get('cluster_uid_filter')
     }
 
-    # Add other parameters if they exist
-    if module.params.get('max_objects'):
-        params['enumerate_options.max_objects'] = module.params['max_objects']
+    # Pagination: only send when the caller set them.
+    if module.params.get('max_objects') is not None:
+        params['enumerate_options.max_objects'] = str(module.params['max_objects'])
+    if module.params.get('object_index') is not None:
+        params['enumerate_options.object_index'] = str(module.params['object_index'])
 
     if module.params.get('include_detailed_resources') is not None:
         params['enumerate_options.include_detailed_resources'] = module.params['include_detailed_resources']
@@ -799,7 +805,10 @@ def enumerate_restores(module: AnsibleModule, client: PXBackupClient) -> List[Di
         # Log the response for debugging
         logger.debug(f"Received response: {response}")
 
-        return response.get('restores', [])
+        return {
+            "restores": response.get('restores', []),
+            "total_count": int(response.get('total_count', 0)),
+        }
     except Exception as e:
         error_msg = str(e)
         if isinstance(e, requests.exceptions.RequestException) and hasattr(e, 'response'):
@@ -1376,12 +1385,14 @@ def perform_operation(module: AnsibleModule, client: PXBackupClient, operation: 
             )
 
         elif operation == 'INSPECT_ALL':
-            restores = enumerate_restores(module, client)
+            enumerate_result = enumerate_restores(module, client)
+            restores = enumerate_result['restores']
+            total_count = enumerate_result['total_count']
             return OperationResult(
                 success=True,
                 changed=False,
-                data={'restores': restores},
-                message=f"Found {len(restores)} restores"
+                data={'restores': restores, 'total_count': total_count},
+                message=f"Found {len(restores)} of {total_count} restores"
             )
 
         elif operation == 'INSPECT_ONE':

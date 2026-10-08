@@ -23,6 +23,8 @@
         api_url: "{{ px_backup_api_url }}"
         token: "{{ px_backup_token }}"
         org_id: "{{ org_id | default('default') }}"
+        max_objects: "{{ max_objects | default(omit) }}"
+        object_index: "{{ object_index | default(omit) }}"
         # Optional: Cluster discovery config based filters
         cluster_enumerate_options:
           project_names: "{{ project_names | default(omit) }}"

@@ -515,9 +515,11 @@ def run_module():
 
             elif operation == 'INSPECT_ALL':
                 recipients = enumerate_recipients(module, client)
+                # Recipient enumerate is not paginated and returns no total_count; the list is complete.
                 result.update({
                     'changed': False,
                     'recipients': recipients,
+                    'total_count': len(recipients),
                     'message': f'Found {len(recipients)} recipients'
                 })
 
