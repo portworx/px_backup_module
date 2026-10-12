@@ -29,6 +29,8 @@
         api_url: "{{ px_backup_api_url }}"
         token: "{{ px_backup_token }}"
         org_id: "{{ org_id | default('default') }}"
+        max_objects: "{{ max_objects | default(omit) }}"
+        object_index: "{{ object_index | default(omit) }}"
         # SSL Certificate Parameters
         ssl_config: "{{ ssl_config.px_backup | default({}) }}"
       register: backup_location_result

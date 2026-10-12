@@ -669,8 +669,11 @@ def enumerate_backup_schedules(module, client, operation):
                 f"v1/backupschedule/{module.params['org_id']}/enumerate",
                 data=request_body
             )
-            
-            return response.get('backup_schedules', [])
+
+            return {
+                "backup_schedules": response.get('backup_schedules', []),
+                "total_count": int(response.get('total_count', 0)),
+            }
             
         except Exception as e:
             handle_request_exception(e, module, "enumerate backup schedules")
@@ -744,7 +747,10 @@ def enumerate_backup_schedules(module, client, operation):
 
         try:
             response = client.make_request('GET', f"v1/backupschedule/{module.params['org_id']}", params=params)
-            return response.get('backup_schedules', [])
+            return {
+                "backup_schedules": response.get('backup_schedules', []),
+                "total_count": int(response.get('total_count', 0)),
+            }
         except Exception as e:
             handle_request_exception(e, module, "enumerate backup schedules")
 
@@ -1350,9 +1356,12 @@ def run_module():
             result['changed'] = changed
 
         elif module.params['operation'] == 'INSPECT_ALL' or module.params['operation'] == 'INSPECT_ALL_POST_REQUEST':
-            backup_schedules = enumerate_backup_schedules(module, client, module.params['operation'])
+            enumerate_result = enumerate_backup_schedules(module, client, module.params['operation'])
+            backup_schedules = enumerate_result['backup_schedules']
+            total_count = enumerate_result['total_count']
             result['backup_schedules'] = backup_schedules
-            result['message'] = f"Found {len(backup_schedules)} backup schedules"
+            result['total_count'] = total_count
+            result['message'] = f"Found {len(backup_schedules)} of {total_count} backup schedules"
             result['changed'] = False
 
         elif module.params['operation'] == 'INSPECT_ONE':

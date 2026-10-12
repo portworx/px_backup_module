@@ -1168,7 +1168,9 @@ def run_module():
             
         elif operation == 'INSPECT_ALL':
             schedule_policies = enumerate_schedule_policies(module, client)
+            # Schedule policy enumerate is not paginated and returns no total_count; the list is complete.
             result['schedule_policies'] = schedule_policies
+            result['total_count'] = len(schedule_policies)
             result['message'] = f"Found {len(schedule_policies)} Schedule Policies"
             
         elif operation == 'INSPECT_ONE':

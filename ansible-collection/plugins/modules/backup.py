@@ -1612,12 +1612,11 @@ def update_backup_share(module: AnsibleModule, client: PXBackupClient) -> Tuple[
                 error_msg = f"{error_msg}: {getattr(e.response, 'text', 'No response text')}"
         module.fail_json(msg=f"Failed to update backup share: {error_msg}")
 
-def enumerate_backups(module: AnsibleModule, client: PXBackupClient) -> List[Dict[str, Any]]:
+def enumerate_backups(module: AnsibleModule, client: PXBackupClient) -> Dict[str, Any]:
     """List all backups with support for both GET and POST methods based on query complexity"""
     try:
         # Build enumerate_options for POST request
         enumerate_options = {
-            "max_objects": str(module.params.get('max_objects')),
             "name_filter": module.params.get('name_filter'),
             "cluster_name_filter": module.params.get('cluster_name_filter'),
             "cluster_uid_filter": module.params.get('cluster_uid_filter'),
@@ -1626,7 +1625,13 @@ def enumerate_backups(module: AnsibleModule, client: PXBackupClient) -> List[Dic
             "owners": module.params.get('owners', []),
             "status": module.params.get('status', [])
         }
-            
+
+        # Pagination: only send when the caller set them.
+        if module.params.get('max_objects') is not None:
+            enumerate_options["max_objects"] = str(module.params['max_objects'])
+        if module.params.get('object_index') is not None:
+            enumerate_options["object_index"] = str(module.params['object_index'])
+
         # Add backup_object_type if provided
         if module.params.get('backup_object_type'):
             enumerate_options['backup_object_type'] = module.params['backup_object_type'].get('type')
@@ -1669,7 +1674,10 @@ def enumerate_backups(module: AnsibleModule, client: PXBackupClient) -> List[Dic
             data={"enumerate_options": enumerate_options}
         )
 
-        return response.get('backups', [])
+        return {
+            "backups": response.get('backups', []),
+            "total_count": int(response.get('total_count', 0)),
+        }
     except Exception as e:
         error_msg = str(e)
         if isinstance(e, requests.exceptions.RequestException) and hasattr(e, 'response'):
@@ -2042,12 +2050,14 @@ def perform_operation(module: AnsibleModule, client: PXBackupClient, operation: 
             )
 
         elif operation == 'INSPECT_ALL':
-            backups = enumerate_backups(module, client)
+            result = enumerate_backups(module, client)
+            backups = result['backups']
+            total_count = result['total_count']
             return OperationResult(
                 success=True,
                 changed=False,
-                data={'backups': backups},
-                message=f"Found {len(backups)} backups"
+                data={'backups': backups, 'total_count': total_count},
+                message=f"Found {len(backups)} of {total_count} backups"
             )
 
         elif operation == 'INSPECT_ONE':

@@ -138,6 +138,7 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 | Parameter                  | Type    | Required | Default | Description                         |
 | ---------------------------- | --------- | ---------- | --------- | ------------------------------------- |
 | max_objects                | int     | no       |         | Maximum objects to return           |
+| object_index               | int     | no       |         | Index to start from, for paging     |
 | cluster_uid_filter         | string  | no       |         | Filter by cluster UID              |
 | owners                     | list    | no       |         | Filter by owners                    |
 | status                     | list    | no       |         | Filter by status                    |

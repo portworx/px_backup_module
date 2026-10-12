@@ -302,6 +302,7 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 | Parameter                  | Type       | Required | Default | Description                                       |
 | ---------------------------- | ------------ | ---------- | --------- | --------------------------------------------------- |
 | max_objects                | integer    | no       |         | Maximum number of objects to return               |
+| object_index               | integer    | no       |         | Index to start from, for paging with max_objects  |
 | name_filter                | string     | no       |         | Filter backups by name                            |
 | cluster_name_filter        | string     | no       |         | Filter backups by cluster name                    |
 | cluster_uid_filter         | string     | no       |         | Filter backups by cluster UID                     |

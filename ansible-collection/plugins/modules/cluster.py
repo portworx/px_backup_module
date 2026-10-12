@@ -353,6 +353,14 @@ options:
                 type: list
                 elements: str
                 choices: ['Invalid', 'DeletePending', 'Pending', 'Failed', 'Success']
+    max_objects:
+        description: Maximum number of objects to return per enumerate response (pagination)
+        type: int
+        required: false
+    object_index:
+        description: Starting index for pagination through enumerate results
+        type: int
+        required: false
 
 requirements:
     - python >= 3.9
@@ -592,7 +600,7 @@ def unshare_cluster(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dict
     except Exception as e:
         module.fail_json(msg=f"Failed to unshare cluster: {str(e)}")
 
-def enumerate_clusters(module: AnsibleModule, client: PXBackupClient) -> List[Dict[str, Any]]:
+def enumerate_clusters(module: AnsibleModule, client: PXBackupClient) -> Dict[str, Any]:
     """List all clusters"""
     try:
         params = {
@@ -601,6 +609,12 @@ def enumerate_clusters(module: AnsibleModule, client: PXBackupClient) -> List[Di
             'only_backup_share': module.params.get('only_backup_share', False),
             'cloud_credential_ref': module.params.get('cloud_credential_ref', {}),
         }
+
+        # Pagination: only send when the caller set them.
+        if module.params.get('max_objects') is not None:
+            params['enumerate_options.max_objects'] = str(module.params['max_objects'])
+        if module.params.get('object_index') is not None:
+            params['enumerate_options.object_index'] = str(module.params['object_index'])
 
         # Add new filtration features
         if module.params.get('vm_volume_name'):
@@ -643,6 +657,12 @@ def enumerate_clusters(module: AnsibleModule, client: PXBackupClient) -> List[Di
                 'cluster_enumerate_options': {},
             }
 
+            # Pagination: only send when the caller set them.
+            if module.params.get('max_objects') is not None:
+                post_body['cluster_enumerate_options']['max_objects'] = str(module.params['max_objects'])
+            if module.params.get('object_index') is not None:
+                post_body['cluster_enumerate_options']['object_index'] = str(module.params['object_index'])
+
             if ceo.get('project_names'):
                 post_body['cluster_enumerate_options']['project_names'] = ceo['project_names']
 
@@ -673,7 +693,10 @@ def enumerate_clusters(module: AnsibleModule, client: PXBackupClient) -> List[Di
                 endpoint=f"v1/cluster/{module.params['org_id']}",
                 params=params
             )
-        return response.get('clusters', [])
+        return {
+            "clusters": response.get('clusters', []),
+            "total_count": int(response.get('total_count', 0)),
+        }
 
     except Exception as e:
         module.fail_json(msg=f"Failed to enumerate clusters: {str(e)}")
@@ -879,12 +902,14 @@ def perform_operation(module: AnsibleModule, client: PXBackupClient, operation: 
             )
         
         elif operation == 'INSPECT_ALL':
-            clusters = enumerate_clusters(module, client)
+            enumerate_result = enumerate_clusters(module, client)
+            clusters = enumerate_result['clusters']
+            total_count = enumerate_result['total_count']
             return OperationResult(
                 success=True,
                 changed=False,
-                data={'clusters': clusters},
-                message=f"Found {len(clusters)} clusters"
+                data={'clusters': clusters, 'total_count': total_count},
+                message=f"Found {len(clusters)} of {total_count} clusters"
             )
             
         elif operation == 'INSPECT_ONE':
@@ -1082,6 +1107,8 @@ def run_module():
             )
         ),
         include_secrets=dict(type='bool', default=False),
+        max_objects=dict(type='int', required=False),
+        object_index=dict(type='int', required=False),
         # New filtration features
         vm_volume_name=dict(
             type='str',
