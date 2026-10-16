@@ -108,3 +108,44 @@ backup_locations:
     cluster_refs:
       - name: "cluster-1"
         uid: "cluster-1-uid"
+
+  # --- sync_manual test cases (PB-18144) ---
+
+  # Non-federated: sync_manual: true — manual mode, periodic BackupSync is skipped.
+  - name: "test-s3-sync-manual-true"
+    location_type: "S3"
+    path: "my-backup-bucket"
+    cloud_credential_ref:
+      cloud_credential_name: "s3-credentials"
+    validate_cloud_credential: false
+    object_lock_enabled: false
+    sync_manual: true
+    s3_config:
+      region: "us-east-1"
+      endpoint: "s3.amazonaws.com"
+
+  # Non-federated: sync_manual: false — automatic mode (BackupSync every 10 min).
+  - name: "test-s3-sync-manual-false"
+    location_type: "S3"
+    path: "my-backup-bucket"
+    cloud_credential_ref:
+      cloud_credential_name: "s3-credentials"
+    validate_cloud_credential: false
+    object_lock_enabled: false
+    sync_manual: false
+    s3_config:
+      region: "us-east-1"
+      endpoint: "s3.amazonaws.com"
+
+  # Federated: sync_manual: true — required in federated mode; server rejects false.
+  - name: "test-aws-federated-sync-manual-true"
+    location_type: "S3"
+    path: "my-bucket/backups"
+    object_lock_enabled: false
+    federated: true
+    sync_manual: true
+    s3_config:
+      region: "us-west-2"
+    cluster_refs:
+      - name: "cluster-1"
+        uid: "cluster-1-uid"
