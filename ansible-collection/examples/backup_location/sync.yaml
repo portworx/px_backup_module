@@ -29,6 +29,7 @@
             org_id: "{{ org_id | default('default') }}"
             name: "{{ item.name }}"
             uid: "{{ item.uid | default(omit) }}"
+            cluster_refs: "{{ item.cluster_refs | default(omit) }}"
             wait_for_completion: "{{ item.wait_for_completion | default(false) }}"
             sync_timeout: "{{ item.sync_timeout | default(600) }}"
             sync_poll_interval: "{{ item.sync_poll_interval | default(10) }}"

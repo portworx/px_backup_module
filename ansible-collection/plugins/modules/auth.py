@@ -36,21 +36,18 @@ options:
             - Used to identify the application requesting access
         required: true
         type: str
-        no_log: true
     username:
         description:
             - Username for authentication
             - Must be a valid user with appropriate permissions
         required: true
         type: str
-        no_log: true
     password:
         description:
             - Password for authentication
             - Used in combination with username for authentication
         required: true
         type: str
-        no_log: true
     token_duration:
         description:
             - Duration for which the token should be valid
@@ -67,7 +64,7 @@ options:
         required: false
         type: dict
         default: {}
-        options:
+        suboptions:
             validate_certs:
                 description:
                     - Enable SSL verification

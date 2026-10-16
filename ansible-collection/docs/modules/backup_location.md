@@ -132,6 +132,14 @@ scope the call.
 | s3_config.sse_type                  | string  | no       | Server-side encryption type | 'Invalid', 'SSE_S3', 'SSE_KMS'           |
 | s3_config.azure_environment.type    | string  | no       | Azure environment type      | 'Invalid', 'AZURE_GLOBAL', 'AZURE_CHINA' |
 | s3_config.azure_resource_group_name | string  | no       | Azure resource group name   |                                          |
+| s3_config.azure_account_name        | string  | no       | Azure storage account name (federated Azure) |                               |
+| s3_config.azure_subscription_id     | string  | no       | Azure subscription ID (federated Azure)      |                               |
+| s3_config.google_project_id         | string  | no       | Google Cloud project ID (required for federated Google) |                    |
+
+> **Workload Identity (federated) notes:**
+> - **AWS S3** (`location_type: S3`, `federated: true`): uses AWS IRSA / EKS Pod Identity, no cloud credential. `endpoint` and `disable_ssl` are ignored (TLS always enforced); `region` is optional and falls back to `AWS_REGION` on the Stork pod if omitted.
+> - **Azure** (`location_type: Azure`, `federated: true`): provide `azure_account_name` and `azure_subscription_id` in `s3_config`.
+> - **Google** (`location_type: Google`, `federated: true`): `google_project_id` is required in `s3_config` since no cloud credential is referenced. It is immutable, so it is only set on `CREATE`.
 
 #### NFS Configuration
 

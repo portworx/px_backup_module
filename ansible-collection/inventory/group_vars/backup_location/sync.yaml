@@ -8,8 +8,15 @@ backup_locations_sync:
     wait_for_completion: false     # Set to true to wait for sync to finish
     sync_timeout: 600              # Max seconds to wait (only when wait_for_completion=true)
     sync_poll_interval: 10         # Poll interval in seconds (only when wait_for_completion=true)
+    # cluster_refs: required for federated/WLI backup locations; omit for non-federated
+    # cluster_refs:
+    #   - name: "cluster-name"
+    #     uid: "cluster-uid"
 
   - name: "staging-azure-federated"
     wait_for_completion: true
     sync_timeout: 900
     sync_poll_interval: 15
+    # cluster_refs:
+    #   - name: "cluster-name"
+    #     uid: "cluster-uid"

@@ -42,6 +42,7 @@
             include_filter: "{{ item.include_filter | default(omit) }}"
             exclude_filter: "{{ item.exclude_filter | default(omit) }}"
             cluster_scope: "{{ item.cluster_scope | default(omit) }}"
+            filter_options: "{{ item.filter_options | default(omit) }}"
             # SSL Certificate Parameters
             ssl_config: "{{ ssl_config.px_backup | default({}) }}"
           register: delete_result

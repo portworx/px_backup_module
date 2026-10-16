@@ -247,6 +247,37 @@ backup_object_type:
 | name      | string | yes      | Name of the cluster |
 | uid       | string | no       | Cluster UID         |
 
+### Bulk Selector Filter Options (3.1.1+)
+
+Selectors that narrow which backup schedules a bulk `UPDATE` or `DELETE`
+(including bulk suspend/resume performed via `UPDATE`) acts on. This is distinct
+from `volume_resource_only_policy_ref`, which *sets* the Volume Resource Only
+policy on the schedule being updated; the selector below instead *picks* which
+existing schedules to operate on, by the Volume Resource Only policy they
+already reference.
+
+
+The `owners`, `backup_location_refs` and `status` selectors were added in
+**3.2.0**. All selectors combine (AND) with each other and with
+`include_filter`. `status` (run state) applies to bulk `DELETE` only.
+
+
+| Parameter                                          | Type | Required | Default | Description                                                       |
+| ---------------------------------------------------- | ------ | ---------- | --------- | ------------------------------------------------------------------- |
+| filter_options                                     | dict | no       |         | Bulk selectors narrowing which schedules the operation acts on    |
+| filter_options.volume_resource_only_policy_ref     | list | no       |         | Select schedules that reference any of these Volume Resource Only policies |
+| filter_options.owners                              | list | no       |         | Select schedules owned by any of these owner UIDs (Super Admin only) — 3.2.0+ |
+| filter_options.backup_location_refs                | list | no       |         | Select schedules that use any of these backup locations — 3.2.0+  |
+| filter_options.status                              | str  | no       |         | Select schedules by run state (`Running`/`Suspended`); **DELETE only** — 3.2.0+ |
+
+#### filter_options.volume_resource_only_policy_ref / backup_location_refs Entry Format
+
+
+| Parameter | Type   | Required | Description                          |
+| ----------- | -------- | ---------- | -------------------------------------- |
+| name      | string | yes      | Name of the referenced object (VRO policy / backup location) |
+| uid       | string | no       | UID of the referenced object          |
+
 ### Enumeration Options
 
 

@@ -88,7 +88,7 @@ options:
         required: false
         type: dict
         default: {}
-        options:
+        suboptions:
             validate_certs:
                 description:
                     - Verify SSL certificates
@@ -172,15 +172,15 @@ options:
             - This Keycloak role ID will be associated with the PX-Backup role
             - If not provided for CREATE operation, a Keycloak role will be automatically created
             - This ensures proper integration between PX-Backup roles and Keycloak authentication
-            - Format: UUID string (e.g., 3fe6c733-6df6-4058-91b8-bcd3344c8564)
+            - "Format: UUID string (e.g., 3fe6c733-6df6-4058-91b8-bcd3344c8564)"
         required: false
         type: str
     auth_url:
         description:
             - Keycloak authentication server URL
-            - For CREATE operation: required if role_id is not provided (used to automatically create Keycloak roles)
-            - For DELETE operation: optional (if provided, the associated Keycloak role will also be deleted; if not provided, only PX-Backup role is deleted)
-            - Note: skip_keycloak_deletion takes precedence over auth_url for DELETE operations
+            - "For CREATE operation: required if role_id is not provided (used to automatically create Keycloak roles)"
+            - "For DELETE operation: optional (if provided, the associated Keycloak role will also be deleted; if not provided, only PX-Backup role is deleted)"
+            - "Note: skip_keycloak_deletion takes precedence over auth_url for DELETE operations"
         required: false
         type: str
     skip_keycloak_deletion:
@@ -197,7 +197,7 @@ options:
         description:
             - Description for the auto-created Keycloak role
             - Only used when role_id is not provided for CREATE operation
-            - Default: "Role created via ansible"
+            - 'Default: "Role created via ansible"'
         required: false
         type: str
         default: "Role created via ansible"

@@ -87,7 +87,7 @@ options:
         required: false
         type: dict
         default: {}
-        options:
+        suboptions:
             validate_certs:
                 description:
                     - Verify SSL certificates
@@ -242,11 +242,11 @@ options:
                             weekly_index:
                                 description: 
                                     - Which occurrence of the day within the month.
-                                    - "first" - First occurrence (1st-7th)
-                                    - "second" - Second occurrence (8th-14th)
-                                    - "third" - Third occurrence (15th-21st)
-                                    - "fourth" - Fourth occurrence (22nd-28th)
-                                    - "last" - Last occurrence of the day in the month
+                                    - '"first" - First occurrence (1st-7th)'
+                                    - '"second" - Second occurrence (8th-14th)'
+                                    - '"third" - Third occurrence (15th-21st)'
+                                    - '"fourth" - Fourth occurrence (22nd-28th)'
+                                    - '"last" - Last occurrence of the day in the month'
                                     - Note - fourth and last may differ (e.g., Nov 2025 fourth Sun != last Sun)
                                 type: str
                                 choices: ['first', 'second', 'third', 'fourth', 'last']
