@@ -55,6 +55,7 @@
             object_lock_enabled: "{{ item.object_lock_enabled | default(false) }}"
             federated: "{{ item.federated | default(false) }}"
             cluster_refs: "{{ item.cluster_refs | default(omit) }}"
+            sync_manual: "{{ item.sync_manual | default(omit) }}"
             labels: "{{ item.labels | default(omit) }}"
             s3_config: "{{ item.s3_config | default(omit) }}"
             google_config: "{{ item.google_config | default(omit) }}"

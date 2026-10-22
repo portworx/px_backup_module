@@ -302,6 +302,14 @@ options:
         required: false
         type: bool
         default: false
+    sync_manual:
+        description:
+            - Controls whether this backup location uses manual or automatic sync.
+            - "true: manual mode — periodic BackupSync is skipped; syncs only occur when explicitly triggered."
+            - "false: automatic mode — periodic BackupSync runs every 10 minutes."
+            - "omit (not set): on CREATE the server requires this field; on UPDATE the existing value is preserved."
+        required: false
+        type: bool
     sync_timeout:
         description:
             - Maximum time in seconds to wait for backup sync to complete
@@ -1002,6 +1010,10 @@ def build_backup_location_request(params: Dict[str, Any]) -> Dict[str, Any]:
     if params.get('sync'):
         request['backup_location']['sync'] = True
 
+    # Forward sync_manual only when explicitly provided (None = omit, letting the server apply its default).
+    if params.get('sync_manual') is not None:
+        request['backup_location']['sync_manual'] = params['sync_manual']
+
     # Add optional configurations safely
     if params.get('labels'):
         request['metadata']['labels'] = params['labels']
@@ -1255,6 +1267,7 @@ def run_module():
         object_lock_enabled=dict(type='bool', required=False, default=False),
         federated=dict(type='bool', required=False, default=False),
         sync=dict(type='bool', required=False, default=False),
+        sync_manual=dict(type='bool', required=False, default=None),
         sync_timeout=dict(type='int', required=False, default=600),
         sync_poll_interval=dict(type='int', required=False, default=10),
         wait_for_completion=dict(type='bool', required=False, default=False),
