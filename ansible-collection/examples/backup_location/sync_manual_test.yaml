@@ -1,0 +1,79 @@
+---
+# PB-18144: assert the server's sync_manual acceptance matrix.
+# Runs CREATE for every entry in sync_manual_test_locations and verifies
+# the result matches the entry's `expect` value (accept|reject).
+#
+# Usage:
+#   ansible-playbook examples/backup_location/sync_manual_test.yaml
+#
+# The playbook never fails on an individual module call (failed_when: false);
+# it only fails if the overall accept/reject outcome does not match `expect`.
+- name: Verify sync_manual accept/reject matrix
+  hosts: localhost
+  gather_facts: true
+
+  vars_files:
+    - "{{ inventory_dir }}/group_vars/common/all.yaml"
+    - "{{ inventory_dir }}/group_vars/backup_location/sync_manual_test.yaml"
+
+  vars:
+    scenarios: "{{ sync_manual_test_locations }}"
+
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - px_backup_api_url is defined
+          - sync_manual_test_locations is defined
+
+  tasks:
+    - name: Login and fetch Px-Backup token
+      include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
+
+    - name: Attempt CREATE for each sync_manual scenario
+      backup_location:
+        operation: CREATE
+        api_url: "{{ px_backup_api_url }}"
+        token: "{{ px_backup_token }}"
+        name: "{{ item.name }}"
+        org_id: "{{ org_id | default('default') }}"
+        location_type: "{{ item.location_type }}"
+        path: "{{ item.path }}"
+        cloud_credential_ref: "{{ item.cloud_credential_ref | default(omit) }}"
+        validate_cloud_credential: "{{ item.validate_cloud_credential | default(true) }}"
+        sync_manual: "{{ item.sync_manual | default(omit) }}"
+        s3_config: "{{ item.s3_config | default(omit) }}"
+        ssl_config: "{{ ssl_config.px_backup | default({}) }}"
+      loop: "{{ scenarios }}"
+      loop_control:
+        label: "{{ item.name }} (expect={{ item.expect }})"
+      register: sync_manual_results
+      ignore_errors: true
+
+    - name: Assert each outcome matches `expect`
+      assert:
+        that:
+          - (item.item.expect == 'accept' and not item.failed) or
+            (item.item.expect == 'reject' and item.failed)
+        fail_msg: >-
+          {{ item.item.name }}: expected {{ item.item.expect }},
+          got {{ 'reject' if item.failed else 'accept' }}
+            ({{ item.msg | default('ok') }})
+      loop: "{{ sync_manual_results.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+
+  post_tasks:
+    - name: Clean up the entries that were accepted
+      backup_location:
+        operation: DELETE
+        api_url: "{{ px_backup_api_url }}"
+        token: "{{ px_backup_token }}"
+        name: "{{ item.item.name }}"
+        org_id: "{{ org_id | default('default') }}"
+        ssl_config: "{{ ssl_config.px_backup | default({}) }}"
+      loop: "{{ sync_manual_results.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+      when: not item.failed
+      failed_when: false

@@ -36,6 +36,7 @@
             federated: "{{ item.federated | default(false) }}"
             cluster_refs: "{{ item.cluster_refs | default(omit) }}"
             sync: "{{ item.sync | default(omit) }}"
+            sync_manual: "{{ item.sync_manual | default(omit) }}"
             s3_config: "{{ item.s3_config | default(omit) }}"
             google_config: "{{ item.google_config | default(omit) }}"
             azure_config: "{{ item.azure_config | default(omit) }}"
