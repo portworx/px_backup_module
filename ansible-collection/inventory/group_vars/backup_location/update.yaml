@@ -111,6 +111,39 @@ backup_locations_update:
       - name: "cluster-3"
         uid: "cluster-3-uid"
 
+  # --- sync_manual UPDATE test cases (PB-18144) ---
+  # Flip sync_manual on the two BLs created via create.yaml.
+  # Match location_type / path / cloud_credential_ref / s3_config to what was
+  # used at CREATE — UPDATE re-sends the full BL spec.
+
+  # Was created with sync_manual: false → flip to true
+  - name: "test-s3-sync-manual-false"
+    location_type: "S3"
+    path: "my-backup-bucket"
+    cloud_credential_ref:
+      cloud_credential_name: "s3-credentials"
+    validate_cloud_credential: false
+    object_lock_enabled: false
+    sync_manual: true
+    s3_config:
+      region: "us-east-1"
+      endpoint: "s3.amazonaws.com"
+      disable_ssl: true
+
+  # Was created with sync_manual: true → flip to false
+  - name: "test-s3-sync-manual-true"
+    location_type: "S3"
+    path: "my-backup-bucket"
+    cloud_credential_ref:
+      cloud_credential_name: "s3-credentials"
+    validate_cloud_credential: false
+    object_lock_enabled: false
+    sync_manual: false
+    s3_config:
+      region: "us-east-1"
+      endpoint: "s3.amazonaws.com"
+      disable_ssl: true
+
 
 # Global update configuration
 backup_configs: true
