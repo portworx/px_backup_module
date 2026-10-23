@@ -10,6 +10,7 @@ backup_locations:
     encryption_key: "{{ encryption_key }}"
     validate_cloud_credential: true
     object_lock_enabled: "{{ object_lock }}"
+    sync_manual: false
     s3_config:
       region: "us-east-1"
       endpoint: "s3.amazonaws.com"
@@ -27,6 +28,7 @@ backup_locations:
     encryption_key: "{{ encryption_key }}"
     validate_cloud_credential: true
     object_lock_enabled: "{{ object_lock }}"
+    sync_manual: false
 
   # Azure Configuration
   - name: "azure-backup"
@@ -37,6 +39,7 @@ backup_locations:
     encryption_key: "{{ encryption_key }}"
     validate_cloud_credential: true
     object_lock_enabled: "{{ object_lock }}"
+    sync_manual: false
     azure_config:
       azure_environment: "AZURE_GLOBAL"
 
@@ -47,6 +50,7 @@ backup_locations:
     encryption_key: "{{ encryption_key }}"
     validate_cloud_credential: true
     object_lock_enabled: "{{ object_lock }}"
+    sync_manual: false
     nfs_config:
       server_addr: "nfs.example.com"
       sub_path: "/data"
@@ -123,6 +127,7 @@ backup_locations:
     s3_config:
       region: "us-east-1"
       endpoint: "s3.amazonaws.com"
+      disable_ssl: true
 
   # Non-federated: sync_manual: false — automatic mode (BackupSync every 10 min).
   - name: "test-s3-sync-manual-false"
@@ -136,3 +141,4 @@ backup_locations:
     s3_config:
       region: "us-east-1"
       endpoint: "s3.amazonaws.com"
+      disable_ssl: true

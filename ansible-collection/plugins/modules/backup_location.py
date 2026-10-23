@@ -55,7 +55,7 @@ options:
             - " - INSPECT_ONE: retrieves details of a specific backup location"
             - " - INSPECT_ALL: lists all backup locations"
             - " - UPDATE_OWNERSHIP: updates ownership settings of a backup location"
-            - " - SYNC: triggers backup sync from object store (federated mode only)"
+            - " - SYNC: triggers an on-demand backup sync from object store (for locations in manual sync mode, including federated)"
         required: true
         type: str
         choices: ['CREATE', 'UPDATE', 'DELETE', 'VALIDATE', 'INSPECT_ONE', 'INSPECT_ALL', 'UPDATE_OWNERSHIP', 'SYNC']
@@ -295,7 +295,7 @@ options:
     sync:
         description:
             - Trigger backup sync from the object store
-            - Only valid in federated deployment mode
+            - Intended for locations in manual sync mode (sync_manual true, or federated mode)
             - Can be used with CREATE or UPDATE operations, or via the SYNC operation
             - The sync is on-demand (not automatic or periodic)
             - Parallel sync triggers while another sync is in progress are not allowed
@@ -307,7 +307,9 @@ options:
             - Controls whether this backup location uses manual or automatic sync.
             - "true: manual mode — periodic BackupSync is skipped; syncs only occur when explicitly triggered."
             - "false: automatic mode — periodic BackupSync runs every 10 minutes."
-            - "omit (not set): on CREATE the server requires this field; on UPDATE the existing value is preserved."
+            - "omit (not set): on CREATE the server requires this field in non-federated mode; on UPDATE the existing value is preserved."
+            - "Federated mode (federated is true) has different rules: the server defaults to manual mode when this is omitted."
+            - "Use the SYNC operation to trigger a sync on demand for a location in manual mode."
         required: false
         type: bool
     sync_timeout:

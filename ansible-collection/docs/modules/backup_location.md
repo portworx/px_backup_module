@@ -31,7 +31,7 @@ The module supports the following operations:
 | INSPECT_ONE      | Get details of a specific backup location                                         |
 | INSPECT_ALL      | List all backup locations                                                         |
 | UPDATE_OWNERSHIP | Update ownership settings                                                         |
-| SYNC             | Trigger backup sync from object store (federated mode only)                       |
+| SYNC             | Trigger on-demand backup sync from object store (manual sync mode)                |
 
 ## Parameters
 
@@ -77,6 +77,15 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 | object_lock_enabled       | boolean    | no       | false                          | Enable object lock for S3 backup locations |                                |
 | cloud_credential_ref      | dictionary | no       | Reference to cloud credentials |                                            |                                |
 
+### Sync Mode Parameters (CREATE / UPDATE)
+
+| Parameter   | Type    | Required | Default | Description                                                                                         |
+| ----------- | ------- | -------- | ------- | --------------------------------------------------------------------------------------------------- |
+| sync_manual | boolean | varies   |         | `true`: manual sync, periodic BackupSync is skipped. `false`: automatic sync, BackupSync every 10 min |
+
+- **Non-federated:** `sync_manual` is required on `CREATE` (the server rejects the request if omitted). On `UPDATE`, omitting it preserves the existing value.
+- **Federated:** only manual mode is supported. `sync_manual: true` is accepted, `sync_manual: false` is rejected by the server, and when omitted the server defaults to `true`.
+
 ### Sync Parameters (SYNC operation)
 
 | Parameter           | Type    | Required | Default | Description                                                 |
@@ -86,9 +95,9 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 | sync_timeout        | integer | no       | 600     | Max seconds to wait for sync completion                     |
 | sync_poll_interval  | integer | no       | 10      | Seconds between status polls when waiting for completion    |
 
-> **Note:** The SYNC operation is only available when PX-Backup is running in federated deployment mode.
+> **Note:** The SYNC operation applies to backup locations in manual sync mode (`sync_manual: true`, or federated mode).
 > Backup sync discovers backups in the object store bucket that are not yet tracked in PX-Backup and imports them.
-> The sync is on-demand (not automatic or periodic). Parallel sync triggers while another sync is in progress are not allowed.
+> The sync is on-demand; periodic BackupSync is skipped for locations in manual mode. Parallel sync triggers while another sync is in progress are not allowed.
 
 ### Validation Parameters (federated / Workload Identity)
 

@@ -119,29 +119,29 @@ backup_locations_update:
   # Was created with sync_manual: false → flip to true
   - name: "test-s3-sync-manual-false"
     location_type: "S3"
-    path: "test"
+    path: "my-backup-bucket"
     cloud_credential_ref:
-      cloud_credential_name: "mybl"
+      cloud_credential_name: "s3-credentials"
     validate_cloud_credential: false
     object_lock_enabled: false
     sync_manual: true
     s3_config:
       region: "us-east-1"
-      endpoint: "s3.example.com"
+      endpoint: "s3.amazonaws.com"
       disable_ssl: true
 
   # Was created with sync_manual: true → flip to false
   - name: "test-s3-sync-manual-true"
     location_type: "S3"
-    path: "test"
+    path: "my-backup-bucket"
     cloud_credential_ref:
-      cloud_credential_name: "mybl"
+      cloud_credential_name: "s3-credentials"
     validate_cloud_credential: false
     object_lock_enabled: false
     sync_manual: false
     s3_config:
       region: "us-east-1"
-      endpoint: "s3.example.com"
+      endpoint: "s3.amazonaws.com"
       disable_ssl: true
 
 
