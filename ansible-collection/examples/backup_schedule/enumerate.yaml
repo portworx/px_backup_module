@@ -29,6 +29,8 @@
           cluster_name_filter: "{{ enumerate_options.cluster_name_filter | default(omit) }}"
           cluster_uid_filter: "{{ enumerate_options.cluster_uid_filter | default(omit) }}"
           backup_object_type: "{{ enumerate_options.backup_object_type | default(omit) }}"
+          max_objects: "{{ enumerate_options.max_objects | default(omit) }}"
+          object_index: "{{ enumerate_options.object_index | default(omit) }}"
         # SSL Certificate Parameters
         ssl_config: "{{ ssl_config.px_backup | default({}) }}"
       register: backup_schedule_result

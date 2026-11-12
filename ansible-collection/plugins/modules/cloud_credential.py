@@ -176,6 +176,14 @@ options:
         description: Labels to attach to the cloud credential
         required: false
         type: dict
+    max_objects:
+        description: Maximum number of objects to return per enumerate response (pagination)
+        type: int
+        required: false
+    object_index:
+        description: Starting index for pagination through enumerate results
+        type: int
+        required: false
     ownership:
         description: Ownership configuration for the cloud credential
         required: false
@@ -281,9 +289,17 @@ def enumerate_cloud_credentials(module, client):
     params = {
         'include_secrets': module.params.get('include_secrets', False)
     }
+    # Pagination: only send when the caller set them.
+    if module.params.get('max_objects') is not None:
+        params['enumerate_options.max_objects'] = str(module.params['max_objects'])
+    if module.params.get('object_index') is not None:
+        params['enumerate_options.object_index'] = str(module.params['object_index'])
     try:
         response = client.make_request('GET', f"v1/cloudcredential/{module.params['org_id']}", params=params)
-        return response.get('cloud_credentials', [])
+        return {
+            "cloud_credentials": response.get('cloud_credentials', []),
+            "total_count": int(response.get('total_count', 0)),
+        }
     except Exception as e:
         module.fail_json(msg=f"Failed to enumerate Cloud Credential: {str(e)}")
 
@@ -410,6 +426,8 @@ def run_module():
         ),
         
         include_secrets=dict(type='bool', default=False),
+        max_objects=dict(type='int', required=False),
+        object_index=dict(type='int', required=False),
         labels=dict(type='dict', required=False),
          # metadata-related arguments
         ownership = dict(
@@ -528,9 +546,12 @@ def run_module():
             result['message'] = "Cloud Credential Ownership updated successfully"
             
         elif operation == 'INSPECT_ALL':
-            cloud_credentials = enumerate_cloud_credentials(module, client)
+            enumerate_result = enumerate_cloud_credentials(module, client)
+            cloud_credentials = enumerate_result['cloud_credentials']
+            total_count = enumerate_result['total_count']
             result['cloud_credentials'] = cloud_credentials
-            result['message'] = f"Found {len(cloud_credentials)} Cloud Credentials"
+            result['total_count'] = total_count
+            result['message'] = f"Found {len(cloud_credentials)} of {total_count} Cloud Credentials"
             
         elif operation == 'INSPECT_ONE':
             cloud_credential = inspect_cloud_credentials(module, client)

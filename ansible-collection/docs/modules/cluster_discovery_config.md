@@ -46,6 +46,15 @@ The module supports the following operations:
 | uid       | string | no       |           | Unique identifier (for exact match operations)  |
 | labels    | dict   | no       |           | Metadata labels for the configuration           |
 
+### Pagination Parameters (INSPECT_ALL operation)
+
+| Parameter    | Type    | Required | Default | Description                                                |
+| ------------ | ------- | -------- | ------- | ---------------------------------------------------------- |
+| max_objects  | integer | no       |         | Maximum number of objects to return; omit to return all    |
+| object_index | integer | no       |         | Index to start from, for paging with max_objects           |
+
+INSPECT_ALL also returns `total_count`, the total number of matching objects across all pages.
+
 ### SSL/TLS Configuration
 
 All modules support comprehensive SSL/TLS certificate management. See [SSL Certificate Configuration](../common/ssl_configuration.md) for:

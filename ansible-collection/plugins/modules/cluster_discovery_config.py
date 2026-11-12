@@ -180,6 +180,14 @@ options:
             client_key:
                 description: Path to client private key file for mutual TLS authentication
                 type: path
+    max_objects:
+        description: Maximum number of objects to return per enumerate response (pagination)
+        type: int
+        required: false
+    object_index:
+        description: Starting index for pagination through enumerate results
+        type: int
+        required: false
 
 requirements:
     - python >= 3.9
@@ -296,7 +304,7 @@ def update_cluster_discovery_config(module: AnsibleModule, client: PXBackupClien
         module.fail_json(msg=f"Failed to update cluster discovery config: {_format_error(e)}")
 
 
-def enumerate_cluster_discovery_configs(module: AnsibleModule, client: PXBackupClient) -> List[Dict[str, Any]]:
+def enumerate_cluster_discovery_configs(module: AnsibleModule, client: PXBackupClient) -> Dict[str, Any]:
     """List all cluster discovery configurations."""
     try:
         query_params = {}
@@ -306,12 +314,21 @@ def enumerate_cluster_discovery_configs(module: AnsibleModule, client: PXBackupC
 
         query_params['include_secrets'] = module.params.get('include_secrets', False)
 
+        # Pagination: only send when the caller set them.
+        if module.params.get('max_objects') is not None:
+            query_params['options.max_objects'] = str(module.params['max_objects'])
+        if module.params.get('object_index') is not None:
+            query_params['options.object_index'] = str(module.params['object_index'])
+
         response = client.make_request(
             method='GET',
             endpoint=f"v1/clusterdiscoveryconfig/{module.params['org_id']}",
             params=query_params
         )
-        return response.get('cluster_discovery_configs', [])
+        return {
+            "cluster_discovery_configs": response.get('cluster_discovery_configs', []),
+            "total_count": int(response.get('total_count', 0)),
+        }
 
     except Exception as e:
         module.fail_json(msg=f"Failed to enumerate cluster discovery configs: {_format_error(e)}")
@@ -616,12 +633,14 @@ def perform_operation(module: AnsibleModule, client: PXBackupClient, operation: 
             )
 
         elif operation == 'INSPECT_ALL':
-            configs = enumerate_cluster_discovery_configs(module, client)
+            enumerate_result = enumerate_cluster_discovery_configs(module, client)
+            configs = enumerate_result['cluster_discovery_configs']
+            total_count = enumerate_result['total_count']
             return OperationResult(
                 success=True,
                 changed=False,
-                data={'cluster_discovery_configs': configs},
-                message=f"Found {len(configs)} cluster discovery configs"
+                data={'cluster_discovery_configs': configs, 'total_count': total_count},
+                message=f"Found {len(configs)} of {total_count} cluster discovery configs"
             )
 
         elif operation == 'INSPECT_ONE':
@@ -725,6 +744,8 @@ def run_module():
         ),
         labels=dict(type='dict', required=False),
         include_secrets=dict(type='bool', required=False, default=False),
+        max_objects=dict(type='int', required=False),
+        object_index=dict(type='int', required=False),
         confirm_update=dict(type='bool', required=False, default=False),
         gardener_kubeconfig=dict(type='str', required=False, no_log=True),
         ssl_config=dict(

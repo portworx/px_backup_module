@@ -575,7 +575,7 @@ def update_ownership(module: AnsibleModule, client: PXBackupClient) -> Tuple[Dic
     except Exception as e:
         module.fail_json(msg=f"Failed to update volume resource only policy ownership: {str(e)}")
 
-def enumerate_volume_resource_only_policies(module: AnsibleModule, client: PXBackupClient) -> List[Dict[str, Any]]:
+def enumerate_volume_resource_only_policies(module: AnsibleModule, client: PXBackupClient) -> Dict[str, Any]:
     """List all volume resource only policies"""
 
     # Determine if we should use the new POST endpoint based on enhanced options
@@ -637,7 +637,10 @@ def enumerate_volume_resource_only_policies(module: AnsibleModule, client: PXBac
             f"v1/volumeresourceonlypolicy/{module.params['org_id']}/enumerate",
             data=request_body
         )
-        return response.get('volume_resource_only_policies', [])
+        return {
+            "volume_resource_only_policies": response.get('volume_resource_only_policies', []),
+            "total_count": int(response.get('total_count', 0)),
+        }
     except Exception as e:
         module.fail_json(msg=f"Failed to enumerate volume resource only policies (POST): {str(e)}")
 
@@ -736,12 +739,14 @@ def perform_operation(module: AnsibleModule, client: PXBackupClient, operation: 
             )
         
         elif operation == 'INSPECT_ALL':
-            policies = enumerate_volume_resource_only_policies(module, client)
+            enumerate_result = enumerate_volume_resource_only_policies(module, client)
+            policies = enumerate_result['volume_resource_only_policies']
+            total_count = enumerate_result['total_count']
             return OperationResult(
                 success=True,
                 changed=False,
-                data={'volume_resource_only_policies': policies},
-                message=f"Found {len(policies)} volume resource only policies"
+                data={'volume_resource_only_policies': policies, 'total_count': total_count},
+                message=f"Found {len(policies)} of {total_count} volume resource only policies"
             )
 
         elif operation == 'INSPECT_ONE':

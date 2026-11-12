@@ -25,6 +25,8 @@
         org_id: "{{ org_id | default('default') }}"
         config_type: "{{ discovery_config_type | default(omit) }}"
         include_secrets: "{{ include_secrets | default(false) }}"
+        max_objects: "{{ max_objects | default(omit) }}"
+        object_index: "{{ object_index | default(omit) }}"
         ssl_config: "{{ ssl_config.px_backup | default({}) }}"
       register: enumerate_result
 

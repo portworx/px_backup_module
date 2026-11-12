@@ -1,0 +1,10 @@
+# ansible-collection/inventory/group_vars/restore/get_cr_download_location.yaml
+---
+# Required variables
+restore_name: "default-restore-with-delete"    # Name of the restore whose CR download location is requested
+restore_uid: ""                                # Optional but recommended for uniquely identifying the restore
+
+# Optional variables
+expiry_seconds: 1800                           # Requested TTL of the signed URL (S3-family only).
+                                               # Server clamps to [60, 604800]; 0/unset uses the server default (1800).
+                                               # Ignored for NFS BackupLocations.
