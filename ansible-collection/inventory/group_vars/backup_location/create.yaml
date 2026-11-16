@@ -142,3 +142,55 @@ backup_locations:
       region: "us-east-1"
       endpoint: "s3.amazonaws.com"
       disable_ssl: true
+
+  # Non-federated: sync_manual omitted — server defaults to manual mode (true).
+  - name: "test-s3-sync-manual-omitted"
+    location_type: "S3"
+    path: "my-backup-bucket"
+    cloud_credential_ref:
+      cloud_credential_name: "s3-credentials"
+    validate_cloud_credential: false
+    object_lock_enabled: false
+    s3_config:
+      region: "us-east-1"
+      endpoint: "s3.amazonaws.com"
+      disable_ssl: true
+
+  # Federated (Azure Workload Identity) cases. No cloud_credential_ref; cluster
+  # identities authenticate against Azure. Replace the Azure and cluster_refs
+  # values with your own before running.
+  # Not included: federated + sync_manual: false, which the server rejects
+  # (only manual mode is supported in federated mode).
+
+  # Federated: sync_manual: true — manual mode (the only mode allowed in federated).
+  - name: "test-azure-fed-sync-manual-true"
+    location_type: "Azure"
+    path: "my-azure-container"
+    object_lock_enabled: false
+    federated: true
+    sync_manual: true
+    s3_config:
+      azure_environment:
+        type: "AZURE_GLOBAL"
+      azure_resource_group_name: "my-rg"
+      azure_account_name: "mystorageaccount"
+      azure_subscription_id: "00000000-0000-0000-0000-000000000000"
+    cluster_refs:
+      - name: "cluster-1"
+        uid: "cluster-1-uid"
+
+  # Federated: sync_manual omitted — server defaults to manual mode (true).
+  - name: "test-azure-fed-sync-manual-omitted"
+    location_type: "Azure"
+    path: "my-azure-container"
+    object_lock_enabled: false
+    federated: true
+    s3_config:
+      azure_environment:
+        type: "AZURE_GLOBAL"
+      azure_resource_group_name: "my-rg"
+      azure_account_name: "mystorageaccount"
+      azure_subscription_id: "00000000-0000-0000-0000-000000000000"
+    cluster_refs:
+      - name: "cluster-1"
+        uid: "cluster-1-uid"

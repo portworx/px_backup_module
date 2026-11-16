@@ -1,7 +1,8 @@
 ---
-# Backup locations to trigger sync (federated mode only)
+# Backup locations to trigger an on-demand sync for.
 # Sync discovers backups in the object store that are not yet tracked in PX-Backup
-# and imports them. This is only available when PX-Backup is running in federated mode.
+# and imports them. Applies to backup locations in manual sync mode
+# (sync_manual: true), which includes every federated backup location.
 backup_locations_sync:
   - name: "prod-azure-federated"
     # uid: "backup-location-uid"  # Optional: specify UID for precise targeting
@@ -20,3 +21,17 @@ backup_locations_sync:
     # cluster_refs:
     #   - name: "cluster-name"
     #     uid: "cluster-uid"
+
+  # --- sync_manual test cases (PB-18144) ---
+  # Manual-mode BLs created via create.yaml (and not flipped by update.yaml).
+
+  # Non-federated BL created without sync_manual (server default: manual).
+  - name: "test-s3-sync-manual-omitted"
+    wait_for_completion: true
+
+  # Federated BL created with sync_manual: true.
+  - name: "test-azure-fed-sync-manual-true"
+    wait_for_completion: true
+    cluster_refs:
+      - name: "cluster-1"
+        uid: "cluster-1-uid"

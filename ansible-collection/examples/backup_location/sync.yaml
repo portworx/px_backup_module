@@ -1,5 +1,5 @@
 ---
-- name: Trigger PX-Backup Location Sync (Federated Mode)
+- name: Trigger PX-Backup Location Sync (Manual Sync Mode)
   hosts: localhost
   gather_facts: true
 
@@ -19,7 +19,7 @@
     - name: Login and fetch Px-Backup token
       include_tasks: "{{ playbook_dir | dirname }}/auth/auth.yaml"
 
-    - name: Trigger backup sync on federated backup locations
+    - name: Trigger backup sync on manual-mode backup locations
       block:
         - name: Trigger backup sync
           backup_location:
