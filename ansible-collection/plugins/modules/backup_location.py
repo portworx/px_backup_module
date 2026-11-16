@@ -11,7 +11,7 @@ This Ansible module manages backup locations in PX-Backup, providing operations 
 - Validating backup locations
 - Inspecting backup locations (single or all)
 - Managing backup location ownership
-- Triggering backup sync from object store (federated mode)
+- Triggering backup sync from object store (locations in manual sync mode)
 
 """
 
@@ -306,9 +306,8 @@ options:
         description:
             - Controls whether this backup location uses manual or automatic sync.
             - "true: manual mode — periodic BackupSync is skipped; syncs only occur when explicitly triggered."
-            - "false: automatic mode — periodic BackupSync runs every 10 minutes."
-            - "omit (not set): on CREATE the server requires this field in non-federated mode; on UPDATE the existing value is preserved."
-            - "Federated mode (federated is true) has different rules: the server defaults to manual mode when this is omitted."
+            - "false: automatic mode — periodic BackupSync runs every 10 minutes. Rejected in federated mode."
+            - "omit (not set): on CREATE the server defaults to manual mode (true) in both federated and non-federated mode; on UPDATE the existing value is preserved."
             - "Use the SYNC operation to trigger a sync on demand for a location in manual mode."
         required: false
         type: bool
@@ -732,7 +731,7 @@ def _build_cluster_refs(refs):
 
 
 def sync_backup_location(module, client):
-    """Trigger backup sync from object store for a federated backup location.
+    """Trigger backup sync from object store for a backup location in manual sync mode.
 
     This triggers an on-demand backup sync by sending a minimal PUT /v1/backuplocation
     request with only sync=true set in the backup_location payload.
@@ -1008,7 +1007,7 @@ def build_backup_location_request(params: Dict[str, Any]) -> Dict[str, Any]:
         }
     }
 
-    # Add sync flag if enabled (for federated mode backup sync)
+    # Add sync flag if enabled (on-demand backup sync for locations in manual sync mode)
     if params.get('sync'):
         request['backup_location']['sync'] = True
 

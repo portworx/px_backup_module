@@ -2,3 +2,10 @@
 # Backup locations to delete
 backup_locations_delete:
   - name: "sample-backup-location-name"
+
+  # --- sync_manual test cases (PB-18144): cleanup ---
+  - name: "test-s3-sync-manual-true"
+  - name: "test-s3-sync-manual-false"
+  - name: "test-s3-sync-manual-omitted"
+  - name: "test-azure-fed-sync-manual-true"
+  - name: "test-azure-fed-sync-manual-omitted"
