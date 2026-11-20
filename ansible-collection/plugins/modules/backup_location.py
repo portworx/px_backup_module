@@ -11,7 +11,7 @@ This Ansible module manages backup locations in PX-Backup, providing operations 
 - Validating backup locations
 - Inspecting backup locations (single or all)
 - Managing backup location ownership
-- Triggering backup sync from object store (federated mode)
+- Triggering backup sync from object store (locations in manual sync mode)
 
 """
 
@@ -306,9 +306,8 @@ options:
         description:
             - Controls whether this backup location uses manual or automatic sync.
             - "true: manual mode — periodic BackupSync is skipped; syncs only occur when explicitly triggered."
-            - "false: automatic mode — periodic BackupSync runs every 10 minutes."
-            - "omit (not set): on CREATE the server requires this field in non-federated mode; on UPDATE the existing value is preserved."
-            - "Federated mode (federated is true) has different rules: the server defaults to manual mode when this is omitted."
+            - "false: automatic mode — periodic BackupSync runs every 10 minutes. Rejected in federated mode."
+            - "omit (not set): on CREATE the server defaults to manual mode (true) in both federated and non-federated mode; on UPDATE the existing value is preserved."
             - "Use the SYNC operation to trigger a sync on demand for a location in manual mode."
         required: false
         type: bool
@@ -732,19 +731,20 @@ def _build_cluster_refs(refs):
 
 
 def sync_backup_location(module, client):
-    """Trigger backup sync from object store for a federated backup location.
+    """Trigger backup sync from object store for a backup location in manual sync mode.
 
     This triggers an on-demand backup sync by sending a minimal PUT /v1/backuplocation
-    request with only sync=true set in the backup_location payload.
+    request: sync=true, plus the existing path and use_workload_identity values.
 
     The PX-Backup server recognizes this as a "sync-only update" when:
       - sync=true
       - type is not set (defaults to Invalid/0 in protobuf)
       - cloud_credential_ref.name is empty
     This bypasses provider-specific validation (e.g., Azure environment type checks)
-    and cloud credential requirements. The server hydrates all required fields
-    (type, path, s3_config, cluster_refs, etc.) from the existing backup location
-    object stored in MongoDB.
+    and cloud credential requirements. The server checks non-updatable fields
+    (path, use_workload_identity) against the stored object before it fills in the
+    remaining fields (type, s3_config, etc.), so those two are copied from the
+    existing backup location and sent unchanged.
 
     In federated mode, PX-Backup will then create a sync BackupLocation CR on an
     application cluster, and Stork will read the object store bucket and create
@@ -773,18 +773,17 @@ def sync_backup_location(module, client):
         bl_uid = params.get('uid') or current_bl.get('metadata', {}).get('uid', '')
 
         # Build a minimal sync-only update request.
-        # IMPORTANT: Send a minimal request with only sync=true.
-        # Do NOT send type, path, s3_config, cloud_credential_ref, or other fields.
+        # Do NOT send type, s3_config, cloud_credential_ref, or other fields.
         # The server treats this as a "sync-only update" (isSyncOnlyUpdate=true)
         # when type==Invalid (not set) and cloud_credential_ref is empty, which
         # skips all provider-specific validation (Azure env type, S3 endpoint, etc.).
-        # The server hydrates all required fields from the existing object via
-        # hydrateWLIAzureConfigFromExisting() and other preservation logic.
+        # Sending type breaks this (e.g. Azure: "environment type can't be edited").
         #
-        # However, use_workload_identity MUST match the existing value because
-        # validateBlNonUpdatableParam() checks it BEFORE the server's hydration
-        # logic runs. If the existing BL has use_workload_identity=true and we
-        # omit it (defaults to false), the server rejects the request.
+        # However, path and use_workload_identity MUST match the existing values
+        # because validateBlNonUpdatableParam() checks them BEFORE the server fills
+        # in the rest from the stored object. Omitting either sends the proto
+        # default ("" / false), which the server rejects as an attempted change
+        # (e.g. "path can not be updated. Current: [<path>] Provided: []").
         bl_info = current_bl.get('backup_location_info', current_bl.get('backup_location', {}))
 
         update_request = {
@@ -795,6 +794,7 @@ def sync_backup_location(module, client):
             },
             "backup_location": {
                 "sync": True,
+                "path": bl_info.get('path', ''),
                 "use_workload_identity": bl_info.get('use_workload_identity', False),
             }
         }
@@ -1008,7 +1008,7 @@ def build_backup_location_request(params: Dict[str, Any]) -> Dict[str, Any]:
         }
     }
 
-    # Add sync flag if enabled (for federated mode backup sync)
+    # Add sync flag if enabled (on-demand backup sync for locations in manual sync mode)
     if params.get('sync'):
         request['backup_location']['sync'] = True
 

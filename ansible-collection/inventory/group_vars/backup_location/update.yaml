@@ -112,7 +112,8 @@ backup_locations_update:
         uid: "cluster-3-uid"
 
   # --- sync_manual UPDATE test cases (PB-18144) ---
-  # Flip sync_manual on the two BLs created via create.yaml.
+  # Flip sync_manual on the two non-federated test BLs created via create.yaml,
+  # and re-send a federated one without sync_manual to check it is preserved.
   # Match location_type / path / cloud_credential_ref / s3_config to what was
   # used at CREATE — UPDATE re-sends the full BL spec.
 
@@ -143,6 +144,23 @@ backup_locations_update:
       region: "us-east-1"
       endpoint: "s3.amazonaws.com"
       disable_ssl: true
+
+  # Federated: update without sync_manual → server keeps the stored value (true).
+  # Not included: federated + sync_manual: false, which the server rejects.
+  - name: "test-azure-fed-sync-manual-omitted"
+    location_type: "Azure"
+    path: "my-azure-container"
+    object_lock_enabled: false
+    federated: true
+    s3_config:
+      azure_environment:
+        type: "AZURE_GLOBAL"
+      azure_resource_group_name: "my-rg"
+      azure_account_name: "mystorageaccount"
+      azure_subscription_id: "00000000-0000-0000-0000-000000000000"
+    cluster_refs:
+      - name: "cluster-1"
+        uid: "cluster-1-uid"
 
 
 # Global update configuration

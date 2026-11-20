@@ -7,5 +7,12 @@ backup_locations_inspect:
   - name: "azure"
     include_secrets: true
 
+  # --- sync_manual test cases (PB-18144): check the stored sync_manual ---
+  - name: "test-s3-sync-manual-true"
+  - name: "test-s3-sync-manual-false"
+  - name: "test-s3-sync-manual-omitted"
+  - name: "test-azure-fed-sync-manual-true"
+  - name: "test-azure-fed-sync-manual-omitted"
+
 # Global inspect configuration
 default_include_secrets: true

@@ -1,6 +1,6 @@
 # Backup Location Module
 
-The backup location module provides comprehensive management of PX-Backup storage locations, including creation, modification, deletion, validation, inspection, ownership management, and backup sync (federated mode) for S3, Azure, Google, and NFS storage destinations.
+The backup location module provides comprehensive management of PX-Backup storage locations, including creation, modification, deletion, validation, inspection, ownership management, and on-demand backup sync (locations in manual sync mode) for S3, Azure, Google, and NFS storage destinations.
 
 ## Synopsis
 
@@ -9,7 +9,7 @@ The backup location module provides comprehensive management of PX-Backup storag
 - Validate backup location configurations
 - Manage backup location ownership and access control
 - Comprehensive inspection and enumeration capabilities
-- Trigger on-demand backup sync from object store (federated mode)
+- Trigger on-demand backup sync from object store (locations in manual sync mode, including all federated locations)
 
 ## Requirements
 
@@ -79,12 +79,14 @@ All modules support comprehensive SSL/TLS certificate management. See [SSL Certi
 
 ### Sync Mode Parameters (CREATE / UPDATE)
 
-| Parameter   | Type    | Required | Default | Description                                                                                         |
-| ----------- | ------- | -------- | ------- | --------------------------------------------------------------------------------------------------- |
-| sync_manual | boolean | varies   |         | `true`: manual sync, periodic BackupSync is skipped. `false`: automatic sync, BackupSync every 10 min |
+| Parameter   | Type    | Required | Default                   | Description                                                                                           |
+| ----------- | ------- | -------- | ------------------------- | ----------------------------------------------------------------------------------------------------- |
+| sync_manual | boolean | no       | `true` (Manual) on CREATE | `true`: manual sync, periodic BackupSync is skipped. `false`: automatic sync, BackupSync every 10 min |
 
-- **Non-federated:** `sync_manual` is required on `CREATE` (the server rejects the request if omitted). On `UPDATE`, omitting it preserves the existing value.
-- **Federated:** only manual mode is supported. `sync_manual: true` is accepted, `sync_manual: false` is rejected by the server, and when omitted the server defaults to `true`.
+- **CREATE:** when omitted, the server defaults `sync_manual` to `true` (Manual) in both federated and non-federated mode.
+- **UPDATE:** omitting `sync_manual` preserves the existing value.
+- **Federated:** only manual mode is supported. `sync_manual: true` is accepted; `sync_manual: false` is rejected by the server.
+- **Upgrade:** backup locations created before `sync_manual` existed are migrated at server startup to `false` (Automatic) in non-federated mode and `true` (Manual) in federated mode, so their sync behaviour does not change.
 
 ### Sync Parameters (SYNC operation)
 
